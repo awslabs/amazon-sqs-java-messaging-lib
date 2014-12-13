@@ -12,10 +12,10 @@
   <description>The Amazon SQS Java Messaging Library holds the Java Message Service compatible classes, that are used
     for communicating with Amazon Simple Queue Service.
   </description>
-  <url>https://github.com/aws/amazon-sqs-java-messaging-lib/</url>
+  <url>https://github.com/awslabs/amazon-sqs-java-messaging-lib/</url>
 
   <scm>
-    <url>https://github.com/aws/amazon-sqs-java-messaging-lib.git</url>
+    <url>https://github.com/awslabs/amazon-sqs-java-messaging-lib.git</url>
   </scm>
 
   <licenses>
