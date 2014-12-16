@@ -11,7 +11,7 @@ for communicating with Amazon Simple Queue Service. This project builds on top o
 * **Sign up for AWS** — Before you begin, you need an AWS account. For more information about creating an AWS account and retrieving your AWS credentials, see [AWS Account and Credentials](http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-setup.html) in the AWS SDK for Java Developer Guide.
 * **Sign up for Amazon SQS** — Go to the Amazon [SQS console](https://console.aws.amazon.com/sqs/home?region=us-east-1) to sign up for the service.
 * **Minimum requirements** — To use the sample application, you'll need Java 1.7+ and [Maven 3](http://maven.apache.org/). For more information about the requirements, see the [Getting Started](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSGettingStartedGuide/Welcome.html) section of the Amazon SQS Developer Guide.
-* **Download** — Download the [latest preview releaseor](https://github.com/awslabs/amazon-sqs-java-messaging-lib/releases) pick it up from Maven:
+* **Download** — Download the [latest preview release or](https://github.com/awslabs/amazon-sqs-java-messaging-lib/releases) pick it up from Maven:
 ```xml
   <dependency>
     <groupId>com.amazonaws</groupId>
