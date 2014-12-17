@@ -92,7 +92,7 @@ public class SQSMessage implements Message {
         this.messageID = String.format(MESSAGE_ID_FORMAT,sqsMessageID);
         Map<String,String> systemAttributes = sqsMessage.getAttributes();
         int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
-
+       
         properties.put(JMSX_DELIVERY_COUNT, new JMSMessagePropertyValue(
                 receiveCount, INT));
         if (receiveCount > 1) {
@@ -135,13 +135,13 @@ public class SQSMessage implements Message {
         }
     }
     
-    protected JMSException convertExceptionToJMSException(Exception e) {
+    protected static JMSException convertExceptionToJMSException(Exception e) {
         JMSException ex = new JMSException(e.getMessage());
         ex.initCause(e);
         return ex;
     }
     
-    protected MessageFormatException convertExceptionToMessageFormatException(Exception e) {
+    protected static MessageFormatException convertExceptionToMessageFormatException(Exception e) {
         MessageFormatException ex = new MessageFormatException(e.getMessage());
         ex.initCause(e);
         return ex;
@@ -327,7 +327,8 @@ public class SQSMessage implements Message {
         }
         T convertedValue = TypeConversionSupport.convert(value, type);
         if (convertedValue == null) {
-            throw new MessageFormatException("Property " + property + " was " + value.getClass().getName() + " and cannot be read as " + type.getName());
+            throw new MessageFormatException("Property " + property + " was " + value.getClass().getName() +
+                                             " and cannot be read as " + type.getName());
         }
         return convertedValue;
     }
@@ -495,9 +496,9 @@ public class SQSMessage implements Message {
     }
 
     /**
-     * Copied from org.apache.activemq.util.TypeConversionSupport to provide
-     * the same property support provided by activemq without creating a
-     * dependency on activemq.
+     * Copied from org.apache.activemq.util.TypeConversionSupport to provide the
+     * same property support provided by activemq without creating a dependency
+     * on activemq.
      */
     public static class TypeConversionSupport {
 
@@ -565,7 +566,7 @@ public class SQSMessage implements Message {
             CONVERSION_MAP.put(new ConversionKey(String.class, Boolean.class), new Converter() {
                 public Object convert(Object value) {
                     String stringValue = (String) value;
-                    if (Boolean.valueOf(stringValue) || INT_TRUE.equals(stringValue)) {
+                    if (Boolean.valueOf(stringValue) || INT_TRUE.equals((String) value)) {
                         return Boolean.TRUE;
                     }
                     return Boolean.FALSE;

@@ -20,6 +20,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.Arrays;
 
 import javax.jms.BytesMessage;
 import javax.jms.JMSException;
@@ -53,8 +54,8 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
     SQSBytesMessage(Acknowledger acknowledger, String queueUrl, Message sqsMessage) throws JMSException {
         super(acknowledger, queueUrl, sqsMessage);
         try {
-            bytes = Base64.decode(sqsMessage.getBody());
-            dataOut.write(bytes);
+        	/** Bytes is set by the reset() */
+            dataOut.write(Base64.decode(sqsMessage.getBody()));
             reset();
         } catch (IOException e) {
             LOG.error("IOException: Message cannot be written", e);
@@ -77,7 +78,7 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
         checkCanRead();
         return bytes.length;
     }
-
+    
     @Override
     public boolean readBoolean() throws JMSException {
         checkCanRead();
@@ -218,7 +219,8 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
     @Override
     public int readBytes(byte[] value, int length) throws JMSException {
         if (length < 0) {
-            throw new IndexOutOfBoundsException("Length bytes to read can't be smaller than 0 but was " + length);
+            throw new IndexOutOfBoundsException("Length bytes to read can't be smaller than 0 but was " +
+                                                length);
         }
         checkCanRead();
         try {
@@ -385,24 +387,21 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
         } else if (value instanceof byte[]) {
             writeBytes((byte[]) value);
         } else {
-            throw new MessageFormatException("Cannot write non-primitive type:" + value.getClass());
+            throw new MessageFormatException("Cannot write non-primitive type: " + value.getClass());
         }
     }
 
     /**
-     * Puts the message body in read-only mode and repositions the stream of bytes to the beginning. 
+     * Puts the message body in read-only mode and repositions the stream of
+     * bytes to the beginning.
      */
     @Override
     public void reset() throws JMSException {
-        try {
-            if (dataOut != null) {
-                dataOut.flush();
-                bytes = bytesOut.toByteArray();
-                dataOut = null;
-                bytesOut = null;
-            }
-        } catch (IOException e) {
-            throw convertExceptionToJMSException(e);
+
+        if (dataOut != null) {
+            bytes = bytesOut.toByteArray();
+            dataOut = null;
+            bytesOut = null;
         }
         dataIn = new DataInputStream(new ByteArrayInputStream(bytes));
     }
@@ -423,7 +422,20 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
         dataOut = new DataOutputStream(bytesOut);
         setBodyWritePermissions(true);
     }
-
+    
+	/**
+	 * Reads the body of message, which can be either the body returned from the
+	 * the receives message as bytes or the bytes put in bytesOut if it is a
+	 * sent message.
+	 */
+	byte[] getBodyAsBytes() throws JMSException {
+		if (bytes != null) {
+			return Arrays.copyOf(bytes, bytes.length);
+		} else {
+			return bytesOut.toByteArray();
+		}
+	}
+    
     private void checkCanRead() throws JMSException {        
         if (bytes == null) {
             throw new MessageNotReadableException("Message is not readable");

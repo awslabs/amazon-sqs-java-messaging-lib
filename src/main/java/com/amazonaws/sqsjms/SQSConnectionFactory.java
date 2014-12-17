@@ -37,6 +37,8 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     private final String endpoint;
     private final String signerRegionOverride;
     private final AWSCredentialsProvider awsCredentialsProvider;
+
+    /** Controls the size of the prefetch buffers used by consumers. */
     private final int numberOfMessagesToPrefetch;
 
     private SQSConnectionFactory(Builder builder) {

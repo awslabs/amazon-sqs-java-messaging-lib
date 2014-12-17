@@ -35,6 +35,7 @@ import com.amazonaws.services.sqs.model.CreateQueueResult;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchResult;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
+import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
@@ -47,14 +48,17 @@ import com.amazonaws.services.sqs.model.SendMessageResult;
  * This is a JMS Wrapper of AmazonSQSClient. This class changes all
  * AmazonServiceException and AmazonClientException into
  * JMSException/JMSSecurityException.
- * 
- * @author jinsrhee
  */
 public class AmazonSQSClientJMSWrapper {
     private static final Log LOG = LogFactory.getLog(AmazonSQSClientJMSWrapper.class);
     
     private static final Set<String> SECURITY_EXCEPTION_ERROR_CODES;
     static {
+        /**
+         * List of exceptions that can classified as security. These exceptions
+         * are not thrown during connection-set-up rather after the service
+         * calls of the AmazonSQSClient
+         */
         SECURITY_EXCEPTION_ERROR_CODES = new HashSet<String>();
         SECURITY_EXCEPTION_ERROR_CODES.add("MissingClientTokenId");
         SECURITY_EXCEPTION_ERROR_CODES.add("InvalidClientTokenId");
@@ -63,7 +67,13 @@ public class AmazonSQSClientJMSWrapper {
     }
 
     private final AmazonSQS amazonSQSClient;
-
+    
+    /**
+     * @param amazonSQSClient
+     *            The AWS SDK Client for SQS.
+     * @throws JMSException
+     *            if the client is null
+     */
     public AmazonSQSClientJMSWrapper(AmazonSQS amazonSQSClient) throws JMSException {
         if (amazonSQSClient == null) {
             throw new JMSException("Amazon SQS client cannot be null");
@@ -75,11 +85,18 @@ public class AmazonSQSClientJMSWrapper {
      * If one uses any other AWS SDK operations other than explicitly listed
      * here, the exceptions thrown by those operations will not be wrapped as
      * JMSExceptions.
+     * @return amazonSQSClient
      */
     public AmazonSQS getAmazonSQSClient() {
         return amazonSQSClient;
     }
 
+    /**
+     * @param endpoint
+     *            The endpoint (ex: "sqs.us-east-1.amazonaws.com") of the region
+     *            specific AWS endpoint this client will communicate with.
+     * @throws JMSException
+     */
     public void setEndpoint(String endpoint) throws JMSException {
         try {
             amazonSQSClient.setEndpoint(endpoint);
@@ -89,6 +106,13 @@ public class AmazonSQSClientJMSWrapper {
         }
     }
     
+    /**
+     * @param region
+     *            The region this client will communicate with. See
+     *            {@link Region#getRegion(com.amazonaws.regions.Regions)} for
+     *            accessing a given region.
+     * @throws JMSException
+     */
     public void setRegion(Region region) throws JMSException {
         try {
             amazonSQSClient.setRegion(region);
@@ -98,6 +122,12 @@ public class AmazonSQSClientJMSWrapper {
         }
     }
     
+    /**
+     * @param deleteMessageRequest
+     *            Container for the necessary parameters to execute the
+     *            deleteMessage service method on AmazonSQS.
+     * @throws JMSException
+     */
     public void deleteMessage(DeleteMessageRequest deleteMessageRequest) throws JMSException {
         try {
             amazonSQSClient.deleteMessage(deleteMessageRequest);
@@ -105,7 +135,14 @@ public class AmazonSQSClientJMSWrapper {
             throw handleException(e, "deleteMessage");
         }
     }
-
+    
+    /**
+     * @param deleteMessageBatchRequest
+     *            Container for the necessary parameters to execute the
+     *            deleteMessageBatch service method on AmazonSQS. This is the
+     *            batch version of deleteMessage. Max batch size is 10.
+     * @throws JMSException
+     */
     public DeleteMessageBatchResult deleteMessageBatch(DeleteMessageBatchRequest deleteMessageBatchRequest) throws JMSException {
         try {
             return amazonSQSClient.deleteMessageBatch(deleteMessageBatchRequest);
@@ -113,7 +150,13 @@ public class AmazonSQSClientJMSWrapper {
             throw handleException(e, "deleteMessageBatch");
         }    
     }
-
+    
+    /**
+     * @param sendMessageRequest
+     *            Container for the necessary parameters to execute the
+     *            sendMessage service method on AmazonSQS.
+     * @throws JMSException
+     */
     public SendMessageResult sendMessage(SendMessageRequest sendMessageRequest) throws JMSException {
         try {
             return amazonSQSClient.sendMessage(sendMessageRequest);
@@ -141,11 +184,25 @@ public class AmazonSQSClientJMSWrapper {
             throw handleException(e, "getQueueUrl");  
         } 
     }
-
+    
+    /**
+     * @param queueName
+     * @return The response from the GetQueueUrl service method, as returned by
+     *         AmazonSQS, which will include queue`s URL
+     * @throws JMSException
+     */
     public GetQueueUrlResult getQueueUrl(String queueName) throws JMSException {
         return getQueueUrl(new GetQueueUrlRequest(queueName));
     }
-
+     
+    /**
+     * @param getQueueUrlRequest
+     *            Container for the necessary parameters to execute the
+     *            getQueueUrl service method on AmazonSQS.
+     * @return The response from the GetQueueUrl service method, as returned by
+     *         AmazonSQS, which will include queue`s URL
+     * @throws JMSException
+     */
     public GetQueueUrlResult getQueueUrl(GetQueueUrlRequest getQueueUrlRequest) throws JMSException {
         try {
             return amazonSQSClient.getQueueUrl(getQueueUrlRequest);
@@ -154,6 +211,15 @@ public class AmazonSQSClientJMSWrapper {
         }    
     }
     
+    /**
+     * This function creates the queue with the default queue attributes. 
+     * 
+     * @param queueName
+     * @return The response from the createQueue service method, as returned by
+     *         AmazonSQS. This call creates a new queue, or returns the URL of
+     *         an existing one.
+     * @throws JMSException
+     */
     public CreateQueueResult createQueue(String queueName) throws JMSException {
         try {
             return amazonSQSClient.createQueue(queueName);
@@ -161,7 +227,48 @@ public class AmazonSQSClientJMSWrapper {
             throw handleException(e, "createQueue");   
         }    
     }
-
+    
+    /**
+     * @param createQueueRequest
+     *            Container for the necessary parameters to execute the
+     *            createQueue service method on AmazonSQS.
+     * @return The response from the createQueue service method, as returned by
+     *         AmazonSQS. This call creates a new queue, or returns the URL of
+     *         an existing one.
+     * @throws JMSException
+     */
+    public CreateQueueResult createQueue(CreateQueueRequest createQueueRequest) throws JMSException {
+        try {
+            return amazonSQSClient.createQueue(createQueueRequest);
+        } catch (AmazonClientException e) {
+            throw handleException(e, "createQueue");   
+        }    
+    }
+    
+    /**
+     * @param receiveMessageRequest
+     *            Container for the necessary parameters to execute the
+     *            receiveMessage service method on AmazonSQS.
+     * @return The response from the ReceiveMessage service method, as returned
+     *         by AmazonSQS.
+     * @throws JMSException
+     */    
+    public ReceiveMessageResult receiveMessage(ReceiveMessageRequest receiveMessageRequest) throws JMSException {
+        try {
+            return amazonSQSClient.receiveMessage(receiveMessageRequest);
+        } catch (AmazonClientException e) {
+            throw handleException(e, "receiveMessage");
+        }
+    }
+    
+    /**
+     * @param changeMessageVisibilityRequest
+     *            Container for the necessary parameters to execute the
+     *            changeMessageVisibility service method on AmazonSQS.
+     * @return The response from the changeMessageVisibility service method, as
+     *         returned by AmazonSQS.
+     * @throws JMSException
+     */
     public void changeMessageVisibility(ChangeMessageVisibilityRequest changeMessageVisibilityRequest) throws JMSException {
         try {
             amazonSQSClient.changeMessageVisibility(changeMessageVisibilityRequest);
@@ -170,14 +277,14 @@ public class AmazonSQSClientJMSWrapper {
         }    
     }
     
-    public ReceiveMessageResult receiveMessage(ReceiveMessageRequest receiveMessageRequest) throws JMSException {
-        try {
-            return amazonSQSClient.receiveMessage(receiveMessageRequest);
-        } catch (AmazonClientException e) {
-            throw handleException(e, "receiveMessage");
-        }
-    }
-
+    /**
+     * @param changeMessageVisibilityBatchRequest
+     *            Container for the necessary parameters to execute the
+     *            changeMessageVisibilityBatch service method on AmazonSQS.
+     * @return The response from the changeMessageVisibilityBatch service
+     *         method, as returned by AmazonSQS.
+     * @throws JMSException
+     */
     public ChangeMessageVisibilityBatchResult changeMessageVisibilityBatch(ChangeMessageVisibilityBatchRequest changeMessageVisibilityBatchRequest)
             throws JMSException {
         try {
@@ -188,19 +295,20 @@ public class AmazonSQSClientJMSWrapper {
     }
 
     /**
-     * Create generic error message for AmazonServiceException.
-     * Message include ActionCall, RequestId, HTTPStatusCode, AmazonErrorCode.
+     * Create generic error message for AmazonServiceException. Message include
+     * ActionCall, RequestId, HTTPStatusCode, AmazonErrorCode.
      */
     private String logAndGetAmazonServiceException(AmazonServiceException ase, String action) {
-        String errorMessage = "AmazonServiceException: " + action + ". RequestId: " + ase.getRequestId() + "\nHTTPStatusCode: "
-                + ase.getStatusCode() + " AmazonErrorCode: " + ase.getErrorCode();
+        String errorMessage = "AmazonServiceException: " + action + ". RequestId: " + ase.getRequestId() +
+                              "\nHTTPStatusCode: " + ase.getStatusCode() + " AmazonErrorCode: " +
+                              ase.getErrorCode();
         LOG.error(errorMessage, ase);
         return errorMessage;
     }
 
     /**
-     * Create generic error message for AmazonClientException.
-     * Message include ActionCall.
+     * Create generic error message for AmazonClientException. Message include
+     * ActionCall.
      */
     private String logAndGetAmazonClientException(AmazonClientException ace, String action) {
         String errorMessage = "AmazonClientException: " + action + ".";

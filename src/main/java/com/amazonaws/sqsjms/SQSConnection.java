@@ -61,8 +61,12 @@ public class SQSConnection implements Connection, QueueConnection {
     private volatile boolean closing = false;
     private volatile boolean running = false;
     
+    /**
+     * Used to determine if any other action was taken on the
+     * connection, that might prevent setting the clientId
+     */
     private volatile boolean actionOnConnectionTaken = false;
-    
+
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<Session, Boolean>());
 
     SQSConnection(AmazonSQSClientJMSWrapper amazonSQSClientJMSWrapper, int numberOfMessagesToPrefetch) {
@@ -335,5 +339,40 @@ public class SQSConnection implements Connection, QueueConnection {
     public ConnectionConsumer createConnectionConsumer(Queue queue, String messageSelector, ServerSessionPool sessionPool, int maxMessages)
             throws JMSException {
         throw new JMSException(SQSJMSClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /*
+     * Unit Test Utility Functions
+     */
+    void setClosed(boolean closed) {
+        this.closed = closed;
+    }
+
+    void setClosing(boolean closing) {
+        this.closing = closing;
+    }
+
+    void setRunning(boolean running) {
+        this.running = running;
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public void setActionOnConnectionTaken(boolean actionOnConnectionTaken) {
+        this.actionOnConnectionTaken = actionOnConnectionTaken;
+    }
+
+    public boolean isActionOnConnectionTaken() {
+        return actionOnConnectionTaken;
+    }
+
+    public Set<Session> getSessions() {
+        return sessions;
+    }
+
+    public Object getStateLock() {
+        return stateLock;
     }
 }

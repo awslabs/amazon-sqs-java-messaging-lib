@@ -14,22 +14,12 @@
  */
 package com.amazonaws.sqsjms.util;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.jms.JMSException;
-
-import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
-import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
-import com.amazonaws.sqsjms.AmazonSQSClientJMSWrapper;
 
 public final class SQSJMSClientUtil {
     
-    private static final int NACK_TIMEOUT = 0;
-
     private static final char HYPHEN = '-';
 
     private static final char UNDERSCORE = '_';

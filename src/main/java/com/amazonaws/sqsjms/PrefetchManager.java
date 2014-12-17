@@ -15,12 +15,14 @@
 package com.amazonaws.sqsjms;
 
 /**
- * This interface is helper to notify when the prefetch should be stopped.
+ * This interface is helper to notify when the prefetch should be resumed.
  */
 public interface PrefetchManager {
 
     /**
-     * Notify the prefetchThread that the message is dispatched from messageQueue when user calls for receive.
+     * Notify the prefetchThread that the message is dispatched from
+     * messageQueue when user calls for receive or message listener onMessage is
+     * called.
      */
     public void messageDispatched();
 }

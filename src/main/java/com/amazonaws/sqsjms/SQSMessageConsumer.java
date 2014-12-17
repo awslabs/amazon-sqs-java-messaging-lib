@@ -42,7 +42,6 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
 
     protected volatile boolean closed = false;
     
-    private final AmazonSQSClientJMSWrapper amazonSQSClient;
     private final SQSDestination sqsDestination;
     private final Acknowledger acknowledger;
     private final SQSSession parentSQSSession;
@@ -61,6 +60,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      */
     private final SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch;
     
+    /** Used to synchronize on calls from message listener on its own consumer */
     private final Object callBackSynchronizer;
     
     SQSMessageConsumer(SQSConnection parentSQSConnection, SQSSession parentSQSSession,
@@ -79,7 +79,6 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
                        SQSSessionCallbackScheduler sqsSessionRunnable, SQSDestination destination,
                        Acknowledger acknowledger, NegativeAcknowledger negativeAcknowledger, ThreadFactory threadFactory,
                        SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch) {
-        this.amazonSQSClient = parentSQSConnection.getWrappedAmazonSQSClient();
         this.parentSQSSession = parentSQSSession;
         this.sqsDestination = destination;
         this.acknowledger = acknowledger;

@@ -20,13 +20,14 @@ import com.amazonaws.sqsjms.AmazonSQSClientJMSWrapper;
 import com.amazonaws.sqsjms.SQSSession;
 
 /**
- * This enum specifies the different possible modes of acknowledgment under
- * CLIENT_ACKNOWLEDGE Mode.
- * ACK_AUTO In this mode, every time the user receives a message it is acknowledged.
- * This is implemented by consumer and does not need any further processing.
- * In ACK_UNORDERED mode, messages can be acknowledged in any order.
- * In ACK_RANGE mode, all messages received before that message including that
- * one are acknowledged.
+ * This enum specifies the different possible modes of acknowledgment:
+ * In ACK_AUTO mode, every time the user receives
+ * a message, it is acknowledged. This is implemented by consumer and does not
+ * need any further processing. 
+ * In ACK_UNORDERED mode, messages can be
+acknowledged in any order. 
+ * In ACK_RANGE mode, all messages received before
+ * that message including that one are acknowledged.
  */
 public enum AcknowledgeMode {
     ACK_AUTO, ACK_UNORDERED, ACK_RANGE;

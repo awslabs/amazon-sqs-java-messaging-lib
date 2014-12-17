@@ -40,14 +40,15 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         
     private final AmazonSQSClientJMSWrapper amazonSQSClient;
     private final String queueUrl;
+
     /**
-     * Maximum number of MessageConsumer can prefetch 
-     */  
+     * Maximum number messages, which MessageConsumer can prefetch
+     */ 
     private final int numberOfMessagesToPrefetch;
 
     private final SQSDestination sqsDestination;
     /**
-     * Internal buffer of Messages. The size of queue is MAX_BATCH by default
+     * Internal buffer of Messages. The size of queue is MIN_BATCH by default
      * and it can be changed by user.
      */
     protected final ArrayDeque<MessageManager> messageQueue;
@@ -69,15 +70,16 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     protected volatile boolean running = false;
     
+    /** Controls the number of retry attempts to the SQS */
     protected int retriesAttempted = 0;
 
     private final Object stateLock = new Object();
 
     /**
      * AWS SQS SDK with default backup strategy already re-tries 3 times
-     * exponentially with a max delay of 2 seconds and 25ms delayInterval. This
-     * backoff is on top of that to let the prefetch thread backoff after SDK
-     * completes re-tries.
+     * exponentially. This backoff is on top of that to let the prefetch thread
+     * backoff after SDK completes re-tries with a max delay of 2 seconds and
+     * 25ms delayInterval.
      */
     protected ExponentialBackoffStrategy backoffStrategy = new ExponentialBackoffStrategy(25,25,2000);
     
@@ -98,16 +100,16 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     MessageListener getMessageListener() {
         return messageListener;
     }
-    /**
-     * TODO If messageListener becomes null later, nack the messages
-     * immediately.
-     */
+
     protected void setMessageListener(MessageListener messageListener) {
         this.messageListener = messageListener;
         if (messageListener == null || isClosed()) {
             return;
         }
         synchronized (stateLock) {
+            if (!running || isClosed()) {
+                return;
+            }
             while (!messageQueue.isEmpty()) {
                 sqsSessionRunnable.scheduleCallBack(messageListener, messageQueue.pollFirst());
             }

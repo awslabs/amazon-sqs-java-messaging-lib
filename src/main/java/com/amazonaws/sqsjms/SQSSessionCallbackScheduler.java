@@ -103,37 +103,34 @@ public class SQSSessionCallbackScheduler implements Runnable {
                      * continue to prefetch
                      */
                     messageManager.getPrefetchManager().messageDispatched();
-                    int ackMode= acknowledgeMode.getOriginalAcknowledgeMode();
+                    int ackMode = acknowledgeMode.getOriginalAcknowledgeMode();
                     synchronized (synchronizer) {
-                        boolean tryNack = false;
+                        boolean tryNack = true;
                         try {
                             if (messageListener != null) {
                                 if (ackMode != Session.AUTO_ACKNOWLEDGE) {
                                     acknowledger.notifyMessageReceived(message);
                                 }
-                                messageListener.onMessage(message);
+                                boolean callbackFailed = false;
                                 try {
-                                    if (ackMode == Session.AUTO_ACKNOWLEDGE) {
-                                        message.acknowledge();
+                                    messageListener.onMessage(message);
+                                } catch (Throwable ex) {
+                                    LOG.info("Exception thrown from onMessage callback for message " +
+                                             message.getSQSMessageId(), ex);
+                                    callbackFailed = true;
+                                } finally {
+                                    if (!callbackFailed) {
+                                        if (ackMode == Session.AUTO_ACKNOWLEDGE) {
+                                            message.acknowledge();
+                                        }
+                                        tryNack = false;
                                     }
-                                } catch (JMSException ex) {
-                                    LOG.warn(
-                                            "Unable to ack the messageId " +
-                                                    message.getSQSMessageId(), ex);
-                                    tryNack = true;
                                 }
-                            } else {
-                                /**
-                                 * Nack the message if message listener becomes
-                                 * null after scheduled for delivery
-                                 */
-                                tryNack = true;
                             }
-                        } catch (Throwable ex) {
-                            LOG.error(
-                                    "Caught exception while processing the messageId " +
+                        } catch (JMSException ex) {
+                            LOG.warn(
+                                    "Unable to complete message dispatch for the message " +
                                             message.getSQSMessageId(), ex);
-                            tryNack = true;
                         } finally {
                             if (tryNack) {
                                 try {
@@ -141,13 +138,11 @@ public class SQSSessionCallbackScheduler implements Runnable {
                                             message.getQueueUrl(),
                                             Collections.singletonList(message.getReceiptHandle()));
                                 } catch (JMSException ex) {
-                                    LOG.info(
-                                            "Unable to nack the messageId " +
-                                                    message.getSQSMessageId());
+                                    LOG.warn("Unable to nack the message " + message.getSQSMessageId(), ex);
                                 }
                             }
                         }
-                        
+
                         /**
                          * The consumer close is delegated to the session thread
                          * if consumer close is called by its message listener's
@@ -159,8 +154,9 @@ public class SQSSessionCallbackScheduler implements Runnable {
                         }
                         synchronizer.notifyAll();
                     }
-                    
-                } 
+                }
+            } catch (Throwable ex) {
+                LOG.error("Unexpected exception thrown during the run of the scheduled callback", ex);
             } finally {
                 session.finishedCallback();
             }
@@ -204,8 +200,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
                     negativeAcknowledger.bulkAction(nackMessageIdentifiers, nackMessageIdentifiers.size());
                 }
             } catch (JMSException e) {
-                LOG.warn(
-                        "Caught exception while nacking the remaining messages on session callback queue", e);
+                LOG.warn("Caught exception while nacking the remaining messages on session callback queue", e);
             }
         }
     }   

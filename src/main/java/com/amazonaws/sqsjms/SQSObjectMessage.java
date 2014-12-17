@@ -80,7 +80,7 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
         setBodyWritePermissions(true);
     }
 
-    protected Serializable deserialize(String serialized) throws JMSException {
+    protected static Serializable deserialize(String serialized) throws JMSException {
         if (serialized == null) {
             return null;
         }
@@ -108,7 +108,7 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
         return deserializedObject;
     }
 
-    protected String serialize(Serializable serializable) throws JMSException {
+    protected static String serialize(Serializable serializable) throws JMSException {
         if (serializable == null) {
             return null;
         }

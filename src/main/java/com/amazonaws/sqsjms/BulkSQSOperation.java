@@ -24,14 +24,19 @@ import javax.jms.JMSException;
 
 import com.amazonaws.sqsjms.acknowledge.SQSMessageIdentifier;
 
+/**
+ * This is used by different acknowledgers that requires partitioning of the
+ * list, and execute actions on the partitions
+ */
 public abstract class BulkSQSOperation {
+    
     /**
-     * Bulk action on List of messageIdentifier. Up to the indexOfMessage.
+     * Bulk action on list of message identifiers up to the indexOfMessage.
      */
     public void bulkAction(List<SQSMessageIdentifier> messageIdentifierList, int indexOfMessage)
             throws JMSException {
         Map<String, List<String>> receiptHandleWithSameQueueUrl = new HashMap<String, List<String>>();
-
+        
         // Add all messages up to and including requested message into Map.
         // Map contains key as queueUrl and value as list receiptHandles from
         // that queueUrl.

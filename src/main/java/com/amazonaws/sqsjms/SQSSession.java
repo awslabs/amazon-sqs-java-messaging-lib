@@ -54,7 +54,6 @@ import com.amazonaws.sqsjms.acknowledge.Acknowledger;
 import com.amazonaws.sqsjms.acknowledge.NegativeAcknowledger;
 import com.amazonaws.sqsjms.util.SQSJMSClientThreadFactory;
 
-
 public class SQSSession implements Session, QueueSession {
     private static final Log LOG = LogFactory.getLog(SQSSession.class);
 
@@ -147,7 +146,7 @@ public class SQSSession implements Session, QueueSession {
 
         callBackSynchronizer = sqsSessionRunnable.getSynchronizer();
     }
-
+    
     SQSConnection getParentConnection() {
         return parentSQSConnection;
     }
@@ -260,7 +259,9 @@ public class SQSSession implements Session, QueueSession {
                 for (MessageConsumer messageConsumer : messageConsumers) {
                     messageConsumer.close();
                 }
-
+                
+                /** Nack the messages that were delivered but not acked */
+                recover();
                 try {
                     if (executor != null) {
                         LOG.info("Shutting down " + SESSION_EXECUTOR_NAME + " executor");
@@ -331,7 +332,7 @@ public class SQSSession implements Session, QueueSession {
         SQSMessageProducer messageProducer;
         synchronized (stateLock) {
             checkClosing();
-            messageProducer = new SQSMessageProducer(parentSQSConnection, this, (SQSDestination) destination);
+            messageProducer = new SQSMessageProducer(amazonSQSClient, this, (SQSDestination) destination);
             messageProducers.add(messageProducer);
         }
         return messageProducer;
@@ -547,7 +548,7 @@ public class SQSSession implements Session, QueueSession {
     public MapMessage createMapMessage() throws JMSException {
         throw new JMSException(SQSJMSClientConstants.UNSUPPORTED_METHOD);
     }
-    
+
     static class CallbackEntry {
         private final MessageListener messageListener;
         private final MessageManager messageManager;
@@ -638,6 +639,10 @@ public class SQSSession implements Session, QueueSession {
 
     public void setRunning(boolean running) {
         this.running = running;
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 
     public Object getCallBackSynchronizer() {

@@ -43,7 +43,7 @@ public class AutoAcknowledger implements Acknowledger {
 
     @Override
     public void notifyMessageReceived(SQSMessage message) throws JMSException {
-        // When notify message is receive AutoAck mode will ack the message. 
+        // When notify message is received AutoAck mode will ack the message. 
         // Ack the message while close is still running.
         acknowledge(message);
     }

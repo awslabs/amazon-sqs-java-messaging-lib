@@ -41,49 +41,43 @@ import com.amazonaws.sqsjms.SQSMessage.JMSMessagePropertyValue;
 public class SQSMessageProducer implements MessageProducer, QueueSender {
     private static final Log LOG = LogFactory.getLog(SQSMessageProducer.class);
 
-    /** This field is not actually used. It's implemented as a dummy. */
+    /** This field is not actually used. */
     private long timeToLive;
-    /** This field is not actually used. It's implemented as a dummy. */
+    /** This field is not actually used. */
     private int defaultPriority;
-    /** This field is not actually used. It's implemented as a dummy. */
+    /** This field is not actually used. */
     private int deliveryMode;
-    /** This field is not actually used. It's implemented as a dummy. */
+    /** This field is not actually used. */
     private boolean disableMessageTimestamp;
-    /** This field is not actually used. It's implemented as a dummy. */
+    /** This field is not actually used. */
     private boolean disableMessageID;
 
     /**
      * State of MessageProducer.
      * True if MessageProducer is closed.
      */
-    private final AtomicBoolean closed = new AtomicBoolean(false);
+    final AtomicBoolean closed = new AtomicBoolean(false);
 
     private final AmazonSQSClientJMSWrapper amazonSQSClient;
     private final SQSDestination sqsDestination;
     private final SQSSession parentSQSSession;
 
-    SQSMessageProducer(SQSConnection parentSQSConnection, SQSSession parentSQSSession,
+    SQSMessageProducer(AmazonSQSClientJMSWrapper amazonSQSClient, SQSSession parentSQSSession,
                        SQSDestination destination) throws JMSException {
         this.sqsDestination = destination;
-        this.amazonSQSClient = parentSQSConnection.getWrappedAmazonSQSClient();
+        this.amazonSQSClient = amazonSQSClient;
         this.parentSQSSession = parentSQSSession;
     }
 
-    private void sendInternal(Queue queue, Message message) throws JMSException {
-        checkClosed();   
+    void sendInternal(Queue queue, Message message) throws JMSException {
+        checkClosed();
         String sqsMessageBody = null;
         String messageType = null;
         if (message instanceof SQSMessage) {           
             message.setJMSDestination(queue);
             if (message instanceof SQSBytesMessage) {
-                SQSBytesMessage bytesMessage = (SQSBytesMessage) message;
-                bytesMessage.reset();
-                int length = (int) bytesMessage.getBodyLength();
-                byte[] bytes = new byte[length];
-                bytesMessage.readBytes(bytes, length);               
-                sqsMessageBody = Base64.encodeAsString(bytes);
+                sqsMessageBody = Base64.encodeAsString(((SQSBytesMessage) message).getBodyAsBytes());
                 messageType = SQSMessage.BYTE_MESSAGE_TYPE;
-
             } else if (message instanceof SQSObjectMessage) {
                 sqsMessageBody = ((SQSObjectMessage) message).getMessageBody();
                 messageType = SQSMessage.OBJECT_MESSAGE_TYPE;
@@ -91,7 +85,6 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
                 sqsMessageBody = ((SQSTextMessage) message).getText();
                 messageType = SQSMessage.TEXT_MESSAGE_TYPE;
             }
-
         } else {
             throw new MessageFormatException(
                     "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");
@@ -103,14 +96,14 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         addMessageTypeReservedAttribute(messageAttributes, (SQSMessage) message, messageType);
         SendMessageRequest sendMessageRequest = new SendMessageRequest(((SQSDestination) queue).getQueueUrl(), sqsMessageBody);
         sendMessageRequest.setMessageAttributes(messageAttributes);
-        
+
         String messageId = amazonSQSClient.sendMessage(sendMessageRequest).getMessageId();
         LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
         /** TODO: Do not support disableMessageID for now.*/
-        message.setJMSMessageID(String.format(SQSJMSClientConstants.MESSAGE_ID_FORMAT, messageId));    
+        message.setJMSMessageID(String.format(SQSJMSClientConstants.MESSAGE_ID_FORMAT, messageId));
         ((SQSMessage)message).setSQSMessageId(messageId);
     }
-    
+
     @Override
     public Queue getQueue() throws JMSException {
         return sqsDestination;
@@ -125,7 +118,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         checkIfDestinationAlreadySet();
         sendInternal(queue, message);
     }
-    
+
     /**
      * Not verified on the client side, but SQS Attribute names must be
      * valid letter or digit on the basic multilingual plane in addition to
@@ -133,13 +126,18 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      * empty, thus an attribute name may neither start nor end in '.'. And it
      * may not contain "..".
      */
-    private Map<String, MessageAttributeValue> propertyToMessageAttribute(SQSMessage message)
+    Map<String, MessageAttributeValue> propertyToMessageAttribute(SQSMessage message)
             throws JMSException {
         Map<String, MessageAttributeValue> messageAttributes = new HashMap<String, MessageAttributeValue>();
         Enumeration<String> propertyNames = message.getPropertyNames();
-        
+
         while (propertyNames.hasMoreElements()) {
             String propertyName = propertyNames.nextElement();
+
+            // This is generated from SQS message attribute "ApproximateReceiveCount"
+            if (propertyName.equals(SQSJMSClientConstants.JMSX_DELIVERY_COUNT)) {
+                continue;
+            }
             JMSMessagePropertyValue propertyObject = message.getJMSMessagePropertyValue(propertyName);
             MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
 
@@ -150,7 +148,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         }
         return messageAttributes;
     }
-    
+
     /**
      * Adds the message type attribute during send as part of the send message
      * request
@@ -162,10 +160,10 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
 
         messageAttributeValue.setDataType(SQSJMSClientConstants.STRING);
         messageAttributeValue.setStringValue(value);
-        
+
         /**
          * This will override the existing attribute if exists. Everything that
-         * has prefix JMS_ is reserved for JMS Provider, but the user sets that
+         * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
          * attribute, it will be overwritten.
          */
         messageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
@@ -188,10 +186,10 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
 
     @Override
     public void close() throws JMSException {
-        
+
         if (closed.compareAndSet(false, true)) {
             parentSQSSession.removeProducer(this);
-        }       
+        }
     }
 
     @Override
@@ -292,17 +290,25 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     public long getTimeToLive() throws JMSException {
         return timeToLive;
     }
-    
-    private void checkClosed() throws IllegalStateException {
+
+    void checkClosed() throws IllegalStateException {
         if (closed.get()) {
             throw new IllegalStateException("The producer is closed.");
         }
     }
-    
-    private void checkIfDestinationAlreadySet() {
+
+    void checkIfDestinationAlreadySet() {
         if (sqsDestination != null) {
             throw new UnsupportedOperationException(
                     "MessageProducer already specified a destination at creation time.");
         }
+    }
+
+    /*
+     * Unit Tests Utility Functions
+     */
+
+    AtomicBoolean isClosed() {
+        return closed;
     }
 }
