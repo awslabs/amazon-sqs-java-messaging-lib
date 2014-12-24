@@ -116,13 +116,18 @@ public class SQSSession implements Session, QueueSession {
     private final ExecutorService executor;
 
     private final Object stateLock = new Object();
+    
+    /**
+     * Used to determine if the caller thread is the session callback thread.
+     * Guarded by stateLock
+     */
+    private Thread activeCallbackSessionThread;
 
     /**
-     * Counting how many callback threads are currently working.
+     * Used to determine the active consumer, whose is dispatching the message
+     * on the callback. Guarded by stateLock
      */
-    private int callbackCounter = 0;
-
-    final Object callBackSynchronizer;
+    private SQSMessageConsumer activeConsumerInCallback = null;
 
     SQSSession(SQSConnection parentSQSConnection, AcknowledgeMode acknowledgeMode) throws JMSException{
         this(parentSQSConnection, acknowledgeMode,
@@ -143,12 +148,20 @@ public class SQSSession implements Session, QueueSession {
         this.messageProducers = messageProducers;
 
         executor.execute(sqsSessionRunnable);
-
-        callBackSynchronizer = sqsSessionRunnable.getSynchronizer();
     }
     
     SQSConnection getParentConnection() {
         return parentSQSConnection;
+    }
+    
+    /**
+     * True if the current thread is the callback thread
+     * @return
+     */
+    boolean isActiveCallbackSessionThread() {
+        synchronized (stateLock) {
+            return activeCallbackSessionThread == Thread.currentThread();
+        }
     }
 
     @Override
@@ -221,18 +234,17 @@ public class SQSSession implements Session, QueueSession {
         if (closed) {
             return;
         }
-        synchronized (callBackSynchronizer) {
-            /**
-             * A MessageListener must not attempt to close its own Session as
-             * this would lead to deadlock
-             */
-            if (Thread.currentThread() == sqsSessionRunnable.getCurrentThread()) {
-                throw new IllegalStateException(
-                        "MessageListener must not attempt to close its own Session to prevent potential deadlock issues");
-            }
-            doClose();
-            callBackSynchronizer.notifyAll();
+        
+        /**
+         * A MessageListener must not attempt to close its own Session as
+         * this would lead to deadlock
+         */
+        if (isActiveCallbackSessionThread()) {
+            throw new IllegalStateException(
+                    "MessageListener must not attempt to close its own Session to prevent potential deadlock issues");
         }
+        
+        doClose();
     }
 
     void doClose() throws JMSException {
@@ -249,8 +261,6 @@ public class SQSSession implements Session, QueueSession {
 
         if (shouldClose) {
             try {
-                sqsSessionRunnable.close();
-
                 parentSQSConnection.removeSession(this);
 
                 for (MessageProducer messageProducer : messageProducers) {
@@ -260,18 +270,16 @@ public class SQSSession implements Session, QueueSession {
                     messageConsumer.close();
                 }
                 
-                /** Nack the messages that were delivered but not acked */
-                recover();
                 try {
                     if (executor != null) {
                         LOG.info("Shutting down " + SESSION_EXECUTOR_NAME + " executor");
 
                         /** Shut down executor. */
                         executor.shutdown();
-
-                        /** Wait 5 more seconds for the callbacks if necessary */
-                        waitForAllCallbackComplete(5000);
-
+                        
+                        waitForCallbackComplete();
+                        
+                        sqsSessionRunnable.close();
 
                         if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
 
@@ -284,6 +292,9 @@ public class SQSSession implements Session, QueueSession {
                 } catch (InterruptedException e) {
                     LOG.error("Interrupted while closing the session.", e);
                 }
+                
+                /** Nack the messages that were delivered but not acked */
+                recover();
             } finally {
                 synchronized (stateLock) {
                     closed = true;
@@ -350,7 +361,7 @@ public class SQSSession implements Session, QueueSession {
             messageConsumer = createSQSMessageConsumer((SQSDestination) destination);
             messageConsumers.add(messageConsumer);
             if( running ) {
-                messageConsumer.start();
+                messageConsumer.startPrefetch();
             }
         }
         return messageConsumer;
@@ -413,49 +424,54 @@ public class SQSSession implements Session, QueueSession {
         messageProducers.remove(producer);    
     }
     
-    void startingCallback() throws InterruptedException {
+    void startingCallback(SQSMessageConsumer consumer) throws InterruptedException, JMSException {
         if (closed) {
             return;
         }
         synchronized (stateLock) {
+            if (activeConsumerInCallback != null) {
+                throw new IllegalStateException("Callback already in progress");
+            }
+            assert activeCallbackSessionThread == null;
+
             while (!running && !closing) {
                 try {
                     stateLock.wait();
-                } catch(InterruptedException e) {
+                } catch (InterruptedException e) {
                     LOG.error("Interrupted while waiting on session start", e);
                     throw e;
                 }
             }
-            if (!closing) {
-                callbackCounter++;
-            }
+            checkClosing();
+            activeConsumerInCallback = consumer;
+            activeCallbackSessionThread = Thread.currentThread();
         }
     }
     
-    void finishedCallback() {
+    void finishedCallback() throws JMSException {
         synchronized (stateLock) {
-            callbackCounter--;
-            if (callbackCounter <= 0) {
-                stateLock.notifyAll();
+            if (activeConsumerInCallback == null) {
+                throw new IllegalStateException("Callback not in progress");
             }
-        }
-    }
-    
-    void waitForAllCallbackComplete(long timeoutMillis) throws InterruptedException{
-        long endTime = System.currentTimeMillis() + timeoutMillis;
-        synchronized (stateLock) {
-            while (callbackCounter > 0) {
-                try {
-                    long timeToWait = endTime - System.currentTimeMillis();
-                    if (timeToWait <= 0) {
-                        break;
-                    }
-                    stateLock.wait(timeToWait);
-                } catch (InterruptedException e) {
-                    throw e;
-                }
-            }
+            activeConsumerInCallback = null;
+            activeCallbackSessionThread = null;
             stateLock.notifyAll();
+        }
+    }
+    
+    void waitForConsumerCallbackToComplete(SQSMessageConsumer consumer) throws InterruptedException {
+        synchronized (stateLock) {
+            while (activeConsumerInCallback == consumer) {
+                stateLock.wait();
+            }
+        }
+    }
+    
+    void waitForCallbackComplete() throws InterruptedException {
+        synchronized (stateLock) {
+            while (activeConsumerInCallback != null) {
+                stateLock.wait();
+            }
         }
     }
 
@@ -591,7 +607,7 @@ public class SQSSession implements Session, QueueSession {
             checkClosing();
             running = true;            
             for (SQSMessageConsumer messageConsumer : messageConsumers) {
-                messageConsumer.start();
+                messageConsumer.startPrefetch();
             }
             stateLock.notifyAll();
         }
@@ -603,7 +619,12 @@ public class SQSSession implements Session, QueueSession {
             checkClosing();
             running = false;
             for (SQSMessageConsumer messageConsumer : messageConsumers) {
-                messageConsumer.stop();
+                messageConsumer.stopPrefetch();
+            }
+            try {
+                waitForCallbackComplete();
+            } catch (InterruptedException e) {
+                LOG.error("Interrupted while waiting on session stop", e);
             }
             stateLock.notifyAll();
         }
@@ -613,20 +634,24 @@ public class SQSSession implements Session, QueueSession {
      * Unit Tests Utility Functions
      */
 
-    Object getCallbackCounter() {
-        return callbackCounter;
+    boolean isCallbackActive() {
+        return activeConsumerInCallback != null;
     }
-
-    void setCallbackCounter(int callbackCounter) {
-        this.callbackCounter = callbackCounter;
+    
+    void setActiveConsumerInCallback(SQSMessageConsumer consumer) {
+        activeConsumerInCallback = consumer;
     }
-
+    
     Object getStateLock() {
         return stateLock;
     }
 
     boolean isClosed() {
         return closed;
+    }
+    
+    boolean isClosing() {
+        return closing;
     }
 
     void setClosed(boolean closed) {
@@ -643,10 +668,6 @@ public class SQSSession implements Session, QueueSession {
 
     public boolean isRunning() {
         return running;
-    }
-
-    public Object getCallBackSynchronizer() {
-        return callBackSynchronizer;
     }
 
 }

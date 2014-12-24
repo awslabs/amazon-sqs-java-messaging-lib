@@ -25,4 +25,6 @@ public interface PrefetchManager {
      * called.
      */
     public void messageDispatched();
+    
+    public SQSMessageConsumer getMessageConsumer();
 }

@@ -18,18 +18,18 @@ package com.amazonaws.sqsjms.util;
 public class ExponentialBackoffStrategy {
 
     private long delayInterval;
-    private long minDelay;
+    private long initialDelay;
     private long maxDelay;
 
-    public ExponentialBackoffStrategy(long delayInterval, long minDelay, long maxDelay) {
+    public ExponentialBackoffStrategy(long delayInterval, long initialDelay, long maxDelay) {
         this.delayInterval = delayInterval;
         this.maxDelay = maxDelay;
-        this.minDelay = minDelay;
+        this.initialDelay = initialDelay;
     }
 
     public long delayBeforeNextRetry(int retriesAttempted) {
         if (retriesAttempted < 1) {
-            return minDelay;
+            return initialDelay;
         }
 
         long delay = (1 << (retriesAttempted - 1)) * delayInterval;

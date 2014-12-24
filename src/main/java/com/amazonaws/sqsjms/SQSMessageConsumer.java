@@ -60,9 +60,6 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      */
     private final SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch;
     
-    /** Used to synchronize on calls from message listener on its own consumer */
-    private final Object callBackSynchronizer;
-    
     SQSMessageConsumer(SQSConnection parentSQSConnection, SQSSession parentSQSSession,
                        SQSSessionCallbackScheduler sqsSessionRunnable, SQSDestination destination,
                        Acknowledger acknowledger, NegativeAcknowledger negativeAcknowledger, ThreadFactory threadFactory) {
@@ -84,12 +81,11 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
         this.acknowledger = acknowledger;
         this.sqsSessionRunnable = sqsSessionRunnable;
         this.sqsMessageConsumerPrefetch = sqsMessageConsumerPrefetch;
+        this.sqsMessageConsumerPrefetch.setMessageConsumer(this);
         this.negativeAcknowledger = negativeAcknowledger;
 
         prefetchExecutor = Executors.newSingleThreadExecutor(threadFactory);
         prefetchExecutor.execute(sqsMessageConsumerPrefetch);
-
-        callBackSynchronizer = sqsSessionRunnable.getSynchronizer();
     }
 
 
@@ -139,15 +135,13 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
         if (closed) {
             return;
         }
-        synchronized (callBackSynchronizer) {
-            if (Thread.currentThread() == sqsSessionRunnable.getCurrentThread()) {
-                sqsSessionRunnable.setConsumerCloseAfterCallback(this);
-                return;
-            }
-
-            doClose();
-            callBackSynchronizer.notifyAll();
+        
+        if (parentSQSSession.isActiveCallbackSessionThread()) {
+            sqsSessionRunnable.setConsumerCloseAfterCallback(this);
+            return;
         }
+        
+        doClose();
     }
     
     void doClose() {
@@ -160,21 +154,24 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
         parentSQSSession.removeConsumer(this);
 
         try {
-            LOG.info("Shutting down " + SQSSession.CONSUMER_PREFETCH_EXECUTER_NAME + " executor");
-
-            /** Shut down executor. */
-            prefetchExecutor.shutdown();
+            if (!prefetchExecutor.isShutdown()) {
+                LOG.info("Shutting down " + SQSSession.CONSUMER_PREFETCH_EXECUTER_NAME + " executor");
+                /** Shut down executor. */
+                prefetchExecutor.shutdown();
+            }
+            
+            parentSQSSession.waitForConsumerCallbackToComplete(this);
 
             if (!prefetchExecutor.awaitTermination(PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME, TimeUnit.SECONDS)) {
 
-                LOG.warn("Can't terminate executor service " +
-                         SQSSession.CONSUMER_PREFETCH_EXECUTER_NAME + " after " + 60 +
-                         " seconds, some running threads will be shutdown immediately");
+                LOG.warn("Can't terminate executor service " + SQSSession.CONSUMER_PREFETCH_EXECUTER_NAME +
+                         " after " + 60 + " seconds, some running threads will be shutdown immediately");
                 prefetchExecutor.shutdownNow();
             }
         } catch (InterruptedException e) {
             LOG.error("Interrupted while closing the consumer.", e);
         }
+
         closed = true;
     }
     
@@ -196,22 +193,16 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
         throw new JMSException(SQSJMSClientConstants.UNSUPPORTED_METHOD);
     }
     
-    /** This call blocks until message listener in progress have completed. */
-    protected void stop() {
+    /** This stops the prefetching */
+    protected void stopPrefetch() {
         if (!closed) {
-            synchronized (callBackSynchronizer) {
-                sqsMessageConsumerPrefetch.stop();
-                callBackSynchronizer.notifyAll();
-            }
+            sqsMessageConsumerPrefetch.stop();
         }
     }
 
-    protected void start() {
+    protected void startPrefetch() {
         if (!closed) {
-            synchronized (callBackSynchronizer) {
-                sqsMessageConsumerPrefetch.start();
-                callBackSynchronizer.notifyAll();
-            }
+            sqsMessageConsumerPrefetch.start();
         }
     }
        

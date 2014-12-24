@@ -55,6 +55,8 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     private final Acknowledger acknowledger;
     private final NegativeAcknowledger negativeAcknowledger;
     private volatile MessageListener messageListener;
+    
+    private SQSMessageConsumer messageConsumer;
 
     private final SQSSessionCallbackScheduler sqsSessionRunnable;
 
@@ -99,6 +101,15 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     MessageListener getMessageListener() {
         return messageListener;
+    }
+    
+    void setMessageConsumer(SQSMessageConsumer messageConsumer) {
+        this.messageConsumer = messageConsumer;
+    }
+    
+    @Override
+    public SQSMessageConsumer getMessageConsumer() {
+        return messageConsumer;
     }
 
     protected void setMessageListener(MessageListener messageListener) {

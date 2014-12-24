@@ -15,6 +15,7 @@
 package com.amazonaws.sqsjms;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
 
+import com.amazonaws.sqsjms.acknowledge.AcknowledgeMode;
 import com.amazonaws.sqsjms.acknowledge.Acknowledger;
 import com.amazonaws.sqsjms.acknowledge.NegativeAcknowledger;
 import com.amazonaws.sqsjms.acknowledge.SQSMessageIdentifier;
@@ -50,9 +52,10 @@ public class SQSMessageConsumerTest {
     private SQSMessageConsumer consumer;
     private SQSConnection sqsConnection;
     private SQSSession sqsSession;
+    private SQSSession sqsSessionNotMocked;
     private SQSSessionCallbackScheduler sqsSessionRunnable;
     private Acknowledger acknowledger;
-    private Object callBackSynchronizer;
+//    private Object callBackSynchronizer;
 
     private ScheduledExecutorService executorService = Executors.newScheduledThreadPool(5);
     private SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch;
@@ -61,17 +64,16 @@ public class SQSMessageConsumerTest {
     private SQSDestination destination;
 
     @Before
-    public void setup() {
+    public void setup() throws JMSException{
 
-        callBackSynchronizer = spy(new Object());
+//        callBackSynchronizer = spy(new Object());
 
         sqsConnection = mock(SQSConnection.class);
 
         sqsSession = mock(SQSSession.class);
-
         sqsSessionRunnable = mock(SQSSessionCallbackScheduler.class);
-        when(sqsSessionRunnable.getSynchronizer())
-                .thenReturn(callBackSynchronizer);
+//        when(sqsSessionRunnable.getSynchronizer())
+//                .thenReturn(callBackSynchronizer);
 
         acknowledger = mock(Acknowledger.class);
 
@@ -116,77 +118,59 @@ public class SQSMessageConsumerTest {
         /*
          * stop consumer
          */
-        consumer.stop();
+        consumer.stopPrefetch();
 
         /*
          * Verify results
          */
-        verifyNoMoreInteractions(callBackSynchronizer);
+        verifyNoMoreInteractions(sqsMessageConsumerPrefetch);
     }
 
     /**
-     * Test stop blocks on callback synchronizer
+     * Test close blocks on in progress callback
      */
-    @Test
-    public void testStopBlocksOnCallbackSynchronizer() throws InterruptedException {
-
-        /*
-         * Set up the latches
-         */
-
-        final CountDownLatch mainRelease = new CountDownLatch(1);
-        final CountDownLatch holdCallBackSynchronizer = new CountDownLatch(1);
-        final CountDownLatch beforeConsumerStopCall = new CountDownLatch(1);
-        final CountDownLatch passedConsumerStopCall = new CountDownLatch(1);
-
-        consumer = new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
-                destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch);
-
-        // Run a thread to hold the callBackSynchronizer
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    synchronized (callBackSynchronizer) {
-
-                        holdCallBackSynchronizer.countDown();
-
-                        mainRelease.await();
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        // Waiting for the thread to hold callBackSynchronizer
-        holdCallBackSynchronizer.await();
-
-        // Run another thread that tries to close the consumer while callBackSynchronizer is been held
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                beforeConsumerStopCall.countDown();
-                consumer.stop();
-                passedConsumerStopCall.countDown();
-            }
-        });
-
-        beforeConsumerStopCall.await();
-        Thread.yield();
-
-        // Ensure that we wait on callBackSynchronizer
-        assertEquals(false, passedConsumerStopCall.await(2, TimeUnit.SECONDS));
-
-        // Release the callBackSynchronizer
-        mainRelease.countDown();
-        Thread.yield();
-
-        // Ensure that the consumer stop completed
-        passedConsumerStopCall.await();
-
-        verify(sqsMessageConsumerPrefetch).stop();
-    }
+//    @Test
+//    public void testCloseBlocksInProgressCallback() throws InterruptedException {
+//
+//        /*
+//         * Set up the latches
+//         */       
+//        final CountDownLatch beforeConsumerStopCall = new CountDownLatch(1);
+//        final CountDownLatch passedConsumerStopCall = new CountDownLatch(1);
+//
+//        consumer = new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
+//                destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch);
+//        
+//        sqsSession.setActiveConsumerInCallback(consumer);
+//
+//        // Run another thread that tries to close the consumer while activeConsumerInCallback is set
+//        executorService.execute(new Runnable() {
+//
+//            @Override
+//            public void run() {
+//                beforeConsumerStopCall.countDown();
+//                try {
+//                    consumer.close();
+//                } catch (JMSException e) {
+//                    fail();
+//                }
+//                passedConsumerStopCall.countDown();
+//            }
+//        });
+//
+//        beforeConsumerStopCall.await();
+//        Thread.yield();
+//        // Ensure that we wait on activeConsumerInCallback
+//        assertEquals(false, passedConsumerStopCall.await(2, TimeUnit.SECONDS));
+//
+//        // Release the activeConsumerInCallback
+//        sqsSession.setActiveConsumerInCallback(null);
+//
+//        // Ensure that the consumer close completed
+//        passedConsumerStopCall.await();
+//
+//        assertEquals(true, consumer.closed);
+//    }
 
 
     /**
@@ -201,77 +185,14 @@ public class SQSMessageConsumerTest {
         consumer.close();
 
         /*
-         * stop consumer
+         * start consumer
          */
-        consumer.start();
+        consumer.startPrefetch();
 
         /*
          * Verify results
          */
-        verifyNoMoreInteractions(callBackSynchronizer);
-    }
-
-    /**
-     * Test start blocks on callback synchronizer
-     */
-    @Test
-    public void testStartBlocksOnCallbackSynchronizer() throws InterruptedException {
-
-        /*
-         * Set up the latches
-         */
-
-        final CountDownLatch mainRelease = new CountDownLatch(1);
-        final CountDownLatch holdCallBackSynchronizer = new CountDownLatch(1);
-        final CountDownLatch beforeConsumerStopCall = new CountDownLatch(1);
-        final CountDownLatch passedConsumerStopCall = new CountDownLatch(1);
-
-        consumer = new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
-                destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch);
-
-        // Run a thread to hold the callBackSynchronizer
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    synchronized (callBackSynchronizer) {
-
-                        holdCallBackSynchronizer.countDown();
-
-                        mainRelease.await();
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        // Waiting for the thread to hold callBackSynchronizer
-        holdCallBackSynchronizer.await();
-
-        // Run another thread that tries to close the consumer while callBackSynchronizer is been held
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                beforeConsumerStopCall.countDown();
-                consumer.start();
-                passedConsumerStopCall.countDown();
-            }
-        });
-
-        beforeConsumerStopCall.await();
-        Thread.yield();
-
-        // Ensure that we wait on callBackSynchronizer
-        assertEquals(false, passedConsumerStopCall.await(2, TimeUnit.SECONDS));
-
-        // Release the callBackSynchronizer
-        mainRelease.countDown();
-
-        // Ensure that the consumer stop completed
-        passedConsumerStopCall.await();
-
-        verify(sqsMessageConsumerPrefetch).start();
+        verifyNoMoreInteractions(sqsMessageConsumerPrefetch);
     }
 
     /**
@@ -334,8 +255,6 @@ public class SQSMessageConsumerTest {
         consumer = new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
                 destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch);
 
-
-
         /*
          * Do close consumer
          */
@@ -386,8 +305,8 @@ public class SQSMessageConsumerTest {
         consumer = spy(new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
                 destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch));
 
-        when(sqsSessionRunnable.getCurrentThread())
-                .thenReturn(Thread.currentThread());
+        when(sqsSession.isActiveCallbackSessionThread())
+                .thenReturn(true);
 
         /*
          * Close consumer

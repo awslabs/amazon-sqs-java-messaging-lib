@@ -49,14 +49,11 @@ public class SQSSessionCallbackScheduler implements Runnable {
     
     private final Acknowledger acknowledger;
     
-    private volatile boolean closed;
+    // Only set from the callback thread 
+    private SQSMessageConsumer consumerCloseAfterCallback;
     
-    private volatile Thread currentThread;
+    private volatile boolean closed = false;
     
-    private volatile SQSMessageConsumer consumerCloseAfterCallback;
-    
-    private final Object synchronizer = new Object();
-
     SQSSessionCallbackScheduler(SQSSession session, AcknowledgeMode acknowledgeMode, Acknowledger acknowledger) {
         this.session = session;
         this.acknowledgeMode = acknowledgeMode;
@@ -65,46 +62,64 @@ public class SQSSessionCallbackScheduler implements Runnable {
                 this.session.getParentConnection().getWrappedAmazonSQSClient(), changeMessageVisibilityIdGenerator);
         this.acknowledger = acknowledger;
     }
-
+    
+    /**
+     * Used in case no consumers have started, and session needs to terminate
+     * the thread
+     */
     void close() {
-        synchronized (synchronizer) {
-            closed = true;
-            synchronizer.notifyAll();
-        }
+        closed = true;
     }
     
     @Override
     public void run() {
-        currentThread = Thread.currentThread();
+        CallbackEntry callbackEntry = null;
+        try {            
+            while (true) {
+                try {
+                    if (closed) {
+                        break;
+                    }
+                    synchronized (callbackQueue) {
+                        callbackEntry = callbackQueue.pollFirst();
+                    }
 
-        while (true) {
-            try {
-                session.startingCallback(); // this takes care of start and stop
-            } catch (InterruptedException e) {
-                break;
-            } finally {
-                if (closed) {
-                    nackQueuedMessages();
-                    break;
-                }
-            }
+                    if (callbackEntry == null) {
+                        continue;
+                    }
 
-            try {
-                CallbackEntry callbackEntry;
-                synchronized (callbackQueue) {
-                    callbackEntry = callbackQueue.pollFirst();
-                }
-                if (callbackEntry != null) {
                     MessageListener messageListener = callbackEntry.getMessageListener();
                     MessageManager messageManager = callbackEntry.getMessageManager();
                     SQSMessage message = (SQSMessage) messageManager.getMessage();
-                    /**
-                     * Notifying consumer prefetch thread so that it can
-                     * continue to prefetch
-                     */
-                    messageManager.getPrefetchManager().messageDispatched();
-                    int ackMode = acknowledgeMode.getOriginalAcknowledgeMode();
-                    synchronized (synchronizer) {
+                    
+                    boolean retryOnInterruption = false;
+                    boolean exit = false;
+                    do {
+                        try {
+                            // this takes care of start and stop
+                            session.startingCallback(messageManager.getPrefetchManager().getMessageConsumer());
+                        } catch (InterruptedException e) {
+                            retryOnInterruption = true;
+                        } catch (JMSException e) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Not running callback: " + e.getMessage());
+                            }
+                            exit = true;
+                            break;
+                        }
+                    } while (retryOnInterruption);
+                    
+                    if (exit) {
+                        break;
+                    }
+
+                    try {
+                        /**
+                         * Notifying consumer prefetch thread so that it can
+                         * continue to prefetch
+                         */
+                        messageManager.getPrefetchManager().messageDispatched();
+                        int ackMode = acknowledgeMode.getOriginalAcknowledgeMode();
                         boolean tryNack = true;
                         try {
                             if (messageListener != null) {
@@ -133,13 +148,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
                                             message.getSQSMessageId(), ex);
                         } finally {
                             if (tryNack) {
-                                try {
-                                    negativeAcknowledger.action(
-                                            message.getQueueUrl(),
-                                            Collections.singletonList(message.getReceiptHandle()));
-                                } catch (JMSException ex) {
-                                    LOG.warn("Unable to nack the message " + message.getSQSMessageId(), ex);
-                                }
+                                nackReceivedMessage(message);
                             }
                         }
 
@@ -152,29 +161,24 @@ public class SQSSessionCallbackScheduler implements Runnable {
                             consumerCloseAfterCallback.doClose();
                             consumerCloseAfterCallback = null;
                         }
-                        synchronizer.notifyAll();
+                    } finally {
+                        session.finishedCallback();
                     }
+                } catch (Throwable ex) {
+                    LOG.error("Unexpected exception thrown during the run of the scheduled callback", ex);
                 }
-            } catch (Throwable ex) {
-                LOG.error("Unexpected exception thrown during the run of the scheduled callback", ex);
-            } finally {
-                session.finishedCallback();
             }
+        } finally {
+            if (callbackEntry != null) {
+                nackReceivedMessage((SQSMessage) callbackEntry.getMessageManager().getMessage());
+            }
+            nackQueuedMessages();
+            callbackQueue.clear();
         }
-
-        callbackQueue.clear();
-    }
-    
-    public Thread getCurrentThread() {
-        return currentThread;
     }
     
     public void setConsumerCloseAfterCallback(SQSMessageConsumer messageConsumer) {
         consumerCloseAfterCallback = messageConsumer;
-    }
-    
-    public Object getSynchronizer() {
-        return synchronizer;
     }
     
     void scheduleCallBack(MessageListener messageListener, MessageManager messageManager) {
@@ -203,5 +207,14 @@ public class SQSSessionCallbackScheduler implements Runnable {
                 LOG.warn("Caught exception while nacking the remaining messages on session callback queue", e);
             }
         }
-    }   
+    }
+
+    private void nackReceivedMessage(SQSMessage message) {
+        try {
+            negativeAcknowledger.action(
+                    message.getQueueUrl(), Collections.singletonList(message.getReceiptHandle()));
+        } catch (JMSException e) {
+            LOG.warn("Unable to nack the message " + message.getSQSMessageId(), e);
+        }
+    }
 }

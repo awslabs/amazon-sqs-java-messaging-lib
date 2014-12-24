@@ -194,11 +194,13 @@ public class SQSConnection implements Connection, QueueConnection {
     @Override
     public void stop() throws JMSException {
         checkClosed();
-        actionOnConnectionTaken = true;
+                
         if (!running) {
             return;
         }
-
+        
+        actionOnConnectionTaken = true;
+        
         if (SQSSession.SESSION_THREAD_FACTORY.wasThreadCreatedWithThisThreadGroup(Thread.currentThread())) {
             throw new IllegalStateException(
                     "MessageListener must not attempt to stop its own Connection to prevent potential deadlock issues");
