@@ -20,6 +20,16 @@ import javax.jms.TextMessage;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.sqsjms.acknowledge.Acknowledger;
 
+/**
+ * A TextMessage object is used to send a message body containing a
+ * java.lang.String. It inherits from the Message interface and adds a text
+ * message body. SQS does not accept empty or null message body
+ * <P>
+ * When a client receives a TextMessage, it is in read-only mode. If a client
+ * attempts to write to the message at this point, a
+ * MessageNotWriteableException is thrown. If clearBody is called, the message
+ * can now be both read from and written to.
+ */
 public class SQSTextMessage extends SQSMessage implements TextMessage {
 
     /**
@@ -49,18 +59,34 @@ public class SQSTextMessage extends SQSMessage implements TextMessage {
         super();
         this.text = payload;
     }
-
+     
+    /**
+     * Sets the text containing this message's body.
+     * 
+     * @param string
+     *            The <code>String</code> containing the message's body
+     * @throws MessageNotWriteableException
+     *             If the message is in read-only mode.
+     */
     @Override
     public void setText(String string) throws JMSException {
         checkBodyWritePermissions();
         this.text = string;
     }
-
+    
+    /**
+     * Gets the text containing this message's body.
+     * 
+     * @return The <code>String</code> containing the message's body
+     */
     @Override
     public String getText() throws JMSException {
         return text;
     }
-
+    
+    /**
+     * Sets the message body to write mode, and sets the text to null
+     */
     @Override
     public void clearBody() throws JMSException {
         text = null;

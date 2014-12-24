@@ -16,29 +16,42 @@ package com.amazonaws.sqsjms;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.regions.Region;
+import com.amazonaws.regions.Regions;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
 import com.amazonaws.services.sqs.model.ChangeMessageVisibilityRequest;
+import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
+import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 
+import javax.jms.InvalidDestinationException;
 import javax.jms.JMSException;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Test the AmazonSQSClientJMSWrapper class
+ */
 public class AmazonSQSClientJMSWrapperTest {
+
+    private final static String QUEUE_NAME = "queueName";
+    private static final String OWNER_ACCOUNT_ID = "accountId";
 
     private AmazonSQSClient amazonSQSClient;
     private AmazonSQSClientJMSWrapper wrapper;
-    private final static String QUEUE_NAME = "queueName";
 
     @Before
     public void setup() throws JMSException {
@@ -46,11 +59,28 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper = new AmazonSQSClientJMSWrapper(amazonSQSClient);
     }
 
+    /*
+     * Test constructing client with null amazon sqs client
+     */
     @Test(expected = JMSException.class)
     public void testNullSQSClient() throws JMSException {
         new AmazonSQSClientJMSWrapper(null);
     }
 
+    /*
+     * Test set endpoint
+     */
+    @Test
+    public void testSetEndpoint() throws JMSException {
+
+        String endpoint = "endpoint";
+        wrapper.setEndpoint(endpoint);
+        verify(amazonSQSClient).setEndpoint(eq(endpoint));
+    }
+
+    /*
+     * Test set endpoint wrap amazon sqs client exception
+     */
     @Test(expected = JMSException.class)
     public void testSetEndpointThrowIllegalArgumentException() throws JMSException {
 
@@ -61,6 +91,33 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.setEndpoint(endpoint);
     }
 
+    /*
+     * Test set region
+     */
+    @Test
+    public void testSetRegion() throws JMSException {
+
+        Region region = Region.getRegion(Regions.DEFAULT_REGION);
+        wrapper.setRegion(region);
+        verify(amazonSQSClient).setRegion(eq(region));
+    }
+
+    /*
+     * Test set region wrap amazon sqs client exception
+     */
+    @Test(expected = JMSException.class)
+    public void testSetRegionThrowIllegalArgumentException() throws JMSException {
+
+        Region region = Region.getRegion(Regions.DEFAULT_REGION);
+        doThrow(new IllegalArgumentException("iae"))
+                .when(amazonSQSClient).setRegion(eq(region));
+
+        wrapper.setRegion(region);
+    }
+
+    /*
+     * Test delete message wrap amazon sqs client amazon client exception
+     */
     @Test(expected = JMSException.class)
     public void testDeleteMessageThrowAmazonClientException() throws JMSException {
 
@@ -71,6 +128,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.deleteMessage(deleteMessageRequest);
     }
 
+    /*
+     * Test delete message wrap amazon sqs client amazon service exception
+     */
     @Test(expected = JMSException.class)
     public void testDeleteMessageThrowAmazonServiceException() throws JMSException {
 
@@ -81,6 +141,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.deleteMessage(deleteMessageRequest);
     }
 
+    /*
+     * Test delete message batch wrap amazon sqs client amazon client exception
+     */
     @Test(expected = JMSException.class)
     public void testDeleteMessageBatchThrowAmazonClientException() throws JMSException {
 
@@ -91,6 +154,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.deleteMessageBatch(deleteMessageBatchRequest);
     }
 
+    /*
+     * Test delete message batch wrap amazon sqs client amazon service exception
+     */
     @Test(expected = JMSException.class)
     public void testDeleteMessageBatchThrowAmazonServiceException() throws JMSException {
 
@@ -101,6 +167,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.deleteMessageBatch(deleteMessageBatchRequest);
     }
 
+    /*
+     * Test send message batch wrap amazon sqs client amazon client exception
+     */
     @Test(expected = JMSException.class)
     public void testSendMessageThrowAmazonClientException() throws JMSException {
 
@@ -111,6 +180,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.sendMessage(sendMessageRequest);
     }
 
+    /*
+     * Test send message batch wrap amazon sqs client amazon service exception
+     */
     @Test(expected = JMSException.class)
     public void testSendMessageThrowAmazonServiceException() throws JMSException {
 
@@ -121,6 +193,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.sendMessage(sendMessageRequest);
     }
 
+    /*
+     * Test getQueueUrl with queue name input
+     */
     @Test
     public void testGetQueueUrlQueueName() throws JMSException {
 
@@ -129,7 +204,23 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.getQueueUrl(QUEUE_NAME);
         verify(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
     }
+    
+    /*
+     * Test getQueueUrl with queue name and owner account id input
+     */
+    @Test
+    public void testGetQueueUrlQueueNameWithAccountId() throws JMSException {
 
+        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_NAME);
+        getQueueUrlRequest.setQueueOwnerAWSAccountId(OWNER_ACCOUNT_ID);
+        
+        wrapper.getQueueUrl(QUEUE_NAME, OWNER_ACCOUNT_ID);
+        verify(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
+    }
+
+    /*
+     * Test getQueueUrl with queue name input wrap amazon sqs client amazon client exception
+     */
     @Test(expected = JMSException.class)
     public void testGetQueueUrlQueueNameThrowAmazonClientException() throws JMSException {
 
@@ -140,6 +231,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.getQueueUrl(QUEUE_NAME);
     }
 
+    /*
+     * Test getQueueUrl with queue name input wrap amazon sqs client amazon service exception
+     */
     @Test(expected = JMSException.class)
     public void testGetQueueUrlQueueNameThrowAmazonServiceException() throws JMSException {
 
@@ -150,6 +244,36 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.getQueueUrl(QUEUE_NAME);
     }
 
+    /*
+     * Test getQueueUrl with queue name input wrap amazon sqs queue does not exist exception
+     */
+    @Test(expected = InvalidDestinationException.class)
+    public void testGetQueueUrlQueueNameThrowQueueDoesNotExistException() throws JMSException {
+
+        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_NAME);
+        doThrow(new QueueDoesNotExistException("qdnee"))
+                .when(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
+
+        wrapper.getQueueUrl(QUEUE_NAME);
+    }
+    
+    /*
+     * Test getQueueUrl with queue name input wrap amazon sqs queue does not exist exception
+     */
+    @Test(expected = InvalidDestinationException.class)
+    public void testGetQueueUrlQueueNameWithAccountIdThrowQueueDoesNotExistException() throws JMSException {
+
+        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_NAME);
+        getQueueUrlRequest.setQueueOwnerAWSAccountId(OWNER_ACCOUNT_ID);
+        doThrow(new QueueDoesNotExistException("qdnee"))
+                .when(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
+
+        wrapper.getQueueUrl(QUEUE_NAME,OWNER_ACCOUNT_ID);
+    }
+
+    /*
+     * Test getQueueUrl
+     */
     @Test
     public void testGetQueueUrl() throws JMSException {
 
@@ -159,6 +283,9 @@ public class AmazonSQSClientJMSWrapperTest {
         verify(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
     }
 
+    /*
+     * Test getQueueUrl wrap amazon sqs amazon client exception
+     */
     @Test(expected = JMSException.class)
     public void testGetQueueUrlThrowAmazonClientException() throws JMSException {
 
@@ -169,6 +296,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.getQueueUrl(getQueueUrlRequest);
     }
 
+    /*
+     * Test getQueueUrl wrap amazon sqs amazon service exception
+     */
     @Test(expected = JMSException.class)
     public void testGetQueueUrlThrowAmazonServiceException() throws JMSException {
 
@@ -179,15 +309,70 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.getQueueUrl(QUEUE_NAME);
     }
 
+    /*
+     * Test queue exist
+     */
     @Test
-    public void testCreateQueue() throws JMSException {
+    public void testQueueExistsWhenQueueIsPresent() throws JMSException {
+
+        assertTrue(wrapper.queueExists(QUEUE_NAME));
+        verify(amazonSQSClient).getQueueUrl(eq(new GetQueueUrlRequest(QUEUE_NAME)));
+    }
+
+    /*
+     * Test queue exist when amazon sqs client throws QueueDoesNotExistException
+     */
+    @Test
+    public void testQueueExistsThrowQueueDoesNotExistException() throws JMSException {
+
+        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_NAME);
+        doThrow(new QueueDoesNotExistException("qdnee"))
+                .when(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
+
+        assertFalse(wrapper.queueExists(QUEUE_NAME));
+    }
+
+    /*
+     * Test queue exist when amazon sqs client throws AmazonClientException
+     */
+    @Test(expected = JMSException.class)
+    public void testQueueExistsThrowAmazonClientException() throws JMSException {
+
+        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_NAME);
+        doThrow(new AmazonClientException("ace"))
+                .when(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
+
+        wrapper.queueExists(QUEUE_NAME);
+    }
+
+    /*
+     * Test queue exist when amazon sqs client throws AmazonServiceException
+     */
+    @Test(expected = JMSException.class)
+    public void testQueueExistsThrowAmazonServiceException() throws JMSException {
+
+        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_NAME);
+        doThrow(new AmazonServiceException("ase"))
+                .when(amazonSQSClient).getQueueUrl(eq(getQueueUrlRequest));
+
+        wrapper.queueExists(QUEUE_NAME);
+    }
+
+    /*
+     * Test create queue with name input
+     */
+    @Test
+    public void testCreateQueueWithName() throws JMSException {
 
         wrapper.createQueue(QUEUE_NAME);
         verify(amazonSQSClient).createQueue(QUEUE_NAME);
     }
 
+    /*
+     * Test create queue when amazon sqs client throws AmazonClientException
+     */
     @Test(expected = JMSException.class)
-    public void testCreateQueueThrowAmazonClientException() throws JMSException {
+    public void testCreateQueueWithNameThrowAmazonClientException() throws JMSException {
 
         doThrow(new AmazonClientException("ace"))
                 .when(amazonSQSClient).createQueue(eq(QUEUE_NAME));
@@ -195,8 +380,11 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.createQueue(QUEUE_NAME);
     }
 
+    /*
+     * Test create queue when amazon sqs client throws AmazonServiceException
+     */
     @Test(expected = JMSException.class)
-    public void testCreateQueueThrowAmazonServiceException() throws JMSException {
+    public void testCreateQueueWithNameThrowAmazonServiceException() throws JMSException {
 
         doThrow(new AmazonServiceException("ase"))
                 .when(amazonSQSClient).createQueue(eq(QUEUE_NAME));
@@ -204,6 +392,48 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.createQueue(QUEUE_NAME);
     }
 
+    /*
+     * Test create queue
+     */
+    @Test
+    public void testCreateQueue() throws JMSException {
+
+        CreateQueueRequest createQueueRequest = new CreateQueueRequest(QUEUE_NAME);
+
+        wrapper.createQueue(createQueueRequest);
+        verify(amazonSQSClient).createQueue(createQueueRequest);
+    }
+
+    /*
+     * Test create queue when amazon sqs client throws AmazonClientException
+     */
+    @Test(expected = JMSException.class)
+    public void testCreateQueueThrowAmazonClientException() throws JMSException {
+
+        CreateQueueRequest createQueueRequest = new CreateQueueRequest(QUEUE_NAME);
+        doThrow(new AmazonClientException("ace"))
+                .when(amazonSQSClient).createQueue(eq(createQueueRequest));
+
+        wrapper.createQueue(createQueueRequest);
+    }
+
+    /*
+     * Test create queue when amazon sqs client throws AmazonServiceException
+     */
+    @Test(expected = JMSException.class)
+    public void testCreateQueueThrowAmazonServiceException() throws JMSException {
+
+
+        CreateQueueRequest createQueueRequest = new CreateQueueRequest(QUEUE_NAME);
+        doThrow(new AmazonServiceException("ase"))
+                .when(amazonSQSClient).createQueue(eq(createQueueRequest));
+
+        wrapper.createQueue(createQueueRequest);
+    }
+
+    /*
+     * Test receive message
+     */
     @Test
     public void testReceiveMessage() throws JMSException {
 
@@ -212,6 +442,9 @@ public class AmazonSQSClientJMSWrapperTest {
         verify(amazonSQSClient).receiveMessage(getQueueUrlRequest);
     }
 
+    /*
+     * Test receive message when amazon sqs client throws AmazonClientException
+     */
     @Test(expected = JMSException.class)
     public void testReceiveMessageThrowAmazonClientException() throws JMSException {
 
@@ -222,6 +455,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.receiveMessage(getQueueUrlRequest);
     }
 
+    /*
+     * Test receive message when amazon sqs client throws AmazonServiceException
+     */
     @Test(expected = JMSException.class)
     public void testReceiveMessageThrowAmazonServiceException() throws JMSException {
 
@@ -232,6 +468,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.receiveMessage(getQueueUrlRequest);
     }
 
+    /*
+     * Test change message visibility
+     */
     @Test
     public void testChangeMessageVisibility() throws JMSException {
 
@@ -240,6 +479,9 @@ public class AmazonSQSClientJMSWrapperTest {
         verify(amazonSQSClient).changeMessageVisibility(changeMessageVisibilityRequest);
     }
 
+    /*
+     * Test change message visibility when amazon sqs client throws AmazonClientException
+     */
     @Test(expected = JMSException.class)
     public void testChangeMessageVisibilityThrowAmazonClientException() throws JMSException {
 
@@ -250,6 +492,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.changeMessageVisibility(changeMessageVisibilityRequest);
     }
 
+    /*
+     * Test change message visibility when amazon sqs client throws AmazonServiceException
+     */
     @Test(expected = JMSException.class)
     public void testChangeMessageVisibilityThrowAmazonServiceException() throws JMSException {
 
@@ -260,6 +505,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.changeMessageVisibility(changeMessageVisibilityRequest);
     }
 
+    /*
+     * Test change message visibility batch
+     */
     @Test
     public void testChangeMessageVisibilityBatch() throws JMSException {
 
@@ -268,6 +516,9 @@ public class AmazonSQSClientJMSWrapperTest {
         verify(amazonSQSClient).changeMessageVisibilityBatch(changeMessageVisibilityBatchRequest);
     }
 
+    /*
+     * Test change message visibility batch when amazon sqs client throws AmazonClientException
+     */
     @Test(expected = JMSException.class)
     public void testChangeMessageVisibilityBatchThrowAmazonClientException() throws JMSException {
 
@@ -278,6 +529,9 @@ public class AmazonSQSClientJMSWrapperTest {
         wrapper.changeMessageVisibilityBatch(changeMessageVisibilityBatchRequest);
     }
 
+    /*
+     * Test change message visibility batch when amazon sqs client throws AmazonServiceException
+     */
     @Test(expected = JMSException.class)
     public void testChangeMessageVisibilityBatchThrowAmazonServiceException() throws JMSException {
 
@@ -286,5 +540,13 @@ public class AmazonSQSClientJMSWrapperTest {
                 .when(amazonSQSClient).changeMessageVisibilityBatch(eq(changeMessageVisibilityBatchRequest));
 
         wrapper.changeMessageVisibilityBatch(changeMessageVisibilityBatchRequest);
+    }
+
+    /*
+     * Test get amazon SQS client
+     */
+    @Test
+    public void testGetAmazonSQSClient() {
+        assertEquals(amazonSQSClient, wrapper.getAmazonSQSClient());
     }
 }

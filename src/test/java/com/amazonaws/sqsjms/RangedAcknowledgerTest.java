@@ -14,23 +14,26 @@
  */
 package com.amazonaws.sqsjms;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import javax.jms.JMSException;
 
+import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
 import junit.framework.Assert;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
-import com.amazonaws.sqsjms.AcknowledgerCommon;
-import com.amazonaws.sqsjms.AmazonSQSClientJMSWrapper;
-
-import com.amazonaws.sqsjms.SQSMessage;
-import com.amazonaws.sqsjms.SQSSession;
 import com.amazonaws.sqsjms.acknowledge.AcknowledgeMode;
 import com.amazonaws.sqsjms.acknowledge.SQSMessageIdentifier;
 
+/**
+ * Test the RangedAcknowledger class
+ */
 public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
     @Before
@@ -39,6 +42,9 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         acknowledger = AcknowledgeMode.ACK_RANGE.createAcknowledger(amazonSQSClient, mock(SQSSession.class));
     }
 
+    /**
+     * Test forget un-acknowledge messages
+     */
     @Test
     public void testForget() throws JMSException {
         int populateMessageSize = 33;
@@ -47,7 +53,10 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         acknowledger.forgetUnAckMessages();
         Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
     }
-    
+
+    /**
+     * Test acknowledge all un-acknowledge messages
+     */
     @Test
     public void testFullAck() throws JMSException {
         int populateMessageSize = 34;
@@ -59,6 +68,9 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
     }
 
+    /**
+     * Test acknowledge 25 first un-acknowledge messages
+     */
     @Test
     public void testOneAck() throws JMSException {
         int populateMessageSize = 34;
@@ -66,8 +78,29 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         int ackMessage = 25;
 
         testAcknowledge(populateMessageSize, ackMessage);
+
+        ArgumentCaptor<DeleteMessageBatchRequest> argumentCaptor = ArgumentCaptor.forClass(DeleteMessageBatchRequest.class);
+        verify(amazonSQSClient, times(5)).deleteMessageBatch(argumentCaptor.capture());
+
+        assertEquals(baseQueueUrl + 0, argumentCaptor.getAllValues().get(0).getQueueUrl());
+        assertEquals(10, argumentCaptor.getAllValues().get(0).getEntries().size());
+
+        assertEquals(baseQueueUrl + 1, argumentCaptor.getAllValues().get(1).getQueueUrl());
+        assertEquals(10, argumentCaptor.getAllValues().get(1).getEntries().size());
+
+        assertEquals(baseQueueUrl + 1, argumentCaptor.getAllValues().get(2).getQueueUrl());
+        assertEquals(1, argumentCaptor.getAllValues().get(2).getEntries().size());
+
+        assertEquals(baseQueueUrl + 0, argumentCaptor.getAllValues().get(3).getQueueUrl());
+        assertEquals(1, argumentCaptor.getAllValues().get(3).getEntries().size());
+
+        assertEquals(baseQueueUrl + 2, argumentCaptor.getAllValues().get(4).getQueueUrl());
+        assertEquals(4, argumentCaptor.getAllValues().get(4).getEntries().size());
     }
 
+    /**
+     * Test two acknowledge calls
+     */
     @Test
     public void testTwoAck() throws JMSException {
         int populateMessageSize = 44;
@@ -80,19 +113,11 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         testAcknowledge(populateMessageSize, secondAckMessage);
     }
 
-    @Test
-    public void testMessageDoesNotExist() throws JMSException {
-        int populateMessageSize = 32;
-        populateMessage(populateMessageSize);
-        int messagesToAck = 20;
-
-        testAcknowledge(populateMessageSize, messagesToAck);
-        
-        SQSMessage message = populatedMessages.get(10);
-        message.acknowledge();
-
-    }
-
+    /**
+     * Utility function to acknowledge the first <code>indexOfMessageToAck<code/> un-acknowledge messages
+     * @param populateMessageSize current un-acknowledge messages size
+     * @param indexOfMessageToAck index of message to acknowledge
+     */
     public void testAcknowledge(int populateMessageSize, int indexOfMessageToAck) throws JMSException {
         SQSMessage messageToAck = populatedMessages.get(indexOfMessageToAck);
         messageToAck.acknowledge();

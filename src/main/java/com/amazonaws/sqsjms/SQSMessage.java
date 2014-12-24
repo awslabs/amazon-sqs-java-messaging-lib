@@ -34,6 +34,27 @@ import com.amazonaws.sqsjms.acknowledge.Acknowledger;
 
 import static com.amazonaws.sqsjms.SQSJMSClientConstants.*;
 
+/**
+ * The SQSMessage is the root class of all SQS JMS messages and implements JMS
+ * Message interface.
+ * <P>
+ * Not all message headers are supported at this time:
+ * <ul>
+ * <li><code>JMSMessageID</code> is always assigned as SQS provided message id.</li>
+ * <li><code>JMSRedelivered</code> is set to true if SQS delivers the message
+ * more than once. This not necessarily mean that the user received message more
+ * than once, but rather SQS attempted to deliver it more than once. Due to
+ * prefetching used in {@link SQSMessageConsumerPrefetch}, this can be set to
+ * true although user never received the message. This is set based on SQS
+ * ApproximateReceiveCount attribute</li>
+ * <li><code>JMSDestination</code></li> is the destination object which message
+ * is sent to and received from.
+ * </ul>
+ * </P>
+ * <P>
+ * JMSXDeliveryCount reserved property is supported and set based on the
+ * approximate receive count observed on the SQS side.
+ */
 public class SQSMessage implements Message {
         
     private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
@@ -92,7 +113,11 @@ public class SQSMessage implements Message {
         this.messageID = String.format(MESSAGE_ID_FORMAT,sqsMessageID);
         Map<String,String> systemAttributes = sqsMessage.getAttributes();
         int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
-       
+        
+        /**
+         * JMSXDeliveryCount is set based on SQS ApproximateReceiveCount
+         * attribute
+         */
         properties.put(JMSX_DELIVERY_COUNT, new JMSMessagePropertyValue(
                 receiveCount, INT));
         if (receiveCount > 1) {
@@ -152,14 +177,19 @@ public class SQSMessage implements Message {
     }
     
     /**
-     * Get original SQS Message Id
+     * Get SQS Message Id
+     * 
+     * @return SQS Message Id
      */
     public String getSQSMessageId() {
         return sqsMessageID;
     }
     
     /**
-     * Set original SQS Message Id, used on send.
+     * Set SQS Message Id, used on send.
+     * 
+     * @param sqsMessageID
+     *            messageId assigned by SQS during send
      */
     public void setSQSMessageId(String sqsMessageID) throws JMSException {
         this.sqsMessageID = sqsMessageID;
@@ -317,7 +347,7 @@ public class SQSMessage implements Message {
      * @throws NullPointerException and NumberFormatException when property is null. Method throws
      *         same exception as primitives corresponding valueOf(String) method.
      */
-    private <T> T getPrimitiveProperty(String property, Class<T> type) throws JMSException {
+    <T> T getPrimitiveProperty(String property, Class<T> type) throws JMSException {
         if (property == null) {
             throw new NullPointerException("Property name is null");
         }
@@ -754,5 +784,12 @@ public class SQSMessage implements Message {
         public String getStringMessageAttributeValue() {
             return stringMessageAttributeValue;
         }
+    }
+
+    /*
+     * Unit Test Utility Functions
+     */
+    void setWritePermissionsForProperties(boolean writePermissionsForProperties) {
+        this.writePermissionsForProperties = writePermissionsForProperties;
     }
 }

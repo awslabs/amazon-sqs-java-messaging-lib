@@ -254,7 +254,9 @@ public class SQSSession implements Session, QueueSession {
                 shouldClose = true;
                 closing = true;
             }
+            stateLock.notifyAll();
         }
+        
         if (closed) {
             return;
         }
@@ -263,11 +265,10 @@ public class SQSSession implements Session, QueueSession {
             try {
                 parentSQSConnection.removeSession(this);
 
-                for (MessageProducer messageProducer : messageProducers) {
-                    messageProducer.close();
-                }
-                for (MessageConsumer messageConsumer : messageConsumers) {
+                for (SQSMessageConsumer messageConsumer : messageConsumers) {
                     messageConsumer.close();
+                    /** Nack the messages that were delivered but not acked */
+                    messageConsumer.recover();
                 }
                 
                 try {
@@ -280,6 +281,10 @@ public class SQSSession implements Session, QueueSession {
                         waitForCallbackComplete();
                         
                         sqsSessionRunnable.close();
+                        
+                        for (MessageProducer messageProducer : messageProducers) {
+                            messageProducer.close();
+                        }
 
                         if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
 
@@ -292,12 +297,11 @@ public class SQSSession implements Session, QueueSession {
                 } catch (InterruptedException e) {
                     LOG.error("Interrupted while closing the session.", e);
                 }
-                
-                /** Nack the messages that were delivered but not acked */
-                recover();
+               
             } finally {
                 synchronized (stateLock) {
                     closed = true;
+                    running = false;
                     stateLock.notifyAll();
                 }
             }
@@ -407,6 +411,17 @@ public class SQSSession implements Session, QueueSession {
         checkClosed();
         return new SQSDestination(queueName, amazonSQSClient.getQueueUrl(queueName).getQueueUrl());
     }
+    
+    /**
+     * This does not create SQS Queue. This method is only to create JMS Queue
+     * Object. Make sure the queue exists corresponding to the queueName and
+     * ownerAccountId.
+     */
+    public Queue createQueue(String queueName, String ownerAccountId) throws JMSException {
+        checkClosed();
+        return new SQSDestination(
+                queueName, amazonSQSClient.getQueueUrl(queueName, ownerAccountId).getQueueUrl());
+    }
 
     /**
      * This is used in MessageConsumer. When MessageConsumer is closed
@@ -438,8 +453,7 @@ public class SQSSession implements Session, QueueSession {
                 try {
                     stateLock.wait();
                 } catch (InterruptedException e) {
-                    LOG.error("Interrupted while waiting on session start", e);
-                    throw e;
+                    LOG.warn("Interrupted while waiting on session start. Continue to wait...", e);
                 }
             }
             checkClosing();
@@ -462,15 +476,25 @@ public class SQSSession implements Session, QueueSession {
     void waitForConsumerCallbackToComplete(SQSMessageConsumer consumer) throws InterruptedException {
         synchronized (stateLock) {
             while (activeConsumerInCallback == consumer) {
-                stateLock.wait();
+                try {
+                    stateLock.wait();
+                } catch (InterruptedException e) {
+                    LOG.warn(
+                            "Interrupted while waiting the active consumer in callback to complete. Continue to wait...",
+                            e);
+                }
             }
         }
     }
     
-    void waitForCallbackComplete() throws InterruptedException {
+    void waitForCallbackComplete() {
         synchronized (stateLock) {
             while (activeConsumerInCallback != null) {
-                stateLock.wait();
+                try {
+                    stateLock.wait();
+                } catch (InterruptedException e) {
+                    LOG.warn("Interrupted while waiting on session callback completion. Continue to wait...", e);
+                }
             }
         }
     }
@@ -621,11 +645,8 @@ public class SQSSession implements Session, QueueSession {
             for (SQSMessageConsumer messageConsumer : messageConsumers) {
                 messageConsumer.stopPrefetch();
             }
-            try {
-                waitForCallbackComplete();
-            } catch (InterruptedException e) {
-                LOG.error("Interrupted while waiting on session stop", e);
-            }
+            waitForCallbackComplete();
+
             stateLock.notifyAll();
         }
     }
@@ -658,16 +679,19 @@ public class SQSSession implements Session, QueueSession {
         this.closed = closed;
     }
 
-    public void setClosing(boolean closing) {
+    void setClosing(boolean closing) {
         this.closing = closing;
     }
 
-    public void setRunning(boolean running) {
+    void setRunning(boolean running) {
         this.running = running;
     }
 
-    public boolean isRunning() {
+    boolean isRunning() {
         return running;
     }
 
+    SQSSessionCallbackScheduler getSqsSessionRunnable() {
+        return sqsSessionRunnable;
+    }
 }

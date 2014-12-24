@@ -131,7 +131,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     public void run() {
         while (true) {
             int prefetchBatchSize;
-            boolean nackAllMessages = false;
+            boolean nackQueueMessages = false;
             List<Message> messages = null;
             try {
                 if (isClosed()) {
@@ -153,15 +153,15 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                     processReceivedMessages(messages);
                 }
             } catch (InterruptedException e) {
-                nackAllMessages = true;
+                nackQueueMessages = true;
                 break;
             } catch (Throwable e) {
                 LOG.error("Unexpected exception when prefetch messages:", e);
-                nackAllMessages = true;
+                nackQueueMessages = true;
                 throw e;
             } finally {
-                if (isClosed() || nackAllMessages) {
-                    nackAllMessages(messages);
+                if (isClosed() || nackQueueMessages) {
+                    nackQueueMessages();
                 }
             }
         }
@@ -202,7 +202,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 if (messageListener != null) {
                     sqsSessionRunnable.scheduleCallBack(messageListener, new MessageManager(this, jmsMessage));
                     synchronized (stateLock) {
-                        messagesPrefetched++;
+                        messagesPrefetched++;                        
                         notifyStateChange();
                     }
                 } else {
@@ -273,37 +273,16 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         return jmsMessage;
     }
 
-    protected void nackQueuedMessages() {
-        try {
-            negativeAcknowledger.bulkAction(messageQueue, queueUrl);
-        } catch (JMSException e) {
-            LOG.warn("Caught exception while nacking queued messages", e);
-        }
-    }
-
-    /** Guaranteed to be at most 10 messages */
-    protected void nackReceivedMessages(List<Message> messages) {
-        if (messages == null) {
-            return;
-        }
-        List<String> receiptHandles = new ArrayList<String>(messages.size());
-        for (Message message : messages) {
-            receiptHandles.add(message.getReceiptHandle());
-        }
-        try {
-            negativeAcknowledger.action(queueUrl, receiptHandles);
-        } catch (JMSException e) {
-            LOG.warn("Caught exception while nacking received messages", e);
-        }
-    }
-
-
-    protected void nackAllMessages(List<Message> messages) {
-        nackReceivedMessages(messages);
+    protected void nackQueueMessages() {
         // Also nack messages already in the messageQueue
         synchronized (stateLock) {
-            nackQueuedMessages();
-            notifyStateChange();
+            try {
+                negativeAcknowledger.bulkAction(messageQueue, queueUrl);
+            } catch (JMSException e) {
+                LOG.warn("Caught exception while nacking queued messages", e);
+            } finally {
+                notifyStateChange();
+            }
         }
     }
 

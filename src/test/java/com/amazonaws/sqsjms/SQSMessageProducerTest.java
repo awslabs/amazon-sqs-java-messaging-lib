@@ -31,8 +31,6 @@ import javax.jms.Destination;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,6 +53,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Test the SQSMessageProducerTest class
+ */
 public class SQSMessageProducerTest {
 
     public static final String QUEUE_URL = "QueueUrl";

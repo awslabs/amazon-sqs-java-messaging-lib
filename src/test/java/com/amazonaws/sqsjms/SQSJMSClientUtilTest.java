@@ -14,24 +14,25 @@
  */
 package com.amazonaws.sqsjms;
 
+import com.amazonaws.sqsjms.util.SQSJMSClientUtil;
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+
 /**
- * This interface is helper to notify when the prefetchThread should be resuming
- * messages.
+ * Test the SQSJMSClientUtilTest class
  */
-public interface PrefetchManager {
+public class SQSJMSClientUtilTest {
+
+    String text = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-.~!@#$%^&*()`][}{\\|\";'></?";
 
     /**
-     * Notify the prefetchThread that the message is dispatched from
-     * messageQueue when user calls for receive or message listener onMessage is
-     * called.
+     * Test serialize and deserialize property name
      */
-    public void messageDispatched();
-
-    /**
-     * This is used to determine the state of the consumer, when the message
-     * listener scheduler is processing the messages.
-     * 
-     * @return The message consumer, which owns the prefetchThread
-     */
-    public SQSMessageConsumer getMessageConsumer();
+    @Test
+    public void testSerializeDeserializePropertyName() {
+        String serialize = SQSJMSClientUtil.serializePropertyName(text);
+        assertEquals(text, SQSJMSClientUtil.deserializePropertyName(serialize));
+    }
 }

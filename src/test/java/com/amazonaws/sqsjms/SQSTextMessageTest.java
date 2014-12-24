@@ -14,42 +14,50 @@
  */
 package com.amazonaws.sqsjms;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import javax.jms.JMSException;
 
-import junit.framework.Assert;
-
-import org.junit.Before;
 import org.junit.Test;
 
+/**
+ * Test the SQSTextMessageTest class
+ */
 public class SQSTextMessageTest {
-
-    private SQSSession mockSQSSession;
-
-    @Before
-    public void setup() throws JMSException {
-        mockSQSSession = mock(SQSSession.class);
-    }
 
     @Test
     public void testSetText() throws JMSException {
         String expectedPayload = "testing set payload";
-        when(mockSQSSession.createTextMessage()).thenReturn(new SQSTextMessage());
-        SQSTextMessage sqsTextMessage = (SQSTextMessage) mockSQSSession.createTextMessage();
+        SQSTextMessage sqsTextMessage = new SQSTextMessage();
         sqsTextMessage.setText(expectedPayload);
         String actualPayload = sqsTextMessage.getText();
-        Assert.assertEquals(expectedPayload, actualPayload);
+        assertEquals(expectedPayload, actualPayload);
     }
 
+    /**
+     * Test create message with text
+     */
     @Test
     public void testCreateMessageWithText() throws JMSException {
         String expectedPayload = "testing message with payload";
-        when(mockSQSSession.createTextMessage(expectedPayload)).thenReturn(new SQSTextMessage(expectedPayload));
-        SQSTextMessage sqsTextMessage = (SQSTextMessage) mockSQSSession.createTextMessage(expectedPayload);
+        SQSTextMessage sqsTextMessage = new SQSTextMessage(expectedPayload);
 
         String actualPayload = sqsTextMessage.getText();
-        Assert.assertEquals(expectedPayload, actualPayload);
+        assertEquals(expectedPayload, actualPayload);
+    }
+
+    /**
+     * Test create message and setting text
+     */
+    @Test
+    public void testClearBody() throws JMSException {
+        String expectedPayload = "testing set payload";
+        SQSTextMessage sqsTextMessage = new SQSTextMessage();
+        sqsTextMessage.setText(expectedPayload);
+        assertEquals(expectedPayload, sqsTextMessage.getText());
+
+        sqsTextMessage.clearBody();
+        assertNull(sqsTextMessage.getText());
     }
 }

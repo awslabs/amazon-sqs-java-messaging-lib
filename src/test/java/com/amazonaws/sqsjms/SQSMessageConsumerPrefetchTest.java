@@ -56,6 +56,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Test the SQSMessageConsumerPrefetchTest class
+ */
 @SuppressWarnings("unchecked")
 public class SQSMessageConsumerPrefetchTest {
 
@@ -199,7 +202,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).waitForPrefetch();
 
         // Ensure Consumer Prefetch nack any messages when closed
-        verify(consumerPrefetch, times(2)).nackAllMessages(any(List.class));
+        verify(consumerPrefetch, times(2)).nackQueueMessages();
 
         // Ensure we do not get messages when closed while waiting for prefetch
         verify(consumerPrefetch, never()).getMessages(anyInt());
@@ -235,7 +238,7 @@ public class SQSMessageConsumerPrefetchTest {
          */
 
         verify(consumerPrefetch).waitForStart();
-        verify(consumerPrefetch).nackAllMessages(any(List.class));
+        verify(consumerPrefetch).nackQueueMessages();
 
         verify(consumerPrefetch, never()).waitForPrefetch();
         verify(consumerPrefetch, never()).getMessages(anyInt());
@@ -274,7 +277,7 @@ public class SQSMessageConsumerPrefetchTest {
          */
 
         verify(consumerPrefetch).waitForStart();
-        verify(consumerPrefetch).nackAllMessages(any(List.class));
+        verify(consumerPrefetch).nackQueueMessages();
 
         verify(consumerPrefetch, never()).waitForPrefetch();
         verify(consumerPrefetch, never()).getMessages(anyInt());
@@ -311,7 +314,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         verify(consumerPrefetch).waitForStart();
         verify(consumerPrefetch).waitForPrefetch();
-        verify(consumerPrefetch).nackAllMessages(any(List.class));
+        verify(consumerPrefetch).nackQueueMessages();
 
         verify(consumerPrefetch, never()).getMessages(anyInt());
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
@@ -352,7 +355,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         verify(consumerPrefetch).waitForStart();
         verify(consumerPrefetch).waitForPrefetch();
-        verify(consumerPrefetch).nackAllMessages(any(List.class));
+        verify(consumerPrefetch).nackQueueMessages();
 
         verify(consumerPrefetch, never()).getMessages(anyInt());
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
@@ -390,7 +393,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         verify(consumerPrefetch).waitForStart();
         verify(consumerPrefetch).waitForPrefetch();
-        verify(consumerPrefetch).nackAllMessages(any(List.class));
+        verify(consumerPrefetch).nackQueueMessages();
         verify(consumerPrefetch).getMessages(anyInt());
 
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
@@ -433,7 +436,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         verify(consumerPrefetch).waitForStart();
         verify(consumerPrefetch).waitForPrefetch();
-        verify(consumerPrefetch).nackAllMessages(any(List.class));
+        verify(consumerPrefetch).nackQueueMessages();
         verify(consumerPrefetch).getMessages(anyInt());
 
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
@@ -612,7 +615,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Yield execution to allow the consumer to wait
         assertEquals(true, beforeWaitForStartCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Update the state and notify
         consumerPrefetch.start();
@@ -657,7 +660,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Yield execution to allow the consumer to wait
         assertEquals(true, beforeWaitForStartCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Interrupt waiting thread
         t.interrupt();
@@ -699,7 +702,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Yield execution to allow the consumer to wait
         assertEquals(true, beforeWaitForPrefetchCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Release the local and ensure that we are still waiting since the prefetch message still equal to the limit
         consumerPrefetch.notifyStateChange();
@@ -743,7 +746,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Yield execution to allow the consumer to wait
         assertEquals(true, beforeWaitForPrefetchCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Validate we do not wait when the consumer is closed
         assertEquals(true, passedWaitForPrefetch.await(3, TimeUnit.SECONDS));
@@ -778,7 +781,7 @@ public class SQSMessageConsumerPrefetchTest {
         t.start();
 
         assertEquals(true, beforeWaitForPrefetchCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         t.interrupt();
 
@@ -1025,54 +1028,6 @@ public class SQSMessageConsumerPrefetchTest {
         assertEquals(message.getBody(), "MessageBody");
     }
 
-
-    /**
-     * Test no NACK operation with null input.
-     */
-    @Test
-    public void testNackReceivedMessagesNullMessages() throws JMSException {
-
-        consumerPrefetch.nackReceivedMessages(null);
-        verifyNoMoreInteractions(amazonSQSClient);
-    }
-
-    /**
-     * Test no NACK operation with empty input.
-     */
-    @Test
-    public void testNackReceivedMessagesEmptyMessages() throws JMSException {
-
-        consumerPrefetch.nackReceivedMessages(new ArrayList<com.amazonaws.services.sqs.model.Message>());
-        verifyNoMoreInteractions(amazonSQSClient);
-    }
-
-    /**
-     * Test NACK received messages
-     */
-    @Test
-    public void testNackReceivedMessages() throws JMSException {
-
-        /*
-         * Set up messages
-         */
-        List<com.amazonaws.services.sqs.model.Message> sqsMessages = new ArrayList<>();
-        sqsMessages.add(new com.amazonaws.services.sqs.model.Message().withReceiptHandle("r0"));
-        sqsMessages.add(new com.amazonaws.services.sqs.model.Message().withReceiptHandle("r1"));
-        sqsMessages.add(new com.amazonaws.services.sqs.model.Message().withReceiptHandle("r2"));
-
-        /*
-         * Nack messages
-         */
-        consumerPrefetch.nackReceivedMessages(sqsMessages);
-
-        /*
-         * Verify results
-         */
-        List<String> receiptHandlers = createReceiptHandlersList(3);
-
-        verify(negativeAcknowledger).action(QUEUE_URL, receiptHandlers);
-    }
-
     /**
      * Test received messages when consumer prefetch has not started
      */
@@ -1161,7 +1116,7 @@ public class SQSMessageConsumerPrefetchTest {
         });
 
         assertEquals(true, beforeReceiveCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Update the state and notify
         consumerPrefetch.close();
@@ -1209,7 +1164,7 @@ public class SQSMessageConsumerPrefetchTest {
         });
 
         assertEquals(true, beforeReceiveCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Add message to the internal queue
         List<String> receiptHandlers = new ArrayList<String>();
@@ -1487,13 +1442,19 @@ public class SQSMessageConsumerPrefetchTest {
 
         int retriesAttempted = 3;
         int prefetchBatchSize = 5;
-        long sleepTime = 100L;
+        long firstSleepTime = 100L;
+        long secondSleepTime = 200L;
         consumerPrefetch.retriesAttempted = retriesAttempted;
 
         when(amazonSQSClient.receiveMessage(any(ReceiveMessageRequest.class)))
                 .thenThrow(new JMSException("test exception"));
         when(backoffStrategy.delayBeforeNextRetry(retriesAttempted))
-                .thenReturn(sleepTime);
+                .thenReturn(firstSleepTime);
+
+        when(backoffStrategy.delayBeforeNextRetry(retriesAttempted + 1))
+                .thenReturn(secondSleepTime);
+
+        consumerPrefetch.getMessages(prefetchBatchSize);
 
         consumerPrefetch.getMessages(prefetchBatchSize);
 
@@ -1501,8 +1462,9 @@ public class SQSMessageConsumerPrefetchTest {
          * Verify results
          */
         verify(backoffStrategy).delayBeforeNextRetry(retriesAttempted);
-        verify(consumerPrefetch).sleep(sleepTime);
-        assertEquals(retriesAttempted + 1, consumerPrefetch.retriesAttempted);
+        verify(consumerPrefetch).sleep(firstSleepTime);
+        verify(consumerPrefetch).sleep(secondSleepTime);
+        assertEquals(retriesAttempted + 2, consumerPrefetch.retriesAttempted);
     }
 
     /**
@@ -1543,7 +1505,7 @@ public class SQSMessageConsumerPrefetchTest {
         t.start();
 
         assertEquals(true, beforeGetMessagesCall.await(5, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         /*
          * Interrupt the getMessage execution

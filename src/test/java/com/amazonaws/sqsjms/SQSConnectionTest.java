@@ -31,6 +31,9 @@ import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Test the SQSConnectionTest class
+ */
 public class SQSConnectionTest {
 
     public static final String QUEUE_URL = "QueueUrl";
@@ -58,6 +61,9 @@ public class SQSConnectionTest {
         sqsConnection.getSessions().add(session2);
     }
 
+    /**
+     * Test unsupported features
+     */
     @Test
     public void testUnsupportedFeatures() {
 
@@ -85,6 +91,9 @@ public class SQSConnectionTest {
         }
     }
 
+    /**
+     * Test set client id when connection is closing
+     */
     @Test
     public void testSetClientIdWhenClosing() throws JMSException {
 
@@ -97,6 +106,10 @@ public class SQSConnectionTest {
             assertEquals("Connection is closed or closing", ise.getMessage());
         }
     }
+
+    /**
+     * Test set client id on an invalid client id
+     */
     @Test
     public void testSetClientIdInvalidClientId() throws JMSException {
 
@@ -115,6 +128,9 @@ public class SQSConnectionTest {
         }
     }
 
+    /**
+     * Test set client id when action on connection is already made
+     */
     @Test
     public void testSetClientIdActionTaken() throws JMSException {
 
@@ -127,6 +143,9 @@ public class SQSConnectionTest {
         }
     }
 
+    /**
+     * Test set client id
+     */
     @Test
     public void testSetClientId() throws JMSException {
 
@@ -141,6 +160,9 @@ public class SQSConnectionTest {
         assertEquals("id", sqsConnection.getClientID());
     }
 
+    /**
+     * Test closing
+     */
     @Test
     public void testClosing() throws JMSException {
 
@@ -155,6 +177,9 @@ public class SQSConnectionTest {
         }
     }
 
+    /**
+     * Test check closed
+     */
     @Test
     public void testCheckClosed() throws JMSException {
 
@@ -169,6 +194,9 @@ public class SQSConnectionTest {
         }
     }
 
+    /**
+     * Test exception listener
+     */
     @Test
     public void testExceptionListener() throws JMSException {
 
@@ -234,7 +262,7 @@ public class SQSConnectionTest {
 
         // Yield execution to allow the connection to wait
         assertEquals(true, beforeCloseCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Release the lock and ensure that we are still waiting since the did not run
         synchronized (sqsConnection.getStateLock()) {
@@ -470,7 +498,7 @@ public class SQSConnectionTest {
         });
 
         beforeConnectionStopCall.await();
-        Thread.yield();
+        Thread.sleep(10);
 
         // Ensure that we wait on state lock
         assertEquals(false, passedConnectionStopCall.await(2, TimeUnit.SECONDS));
@@ -612,7 +640,7 @@ public class SQSConnectionTest {
         });
 
         beforeConnectionStartCall.await();
-        Thread.yield();
+        Thread.sleep(10);
 
         // Ensure that we wait on state lock
         assertEquals(false, passedConnectionStartCall.await(2, TimeUnit.SECONDS));
@@ -864,7 +892,7 @@ public class SQSConnectionTest {
         });
 
         beforeCreateSessionStartCall.await();
-        Thread.yield();
+        Thread.sleep(10);
 
         // Ensure that we wait on state lock
         assertEquals(false, passedCreateSessionStartCall.await(2, TimeUnit.SECONDS));

@@ -14,46 +14,75 @@
  */
 package com.amazonaws.sqsjms;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import javax.jms.JMSException;
 
-import junit.framework.Assert;
-
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
-import com.amazonaws.sqsjms.AcknowledgerCommon;
-import com.amazonaws.sqsjms.AmazonSQSClientJMSWrapper;
-import com.amazonaws.sqsjms.SQSMessage;
-import com.amazonaws.sqsjms.SQSSession;
+import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.sqsjms.acknowledge.AcknowledgeMode;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
+/**
+ * Test the UnorderedAcknowledgerTest class
+ */
 public class UnorderedAcknowledgerTest extends AcknowledgerCommon {
 
     @Before
     public void setupUnordered() throws JMSException {
-        //super.setup();
         amazonSQSClient = mock(AmazonSQSClientJMSWrapper.class);
         acknowledger = AcknowledgeMode.ACK_UNORDERED.createAcknowledger(amazonSQSClient, mock(SQSSession.class));
     }
 
+    /**
+     * Test forgetUnAckMessages
+     */
     @Test
     public void testForgetUnAckMessages() throws JMSException {
         int populateMessageSize = 30;
         populateMessage(populateMessageSize);
         
         acknowledger.forgetUnAckMessages();
-        Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
+        assertEquals(0, acknowledger.getUnAckMessages().size());
     }
 
+    /**
+     * Test acknowledge does not impact messages that were not specifically acknowledge
+     */
     @Test
-    public void testAck() throws JMSException {
+    public void testAcknowledge() throws JMSException {
         int populateMessageSize = 37;
         populateMessage(populateMessageSize);
-        for (SQSMessage message : populatedMessages) {
+        int counter = 0;
+
+        List<SQSMessage> populatedMessagesCopy =  new ArrayList<SQSMessage>(populatedMessages);
+        while (!populatedMessagesCopy.isEmpty()) {
+
+            int rand = new Random().nextInt(populatedMessagesCopy.size());
+            SQSMessage message = populatedMessagesCopy.remove(rand);
             message.acknowledge();
+            assertEquals(populateMessageSize - (++counter), acknowledger.getUnAckMessages().size());
         }
-        Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
+        assertEquals(0, acknowledger.getUnAckMessages().size());
+
+        ArgumentCaptor<DeleteMessageRequest> argumentCaptor = ArgumentCaptor.forClass(DeleteMessageRequest.class);
+        verify(amazonSQSClient, times(populateMessageSize)).deleteMessage(argumentCaptor.capture());
+
+        for (SQSMessage msg : populatedMessages) {
+            DeleteMessageRequest deleteRequest = new DeleteMessageRequest()
+                    .withQueueUrl(msg.getQueueUrl())
+                    .withReceiptHandle(msg.getReceiptHandle());
+            assertTrue(argumentCaptor.getAllValues().contains(deleteRequest));
+        }
     }
 }

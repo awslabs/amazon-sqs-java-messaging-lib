@@ -56,7 +56,6 @@ public class SQSConnection implements Connection, QueueConnection {
     
     private final AmazonSQSClientJMSWrapper amazonSQSClient;
     private final int numberOfMessagesToPrefetch;
-    
     private volatile boolean closed = false;
     private volatile boolean closing = false;
     private volatile boolean running = false;
@@ -348,6 +347,10 @@ public class SQSConnection implements Connection, QueueConnection {
      */
     void setClosed(boolean closed) {
         this.closed = closed;
+    }
+
+    public boolean isClosed() {
+        return closed;
     }
 
     void setClosing(boolean closing) {

@@ -32,6 +32,18 @@ import com.amazonaws.util.Base64;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.sqsjms.acknowledge.Acknowledger;
 
+/**
+ * An ObjectMessage object is used to send a message that contains a Java
+ * serializable object.
+ * <P>
+ * It inherits from the Message interface and adds a body containing a single
+ * reference to an object. Only Serializable Java objects can be used.
+ * <P>
+ * When a client receives an ObjectMessage, it is in read-only mode. If a client
+ * attempts to write to the message at this point, a
+ * MessageNotWriteableException is thrown. If clearBody is called, the message
+ * can now be both read from and written to.
+ */
 public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
     private static final Log LOG = LogFactory.getLog(SQSObjectMessage.class);
 
@@ -62,18 +74,37 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
         super();
         body = serialize(payload);
     }
-
+    
+    /**
+     * Sets the <code>Serializable</code> containing this message's body
+     * 
+     * @param payload
+     *            The <code>Serializable</code> containing the message's body
+     * @throws MessageNotWriteableException
+     *             If the message is in read-only mode.
+     * @throws MessageFormatException
+     *             If object serialization fails.
+     */
     @Override
     public void setObject(Serializable payload) throws JMSException {
         checkBodyWritePermissions();
         body = serialize(payload);
     }
-
+    
+    /**
+     * Gets the <code>Serializable</code> containing this message's body
+     * 
+     * @throws MessageFormatException
+     *             If object deserialization fails.
+     */
     @Override
     public Serializable getObject() throws JMSException {
         return deserialize(body);
     }
-
+    
+    /**
+     * Sets the message body to write mode, and sets the object body to null
+     */
     @Override
     public void clearBody() throws JMSException {
         body = null;
@@ -134,12 +165,12 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
         }
         return serializedString;
     }
-
-    public String getMessageBody() {
+    
+    String getMessageBody() {
         return body;
     }
 
-    public void setMessageBody(String body) {
+    void setMessageBody(String body) {
         this.body = body;
     }
 }

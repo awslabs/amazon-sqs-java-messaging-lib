@@ -14,24 +14,27 @@
  */
 package com.amazonaws.sqsjms;
 
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+
 /**
- * This interface is helper to notify when the prefetchThread should be resuming
- * messages.
+ * Test the SQSDestinationTest class
  */
-public interface PrefetchManager {
+public class SQSDestinationTest {
+
+    public static final String QUEUE_NAME = "QueueName";
+    public static final String QUEUE_URL = "QueueUrl";
 
     /**
-     * Notify the prefetchThread that the message is dispatched from
-     * messageQueue when user calls for receive or message listener onMessage is
-     * called.
+     * Test SQSDestination property
      */
-    public void messageDispatched();
+    @Test
+    public void testProperty() throws Exception {
+        SQSDestination destination = new SQSDestination(QUEUE_NAME, QUEUE_URL);
 
-    /**
-     * This is used to determine the state of the consumer, when the message
-     * listener scheduler is processing the messages.
-     * 
-     * @return The message consumer, which owns the prefetchThread
-     */
-    public SQSMessageConsumer getMessageConsumer();
-}
+        assertEquals(QUEUE_NAME, destination.getQueueName());
+        assertEquals(QUEUE_URL, destination.getQueueUrl());
+    }
+
+} 

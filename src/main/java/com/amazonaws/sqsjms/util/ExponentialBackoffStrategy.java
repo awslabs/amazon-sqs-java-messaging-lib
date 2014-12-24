@@ -23,8 +23,8 @@ public class ExponentialBackoffStrategy {
 
     public ExponentialBackoffStrategy(long delayInterval, long initialDelay, long maxDelay) {
         this.delayInterval = delayInterval;
-        this.maxDelay = maxDelay;
         this.initialDelay = initialDelay;
+        this.maxDelay = maxDelay;
     }
 
     public long delayBeforeNextRetry(int retriesAttempted) {
@@ -32,7 +32,17 @@ public class ExponentialBackoffStrategy {
             return initialDelay;
         }
 
-        long delay = (1 << (retriesAttempted - 1)) * delayInterval;
+
+        if (retriesAttempted > 63) {
+            return maxDelay;
+        }
+
+        long multiplier = ((long)1 << (retriesAttempted - 1));
+        if (multiplier > Long.MAX_VALUE / delayInterval) {
+            return maxDelay;
+        }
+
+        long delay = multiplier * delayInterval;
         delay = Math.min(delay, maxDelay);
         return delay;
     }

@@ -182,9 +182,16 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      */
     void recover() throws JMSException {
         List<SQSMessageIdentifier> unAckedMessages = acknowledger.getUnAckMessages();
-        negativeAcknowledger.bulkAction(unAckedMessages, unAckedMessages.size());
+        if (!unAckedMessages.isEmpty()) {
+            negativeAcknowledger.bulkAction(unAckedMessages, unAckedMessages.size());
+            acknowledger.forgetUnAckMessages();
+        }
 
-        acknowledger.forgetUnAckMessages();
+        
+    }
+    
+    boolean isClosed() {
+        return closed;
     }
 
     /** This method is not supported. */

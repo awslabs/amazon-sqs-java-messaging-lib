@@ -21,6 +21,7 @@ import javax.jms.Destination;
 import javax.jms.IllegalStateException;
 import javax.jms.JMSException;
 import javax.jms.MessageConsumer;
+import javax.jms.MessageListener;
 import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
 import javax.jms.Queue;
@@ -39,10 +40,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -50,10 +48,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Test the SQSSessionTest class
+ */
 public class SQSSessionTest  {
 
-    public static final String QUEUE_URL = "queueUrl";
-    public static final String QUEUE_NAME = "queueName";
+    private static final String QUEUE_URL = "queueUrl";
+    private static final String QUEUE_NAME = "queueName";
+    private static final String OWNER_ACCOUNT_ID = "accountId";
+
     private SQSSession sqsSession;
     private SQSConnection parentSQSConnection;
     private Set<SQSMessageConsumer> messageConsumers;
@@ -256,7 +259,7 @@ public class SQSSessionTest  {
         });
 
         beforeSessionStopCall.await();
-        Thread.yield();
+        Thread.sleep(10);
 
         // Ensure that we wait on state lock
         assertEquals(false, passedSessionStopCall.await(2, TimeUnit.SECONDS));
@@ -318,7 +321,7 @@ public class SQSSessionTest  {
         });
 
         beforeSessionStartCall.await();
-        Thread.yield();
+        Thread.sleep(10);
 
         // Ensure that we wait on state lock
         assertEquals(false, passedSessionStartCall.await(2, TimeUnit.SECONDS));
@@ -333,7 +336,7 @@ public class SQSSessionTest  {
         verify(consumer2).startPrefetch();
     }
 
-    /*
+    /**
      * Test unsupported feature throws the correct exception
      */
     @Test
@@ -443,7 +446,7 @@ public class SQSSessionTest  {
      * Test waitForAllCallbackComplete blocks on state lock
      */
     @Test
-    public void testWaitForAllCallbackCompleteBlocksOnStateLock() throws InterruptedException {
+    public void testWaitForAllCallbackCompleteBlocksOnStateLock() throws InterruptedException, JMSException {
 
         /*
          * Set up the latches and mocks
@@ -453,20 +456,32 @@ public class SQSSessionTest  {
         final CountDownLatch beforeSessionWaitCall = new CountDownLatch(1);
         final CountDownLatch passedSessionWaitCall = new CountDownLatch(1);
 
-        // Run a thread to hold the stateLock
-        executorService.execute(new Runnable() {
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession.start();
+        MessageListener msgListener = mock(MessageListener.class);
+        SQSMessageConsumerPrefetch.MessageManager msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
+
+        PrefetchManager prefetchManager = new PrefetchManager() {
             @Override
-            public void run() {
+            public void messageDispatched()  {
+                holdStateLock.countDown();
                 try {
-                    synchronized (sqsSession.getStateLock()) {
-                        holdStateLock.countDown();
-                        mainRelease.await();
-                    }
+                    mainRelease.await();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
-        });
+
+            @Override
+            public SQSMessageConsumer getMessageConsumer() {
+                return consumer1;
+            }
+        };
+
+        when(msgManager.getPrefetchManager())
+                .thenReturn(prefetchManager);
+
+        sqsSession.getSqsSessionRunnable().scheduleCallBack(null, msgManager);
 
         // Waiting for the thread to hold state lock
         holdStateLock.await();
@@ -475,18 +490,15 @@ public class SQSSessionTest  {
         executorService.execute(new Runnable() {
             @Override
             public void run() {
-                try {
-                    beforeSessionWaitCall.countDown();
-                    sqsSession.waitForCallbackComplete();
-                    passedSessionWaitCall.countDown();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+                beforeSessionWaitCall.countDown();
+                sqsSession.waitForCallbackComplete();
+                passedSessionWaitCall.countDown();
+
             }
         });
 
         beforeSessionWaitCall.await();
-        Thread.yield();
+        Thread.sleep(10);
 
         // Ensure that we wait on state lock this time is longer then waitForAllCallbackComplete timeoutMillis input
         assertEquals(false, passedSessionWaitCall.await(1, TimeUnit.SECONDS));
@@ -501,77 +513,44 @@ public class SQSSessionTest  {
     /**
      * Test waitForAllCallbackComplete get notify on lock change
      */
-//    @Test
-//    public void testWaitForAllCallbackComplete() throws InterruptedException, JMSException {
-//
-//        /*
-//         * Set up session and mocks
-//         */
-//        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
-//        sqsSession.setActiveConsumerInCallback(consumer1);
-//        final CountDownLatch beforeWaitCall = new CountDownLatch(1);
-//        final CountDownLatch passedWaitCall = new CountDownLatch(1);
-//
-//        /*
-//         * call waitForAllCallbackComplete in different thread
-//         */
-//        executorService.execute(new Runnable() {
-//            @Override
-//            public void run() {
-//                try {
-//                    beforeWaitCall.countDown();
-//                    sqsSession.waitForCallbackComplete();
-//                    passedWaitCall.countDown();
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        });
-//
-//        // Yield execution to allow the consumer to wait
-//        assertEquals(true, beforeWaitCall.await(10, TimeUnit.SECONDS));
-//        Thread.yield();
-//
-//        // Release the lock and ensure that we are still waiting since the prefetch message still equal to the limit
-//        synchronized (sqsSession.getStateLock()) {
-//            sqsSession.getStateLock().notifyAll();
-//        }
-//        assertEquals(false, passedWaitCall.await(1, TimeUnit.SECONDS));
-//
-//        // Simulate callback finished
-//        sqsSession.setActiveConsumerInCallback(null);
-//
-//        synchronized (sqsSession.getStateLock()) {
-//            sqsSession.getStateLock().notifyAll();
-//        }
-//        passedWaitCall.await();
-//    }
+    @Test
+    public void testWaitForAllCallbackComplete() throws InterruptedException, JMSException {
 
-//    /**
-//     * Test waitForAllCallbackComplete exist according to input wait time
-//     */
-//    @Test
-//    public void testWaitForAllCallbackCompleteTimeout() throws InterruptedException {
-//
-//        /*
-//         * Set up session
-//         */
-//        sqsSession.setActiveConsumerInCallback(consumer1);
-//
-//        long startTime = System.currentTimeMillis();
-//        /*
-//         * Call waitForAllCallbackComplete
-//         */
-//        sqsSession.waitForCallbackComplete();
-//
-//        long timeWaited = System.currentTimeMillis() - startTime;
-//
-//        /*
-//         * verify result
-//         */
-//        assertTrue(timeWaited > TimeUnit.SECONDS.toMillis(3));
-//        assertEquals(true, sqsSession.isCallbackActive());
-//    }
+        /*
+         * Set up session and mocks
+         */
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession.start();
+        sqsSession.startingCallback(consumer1);
+        final CountDownLatch beforeWaitCall = new CountDownLatch(1);
+        final CountDownLatch passedWaitCall = new CountDownLatch(1);
+
+        /*
+         * call waitForAllCallbackComplete in different thread
+         */
+        executorService.execute(new Runnable() {
+            @Override
+            public void run() {
+                beforeWaitCall.countDown();
+                sqsSession.waitForCallbackComplete();
+                passedWaitCall.countDown();
+            }
+        });
+
+        // Yield execution to allow the consumer to wait
+        assertEquals(true, beforeWaitCall.await(10, TimeUnit.SECONDS));
+        Thread.sleep(10);
+
+        // Release the lock and ensure that we are still waiting since the prefetch message still equal to the limit
+        synchronized (sqsSession.getStateLock()) {
+            sqsSession.getStateLock().notifyAll();
+        }
+        assertEquals(false, passedWaitCall.await(1, TimeUnit.SECONDS));
+
+        // Simulate callback finished
+        sqsSession.finishedCallback();
+        passedWaitCall.await();
+    }
 
     /**
      * Test finishedCallback decrease callbackCounter
@@ -673,7 +652,7 @@ public class SQSSessionTest  {
 
         // Yield execution to allow the session to wait
         assertEquals(true, beforeWaitCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Release the lock and ensure that we are still waiting since the did not run
         synchronized (sqsSession.getStateLock()) {
@@ -768,6 +747,29 @@ public class SQSSessionTest  {
          * Create queue
          */
         Queue queue = sqsSession.createQueue(QUEUE_NAME);
+
+        /*
+         * Verify results
+         */
+        assert(queue instanceof SQSDestination);
+        assertEquals(QUEUE_NAME, queue.getQueueName());
+        assertEquals(QUEUE_URL, ((SQSDestination) queue).getQueueUrl());
+    }
+    
+    /**
+     * Test create queue when session is already closed
+     */
+    @Test
+    public void testCreateQueueWithOwnerAccountId() throws JMSException {
+
+        GetQueueUrlResult result = new GetQueueUrlResult().withQueueUrl(QUEUE_URL);
+        when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME, OWNER_ACCOUNT_ID))
+                .thenReturn(result);
+
+        /*
+         * Create queue
+         */
+        Queue queue = sqsSession.createQueue(QUEUE_NAME, OWNER_ACCOUNT_ID);
 
         /*
          * Verify results
@@ -1110,7 +1112,7 @@ public class SQSSessionTest  {
 
         // Yield execution to allow the session to wait
         assertEquals(true, beforeDoCloseCall.await(10, TimeUnit.SECONDS));
-        Thread.yield();
+        Thread.sleep(10);
 
         // Release the lock and ensure that we are still waiting since the did not run
         synchronized (sqsSession.getStateLock()) {
@@ -1154,33 +1156,6 @@ public class SQSSessionTest  {
     }
 
     /**
-     * Test do close does not propagate the InterruptedException
-     */
-    @Test
-    public void testDoCloseInterrupted() throws JMSException, InterruptedException {
-
-        doThrow(new InterruptedException("Interrupted"))
-                .when(sqsSession).waitForCallbackComplete();
-
-        /*
-         * Do close
-         */
-        sqsSession.doClose();
-
-        /*
-         * Verify results
-         */
-        verify(parentSQSConnection).removeSession(sqsSession);
-        verify(consumer1).close();
-        verify(consumer2).close();
-
-        verify(producer1).close();
-        verify(producer2).close();
-
-        verify(sqsSession).waitForCallbackComplete();
-    }
-
-    /**
      * Test close when session is already closed
      */
     @Test
@@ -1205,47 +1180,67 @@ public class SQSSessionTest  {
     /**
      * Test close
      */
-//    @Test
-//    public void testClose() throws JMSException, InterruptedException {
-//
-//        /*
-//         * Set up the latches and mocks
-//         */
-//        final CountDownLatch beforeCloseCall = new CountDownLatch(1);
-//        final CountDownLatch passedCloseCall = new CountDownLatch(1);
-//
-//        doNothing()
-//                .when(sqsSession).doClose();
-//         
-//        sqsSession.setActiveConsumerInCallback(consumer1);
-//
-//        // Run thread that tries to close the session while activeConsumerInCallback is set
-//        executorService.execute(new Runnable() {
-//            @Override
-//            public void run() {
-//                beforeCloseCall.countDown();
-//                try {
-//                    sqsSession.close();
-//                    passedCloseCall.countDown();
-//                } catch (JMSException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        });
-//
-//        beforeCloseCall.await();
-//
-//        // Ensure that we wait on activeConsumerInCallback
-//        assertEquals(false, passedCloseCall.await(2, TimeUnit.SECONDS));
-//
-//        // Release the activeConsumerInCallback
-//        sqsSession.setActiveConsumerInCallback(null);
-//
-//        // Ensure that the session close completed
-//        passedCloseCall.await();
-//
-//        assertEquals(true, sqsSession.isClosed());
-//    }
+    @Test
+    public void testClose() throws JMSException, InterruptedException {
+
+        /*
+         * Set up the latches and mocks
+         */
+        final CountDownLatch beforeCloseCall = new CountDownLatch(1);
+        final CountDownLatch passedCloseCall = new CountDownLatch(1);
+
+        sqsSession.setActiveConsumerInCallback(consumer1);
+
+        // Run thread that tries to close the session while activeConsumerInCallback is set
+        executorService.execute(new Runnable() {
+            @Override
+            public void run() {
+                beforeCloseCall.countDown();
+                try {
+                    sqsSession.close();
+                    passedCloseCall.countDown();
+                } catch (JMSException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        beforeCloseCall.await();
+
+        // Ensure that we wait on activeConsumerInCallback
+        assertEquals(false, passedCloseCall.await(2, TimeUnit.SECONDS));
+
+        // Release the activeConsumerInCallback
+        sqsSession.finishedCallback();
+
+        // Ensure that the session close completed
+        passedCloseCall.await();
+
+        assertEquals(true, sqsSession.isClosed());
+    }
+
+    /**
+     * Test close from active callback thread is rejected
+     */
+    @Test
+    public void testCloseFromActiveCallbackThread() throws JMSException, InterruptedException {
+
+        /*
+         * Set up session
+         */
+        sqsSession.start();
+        sqsSession.startingCallback(consumer1);
+
+        /*
+         * Verify result
+         */
+        try {
+            sqsSession.close();
+            fail();
+        } catch (IllegalStateException ise) {
+            // expected
+        }
+    }
 
     /**
      * Test create receiver

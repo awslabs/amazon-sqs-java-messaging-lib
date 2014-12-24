@@ -53,7 +53,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
     private SQSMessageConsumer consumerCloseAfterCallback;
     
     private volatile boolean closed = false;
-    
+        
     SQSSessionCallbackScheduler(SQSSession session, AcknowledgeMode acknowledgeMode, Acknowledger acknowledger) {
         this.session = session;
         this.acknowledgeMode = acknowledgeMode;
@@ -69,6 +69,10 @@ public class SQSSessionCallbackScheduler implements Runnable {
      */
     void close() {
         closed = true;
+        /** Wake-up the thread in case it was blocked on empty queue */
+        synchronized (callbackQueue) {
+            callbackQueue.notify();
+        }
     }
     
     @Override
@@ -82,34 +86,38 @@ public class SQSSessionCallbackScheduler implements Runnable {
                     }
                     synchronized (callbackQueue) {
                         callbackEntry = callbackQueue.pollFirst();
-                    }
-
-                    if (callbackEntry == null) {
-                        continue;
+                        if (callbackEntry == null) {
+                            try {
+                                callbackQueue.wait();
+                            } catch (InterruptedException e) {
+                                /**
+                                 * Will be retried on the next loop, and
+                                 * break if the callback scheduler is closed.
+                                 */
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug("wait on empty callback queue interrupted: " + e.getMessage());
+                                }
+                            }
+                            continue;
+                        }
                     }
 
                     MessageListener messageListener = callbackEntry.getMessageListener();
                     MessageManager messageManager = callbackEntry.getMessageManager();
-                    SQSMessage message = (SQSMessage) messageManager.getMessage();
+                    SQSMessage message = (SQSMessage) messageManager.getMessage();    
+                    SQSMessageConsumer messageConsumer = messageManager.getPrefetchManager().getMessageConsumer();
+                    if (messageConsumer.isClosed()) {
+                        nackReceivedMessage(message);
+                        continue;
+                    }
                     
-                    boolean retryOnInterruption = false;
-                    boolean exit = false;
-                    do {
-                        try {
-                            // this takes care of start and stop
-                            session.startingCallback(messageManager.getPrefetchManager().getMessageConsumer());
-                        } catch (InterruptedException e) {
-                            retryOnInterruption = true;
-                        } catch (JMSException e) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Not running callback: " + e.getMessage());
-                            }
-                            exit = true;
-                            break;
+                    try {
+                        // this takes care of start and stop
+                        session.startingCallback(messageConsumer);
+                    } catch (JMSException e) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Not running callback: " + e.getMessage());
                         }
-                    } while (retryOnInterruption);
-                    
-                    if (exit) {
                         break;
                     }
 
@@ -173,7 +181,6 @@ public class SQSSessionCallbackScheduler implements Runnable {
                 nackReceivedMessage((SQSMessage) callbackEntry.getMessageManager().getMessage());
             }
             nackQueuedMessages();
-            callbackQueue.clear();
         }
     }
     
@@ -185,7 +192,11 @@ public class SQSSessionCallbackScheduler implements Runnable {
         CallbackEntry callbackEntry = new CallbackEntry(messageListener, messageManager);
         
         synchronized (callbackQueue) {
-            callbackQueue.push(callbackEntry);
+            try {
+                callbackQueue.push(callbackEntry);
+            } finally {
+                callbackQueue.notify();
+            }
         }
     }
             

@@ -29,15 +29,19 @@ import junit.framework.Assert;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.sqsjms.acknowledge.Acknowledger;
 
+/**
+ * Parent class for the Acknowledger tests
+ */
 public class AcknowledgerCommon {
 
     protected String baseQueueUrl = "queueUrl";
-
     protected Acknowledger acknowledger;
     protected AmazonSQSClientJMSWrapper amazonSQSClient;
-    
     protected List<SQSMessage> populatedMessages = new ArrayList<SQSMessage>();
 
+    /*
+     * Generate and populate the list with sqs message from different queues
+     */
     public void populateMessage(int populateMessageSize) throws JMSException {
         String queueUrl = baseQueueUrl + 0;
         for (int i = 0; i < populateMessageSize; i++) {
