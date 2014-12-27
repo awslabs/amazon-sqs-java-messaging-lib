@@ -25,3 +25,6 @@ for communicating with Amazon Simple Queue Service. This project builds on top o
 ##Feedback
 * Give us feedback [here](https://github.com/awslabs/amazon-sqs-java-messaging-lib/issues).
 * If you'd like to contribute a new feature or bug fix, we'd love to see Github pull requests from you.
+
+
+

@@ -8,6 +8,6 @@ Amazon Technologies, Inc (http://www.amazon.com/).
 THIRD PARTY COMPONENTS
 **********************
 This software includes third party software subject to the following copyrights:
-- Apache ActiveMQ (see: org.apache.activemq.util.TypeConversionSupport), Copyright 2005-2013 Apache Software Foundation.
+- Apache ActiveMQ (see: org.apache.activemq.util.TypeConversionSupport, org.apache.activemq.command.ActiveMQStreamMessage). Copyright 2005-2013 Apache Software Foundation
 
 The licenses for these third party components are included in LICENSE.txt
