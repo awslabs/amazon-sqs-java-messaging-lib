@@ -77,7 +77,8 @@ public class SQSMessage implements Message {
     private String type;
     private Destination replyTo;
     private Destination destination;
-
+    private Integer delaySeconds;
+    
     private final Map<String, JMSMessagePropertyValue> properties = new HashMap<String, JMSMessagePropertyValue>();
 
     private boolean writePermissionsForProperties;
@@ -370,7 +371,15 @@ public class SQSMessage implements Message {
         this.priority = priority;
     }
     
-    /**
+    public Integer getDelaySeconds() {
+		return delaySeconds;
+	}
+
+	public void setDelaySeconds(Integer delaySeconds) {
+		this.delaySeconds = delaySeconds;
+	}
+
+	/**
      * Clears a message's properties and set the write permissions for
      * properties. The message's header fields and body are not cleared.
      */

@@ -106,16 +106,19 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         if (sqsMessageBody == null || sqsMessageBody.isEmpty()) {
             throw new JMSException("Message body cannot be null or empty");
         }
-        Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute((SQSMessage) message);
-        addMessageTypeReservedAttribute(messageAttributes, (SQSMessage) message, messageType);
+        SQSMessage sqsMessage = (SQSMessage) message;
+        
+        Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute(sqsMessage);
+        addMessageTypeReservedAttribute(messageAttributes, sqsMessage, messageType);
         SendMessageRequest sendMessageRequest = new SendMessageRequest(((SQSQueueDestination) queue).getQueueUrl(), sqsMessageBody);
         sendMessageRequest.setMessageAttributes(messageAttributes);
+        sendMessageRequest.setDelaySeconds(sqsMessage.getDelaySeconds());
 
         String messageId = amazonSQSClient.sendMessage(sendMessageRequest).getMessageId();
         LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
         /** TODO: Do not support disableMessageID for now.*/
         message.setJMSMessageID(String.format(SQSMessagingClientConstants.MESSAGE_ID_FORMAT, messageId));
-        ((SQSMessage)message).setSQSMessageId(messageId);
+        sqsMessage.setSQSMessageId(messageId);
     }
 
     @Override
