@@ -28,6 +28,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
+import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 
 /**
@@ -56,6 +57,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     private final String endpoint;
     private final String signerRegionOverride;
     private final AWSCredentialsProvider awsCredentialsProvider;
+    private AmazonSQS sqsClient;
 
     /** Controls the size of the prefetch buffers used by consumers. */
     private final int numberOfMessagesToPrefetch;
@@ -67,6 +69,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         this.clientConfig = builder.clientConfiguration;
         this.awsCredentialsProvider = builder.awsCredentialsProvider;
         this.numberOfMessagesToPrefetch = builder.numberOfMessagesToPrefetch;
+        this.sqsClient = builder.sqsClient;
     }
 
     @Override
@@ -84,16 +87,20 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     }
 
     public SQSConnection createConnection(AWSCredentials awsCredentials) throws JMSException {
-        AmazonSQSClient amazonSQSClient = new AmazonSQSClient(awsCredentials, clientConfig);
-        configureClient(amazonSQSClient);
-        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQSClient);
+        if(sqsClient == null){
+            sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);
+        }
+        configureClient(sqsClient);
+        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(sqsClient);
         return new SQSConnection(amazonSQSClientJMSWrapper, numberOfMessagesToPrefetch);
     }
     
     public SQSConnection createConnection(AWSCredentialsProvider awsCredentialsProvider) throws JMSException {
-        AmazonSQSClient amazonSQSClient = new AmazonSQSClient(awsCredentialsProvider, clientConfig);
-        configureClient(amazonSQSClient);
-        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQSClient);
+        if(sqsClient == null){
+            sqsClient = new AmazonSQSClient(awsCredentialsProvider, clientConfig);
+        }
+        configureClient(sqsClient);
+        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(sqsClient);
         return new SQSConnection(amazonSQSClientJMSWrapper, numberOfMessagesToPrefetch);
     }
     
@@ -118,6 +125,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         private ClientConfiguration clientConfiguration;
         private int numberOfMessagesToPrefetch;
         private AWSCredentialsProvider awsCredentialsProvider = new DefaultAWSCredentialsProviderChain();
+        private AmazonSQS sqsClient;
         
         public Builder(Region region) {
             this();
@@ -246,9 +254,17 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
                 AWSCredentialsProvider awsCredentialsProvider) {
             this.awsCredentialsProvider = awsCredentialsProvider;
         }
+
+        public AmazonSQS getSqsClient() {
+            return sqsClient;
+        }
+
+        public void setSqsClient(AmazonSQS sqsClient) {
+            this.sqsClient = sqsClient;
+        }
     }
     
-    private void configureClient(AmazonSQSClient client) throws JMSException {
+    private void configureClient(AmazonSQS client) throws JMSException {
         try {
             if( region != null ) {
                 client.setRegion(region);
@@ -256,8 +272,8 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
             if( endpoint != null ) {
                 client.setEndpoint(endpoint);
             }
-            if( signerRegionOverride != null ) {
-                client.setSignerRegionOverride(signerRegionOverride);
+            if( signerRegionOverride != null && client instanceof AmazonSQSClient ) {
+                ((AmazonSQSClient)client).setSignerRegionOverride(signerRegionOverride);
             }
         } catch( IllegalArgumentException e ) {
             throw (JMSException)
