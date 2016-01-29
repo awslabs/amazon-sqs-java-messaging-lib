@@ -187,6 +187,11 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
             setNumberOfMessagesToPrefetch(numberOfMessagesToPrefetch);
             return this;
         }
+        
+        public Builder withSqsClient(AmazonSQS sqsClient) {
+            setSqsClient(sqsClient);
+            return this;
+        }
 
         public SQSConnectionFactory build() {
             return new SQSConnectionFactory(this);
