@@ -61,6 +61,8 @@ public class SQSMessagingClientConstants {
     public static final String JMSX_GROUP_SEC = "JMSXGroupSeq";
 
     public static final String APPROXIMATE_RECEIVE_COUNT = "ApproximateReceiveCount";
+    
+    public static final String SENT_TIMESTAMP = "SentTimestamp";
 
     static final String APPENDED_USER_AGENT_HEADER_VERSION;
     static {
@@ -72,3 +74,4 @@ public class SQSMessagingClientConstants {
         }
     }
 }
+

@@ -17,6 +17,7 @@ package com.amazon.sqs.javamessaging;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
@@ -325,8 +326,19 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             }
         }
         jmsMessage.setJMSDestination(sqsDestination);
-        return jmsMessage;
-    }
+        jmsMessage.setJMSTimestamp(getJMSTimestamp(message));
+		return jmsMessage;
+	}
+
+	private long getJMSTimestamp(Message message) {
+		Map<String, String> systemAttributes = message.getAttributes();
+		String timestamp = systemAttributes.get(SQSMessagingClientConstants.SENT_TIMESTAMP);
+		if (timestamp != null) {
+			return Long.parseLong(timestamp);
+		} else {
+			return 0L;
+		}
+	}
 
     protected void nackQueueMessages() {
         // Also nack messages already in the messageQueue
