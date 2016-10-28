@@ -5,7 +5,7 @@
 
 	<groupId>com.amazonaws</groupId>
 	<artifactId>amazon-sqs-java-messaging-lib</artifactId>
-	<version>1.0.3</version>
+	<version>1.0.4</version>
 	<packaging>jar</packaging>
 	<name>Amazon SQS Java Messaging Library</name>
 	<description>
@@ -38,7 +38,7 @@
 	</developers>
 
 	<properties>
-		<aws-java-sdk.version>1.11.11</aws-java-sdk.version>
+		<aws-java-sdk.version>1.11.48</aws-java-sdk.version>
 	</properties>
 
 	<dependencies>
