@@ -204,6 +204,10 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 LOG.error("Unexpected exception when prefetch messages:", e);
                 nackQueueMessages = true;
                 throw e;
+            } catch(Error e) {
+                LOG.error("Unexpected exception when prefetch messages:", e);
+                nackQueueMessages = true;
+                throw e;
             } finally {
                 if (isClosed() || nackQueueMessages) {
                     nackQueueMessages();
