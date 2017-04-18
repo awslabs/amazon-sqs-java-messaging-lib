@@ -30,7 +30,7 @@ public class SQSQueueDestination implements Destination, Queue {
     
     private final String queueUrl;
     
-    SQSQueueDestination(String queueName, String queueUrl) {
+    public SQSQueueDestination(String queueName, String queueUrl) {
         this.queueName = queueName;
         this.queueUrl = queueUrl;
     }
