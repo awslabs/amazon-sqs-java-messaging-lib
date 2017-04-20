@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -15,9 +15,16 @@
 package com.amazon.sqs.javamessaging;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import javax.jms.JMSException;
 
@@ -27,6 +34,7 @@ import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
+
 import junit.framework.Assert;
 
 import org.junit.Before;
@@ -84,21 +92,35 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
         ArgumentCaptor<DeleteMessageBatchRequest> argumentCaptor = ArgumentCaptor.forClass(DeleteMessageBatchRequest.class);
         verify(amazonSQSClient, times(5)).deleteMessageBatch(argumentCaptor.capture());
-
-        assertEquals(baseQueueUrl + 0, argumentCaptor.getAllValues().get(0).getQueueUrl());
-        assertEquals(10, argumentCaptor.getAllValues().get(0).getEntries().size());
-
-        assertEquals(baseQueueUrl + 1, argumentCaptor.getAllValues().get(1).getQueueUrl());
-        assertEquals(10, argumentCaptor.getAllValues().get(1).getEntries().size());
-
-        assertEquals(baseQueueUrl + 1, argumentCaptor.getAllValues().get(2).getQueueUrl());
-        assertEquals(1, argumentCaptor.getAllValues().get(2).getEntries().size());
-
-        assertEquals(baseQueueUrl + 0, argumentCaptor.getAllValues().get(3).getQueueUrl());
-        assertEquals(1, argumentCaptor.getAllValues().get(3).getEntries().size());
-
-        assertEquals(baseQueueUrl + 2, argumentCaptor.getAllValues().get(4).getQueueUrl());
-        assertEquals(4, argumentCaptor.getAllValues().get(4).getEntries().size());
+        
+        //key is the queue url
+        //value is the sequence of sizes of expected batches
+        Map<String, List<Integer>> expectedCalls = new HashMap<String, List<Integer>>();
+        List<Integer> queue0Calls = new ArrayList<Integer>();
+        queue0Calls.add(10);
+        queue0Calls.add(1);
+        expectedCalls.put(baseQueueUrl + 0, queue0Calls);
+        List<Integer> queue1Calls = new ArrayList<Integer>();
+        queue1Calls.add(10);
+        queue1Calls.add(1);
+        expectedCalls.put(baseQueueUrl + 1, queue1Calls);
+        List<Integer> queue2Calls = new ArrayList<Integer>();
+        queue2Calls.add(4);
+        expectedCalls.put(baseQueueUrl + 2, queue2Calls);
+        
+        for (DeleteMessageBatchRequest request : argumentCaptor.getAllValues()) {
+            String queueUrl = request.getQueueUrl();
+            List<Integer> expectedSequence = expectedCalls.get(queueUrl);
+            assertNotNull(expectedSequence);
+            assertTrue(expectedSequence.size() > 0);
+            assertEquals(expectedSequence.get(0).intValue(), request.getEntries().size());
+            expectedSequence.remove(0);
+            if (expectedSequence.isEmpty()) {
+                expectedCalls.remove(queueUrl);
+            }
+        }
+        
+        assertTrue(expectedCalls.isEmpty());
     }
 
     /**

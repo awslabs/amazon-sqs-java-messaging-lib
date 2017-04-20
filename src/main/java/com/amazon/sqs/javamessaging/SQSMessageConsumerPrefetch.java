@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -16,17 +16,20 @@ package com.amazon.sqs.javamessaging;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
-
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
+import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
@@ -156,9 +159,10 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             if (!running || isClosed()) {
                 return;
             }
-            while (!messageQueue.isEmpty()) {
-                sqsSessionRunnable.scheduleCallBack(messageListener, messageQueue.pollFirst());
-            }
+            
+            List<MessageManager> allPrefetchedMessages = new ArrayList<MessageManager>(messageQueue);
+            sqsSessionRunnable.scheduleCallBacks(messageListener, allPrefetchedMessages);
+            messageQueue.clear();
         }
     }
     
@@ -203,7 +207,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             } catch (Throwable e) {
                 LOG.error("Unexpected exception when prefetch messages:", e);
                 nackQueueMessages = true;
-                throw e;
+                throw new RuntimeException(e);
             } finally {
                 if (isClosed() || nackQueueMessages) {
                     nackQueueMessages();
@@ -225,6 +229,11 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                                                               .withAttributeNames(ALL)
                                                               .withMessageAttributeNames(ALL)
                                                               .withWaitTimeSeconds(WAIT_TIME_SECONDS);
+        //if the receive request is for FIFO queue, provide a unique receive request attempt it, so that
+        //failed calls retried by SDK will claim the same messages
+        if (sqsDestination.isFifo()) {
+            receiveMessageRequest.withReceiveRequestAttemptId(UUID.randomUUID().toString());
+        }
         List<Message> messages = null;
         try {
             ReceiveMessageResult receivedMessageResult = amazonSQSClient.receiveMessage(receiveMessageRequest);
@@ -250,26 +259,25 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      */
     protected void processReceivedMessages(List<Message> messages) {
         List<String> nackMessages = new ArrayList<String>();
+        List<MessageManager> messageManagers = new ArrayList<MessageManager>();
         for (Message message : messages) {
             try {
                 javax.jms.Message jmsMessage = convertToJMSMessage(message);
-
-                if (messageListener != null) {
-                    sqsSessionRunnable.scheduleCallBack(messageListener, new MessageManager(this, jmsMessage));
-                    synchronized (stateLock) {
-                        messagesPrefetched++;                        
-                        notifyStateChange();
-                    }
-                } else {
-                    synchronized (stateLock) {
-                        messageQueue.addLast(new MessageManager(this, jmsMessage));
-                        messagesPrefetched++;
-                        notifyStateChange();
-                    }
-                }
+                messageManagers.add(new MessageManager(this, jmsMessage));
             } catch (JMSException e) {
                 nackMessages.add(message.getReceiptHandle());
             }
+        }
+        
+        synchronized (stateLock) {
+            if (messageListener != null) {
+                sqsSessionRunnable.scheduleCallBacks(messageListener, messageManagers);
+            } else {
+                messageQueue.addAll(messageManagers);
+            }
+            
+            messagesPrefetched += messageManagers.size();
+            notifyStateChange();
         }
 
         // Nack any messages that cannot be serialized to JMSMessage.
@@ -515,5 +523,32 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     
     protected boolean isClosed() {
         return closed;
+    }
+
+    List<SQSMessageIdentifier> purgePrefetchedMessagesWithGroups(Set<String> affectedGroups) throws JMSException {
+        List<SQSMessageIdentifier> purgedMessages = new ArrayList<SQSMessageIdentifier>();
+        synchronized (stateLock) {
+            //let's walk over the prefetched messages
+            Iterator<MessageManager> managerIterator = messageQueue.iterator();
+            while (managerIterator.hasNext()) {
+                MessageManager messageManager = managerIterator.next();
+                SQSMessage prefetchedMessage = (SQSMessage)messageManager.getMessage();
+                SQSMessageIdentifier messageIdentifier = SQSMessageIdentifier.fromSQSMessage(prefetchedMessage);
+
+                //is the prefetch entry for one of the affected group ids?
+                if (affectedGroups.contains(messageIdentifier.getGroupId())) {
+                    //we will purge this prefetched message
+                    purgedMessages.add(messageIdentifier);
+                    //remove from prefetch queue
+                    managerIterator.remove();
+                    //we are done with it and can prefetch more messages
+                    this.messagesPrefetched--;
+                }
+            }
+
+            notifyStateChange();
+        }
+        
+        return purgedMessages;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -131,8 +131,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
 
         public Builder() {
             clientConfiguration = new ClientConfiguration();
-            clientConfiguration.setUserAgent(
-                    clientConfiguration.getUserAgent() + SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION );
+            clientConfiguration.setUserAgentPrefix(clientConfiguration.getUserAgentPrefix() + SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION );
             
             // Set default numberOfMessagesToPrefetch to MIN_BATCH.
             this.numberOfMessagesToPrefetch = SQSMessagingClientConstants.MIN_BATCH;
@@ -220,11 +219,11 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
 
         public void setClientConfiguration(ClientConfiguration clientConfig) {
             clientConfiguration = new ClientConfiguration( clientConfig );
-            if( clientConfig.getUserAgent() == null || clientConfig.getUserAgent().isEmpty() ) {
-                clientConfig.setUserAgent( ClientConfiguration.DEFAULT_USER_AGENT );
+            if( clientConfig.getUserAgentPrefix() == null || clientConfig.getUserAgentPrefix().isEmpty() ) {
+                clientConfig.setUserAgentPrefix( ClientConfiguration.DEFAULT_USER_AGENT );
             }
-            clientConfiguration.setUserAgent(
-                    clientConfig.getUserAgent() + SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION );
+            clientConfiguration.setUserAgentPrefix(
+                    clientConfig.getUserAgentPrefix() + SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION );
         }
 
         public int getNumberOfMessagesToPrefetch() {

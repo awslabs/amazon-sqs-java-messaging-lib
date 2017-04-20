@@ -16,7 +16,6 @@ package com.amazon.sqs.javamessaging;
 
 
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSConnection;
 import com.amazon.sqs.javamessaging.SQSMessageProducer;
 import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.SQSSession;
@@ -25,59 +24,47 @@ import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
 import com.amazonaws.util.Base64;
 
-import javax.jms.InvalidDestinationException;
 import javax.jms.JMSException;
-import javax.jms.IllegalStateException;
-import javax.jms.Message;
-import javax.jms.Queue;
-import javax.jms.Destination;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.argThat;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * Test the SQSMessageProducerTest class
  */
-public class SQSMessageProducerTest {
+public class SQSMessageProducerFifoTest {
 
-    public static final String QUEUE_URL = "QueueUrl";
-    public static final String QUEUE_NAME = "QueueName";
-    public static final String MESSAGE_ID_1 = "MessageId1";
-    public static final String MESSAGE_ID_2 = "MessageId2";
+    public static final String QUEUE_URL = "QueueUrl.fifo";
+    public static final String QUEUE_NAME = "QueueName.fifo";
+    public static final String MESSAGE_ID = "MessageId";
+    public static final String SEQ_NUMBER = "10010101231012312354534";
+    public static final String SEQ_NUMBER_2 = "10010101231012312354535";
+    public static final String GROUP_ID = "G1";
+    public static final String DEDUP_ID = "D1";
 
     private SQSMessageProducer producer;
     private SQSQueueDestination destination;
     private SQSSession sqsSession;
-    private SQSConnection sqsConnection;
     private AmazonSQSMessagingClientWrapper amazonSQSClient;
     private Acknowledger acknowledger;
 
@@ -85,52 +72,12 @@ public class SQSMessageProducerTest {
     public void setup() throws JMSException {
 
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
-        sqsConnection = mock(SQSConnection.class);
 
         acknowledger = mock(Acknowledger.class);
 
         sqsSession = mock(SQSSession.class);
         destination = new SQSQueueDestination(QUEUE_NAME, QUEUE_URL);
         producer = spy(new SQSMessageProducer(amazonSQSClient, sqsSession, destination));
-    }
-
-    /**
-     * Test check If Destination Already Set
-     */
-    @Test
-    public void testCheckIfDestinationAlreadySet() throws JMSException {
-
-        try {
-            producer.checkIfDestinationAlreadySet();
-        } catch (UnsupportedOperationException uoe) {
-            assertEquals("MessageProducer already specified a destination at creation time.", uoe.getMessage());
-        }
-
-        producer = spy(new SQSMessageProducer(amazonSQSClient, sqsSession, null));
-        producer.checkIfDestinationAlreadySet();
-    }
-
-    /**
-     * Test check closed
-     */
-    @Test
-    public void testCheckClosed() throws JMSException {
-
-        /*
-         * Check exception is thrown when producer is closed
-         */
-        producer.isClosed().set(true);
-        try {
-            producer.checkClosed();
-        } catch (IllegalStateException ise) {
-            assertEquals("The producer is closed.", ise.getMessage());
-        }
-
-        /*
-         * Check no op when producer is closed
-         */
-        producer.isClosed().set(false);
-        producer.checkClosed();
     }
 
     /**
@@ -158,14 +105,10 @@ public class SQSMessageProducerTest {
         /*
          * Test Empty byte message default attribute
          */
-        MessageAttributeValue messageAttributeValueByte = new MessageAttributeValue();
-        messageAttributeValueByte.setDataType("String");
-        messageAttributeValueByte.setStringValue("byte");
-
         SQSMessage sqsByte = new SQSBytesMessage();
         Map<String, MessageAttributeValue> messageAttributeByte = producer.propertyToMessageAttribute(sqsByte);
 
-        assertEquals(0, messageAttributeObject.size());
+        assertEquals(0, messageAttributeByte.size());
     }
 
     /**
@@ -242,10 +185,6 @@ public class SQSMessageProducerTest {
         messageAttributeValueObject.setDataType("Number.int");
         messageAttributeValueObject.setStringValue("8");
 
-        MessageAttributeValue messageAttributeValueJMSSQSMessageType = new MessageAttributeValue();
-        messageAttributeValueJMSSQSMessageType.setDataType("String");
-        messageAttributeValueJMSSQSMessageType.setStringValue("text");
-
         /*
          * Convert property to sqs message attribute
          */
@@ -267,87 +206,26 @@ public class SQSMessageProducerTest {
     }
 
     /**
-     * Test sendInternal input of Non SQS message
-     */
-    @Test
-    public void testSendInternalNonSQSMessage() throws JMSException {
-
-        Message msg = mock(Message.class);
-
-        try {
-            producer.sendInternal(destination, msg);
-            fail();
-        } catch (JMSException jmse) {
-            // expected
-        }
-    }
-
-    /**
-     * Test sendInternal input of Non SQS message
-     */
-    @Test
-    public void testSendInternalAlreadyClosed() throws JMSException {
-
-        producer.isClosed().set(true);
-        SQSMessage msg = mock(SQSMessage.class);
-
-        try {
-            producer.sendInternal(destination, msg);
-            fail();
-        } catch (JMSException jmse) {
-            // expected
-        }
-    }
-
-    /**
-     * Test sendInternal input that SQSMessage is not a valid input
-     */
-    @Test
-    public void testSendInternalNoMessageBody() throws JMSException {
-
-        SQSMessage msg = mock(SQSMessage.class);
-
-        try {
-            producer.sendInternal(destination, msg);
-            fail();
-        } catch (JMSException jmse) {
-            //expected
-        }
-
-        verify(msg).setJMSDestination(destination);
-    }
-
-    /**
      * Test sendInternal input with SQSTextMessage
      */
     @Test
     public void testSendInternalSQSTextMessage() throws JMSException {
 
-        String messageBody1 = "MyText1";
-        String messageBody2 = "MyText2";
-        SQSTextMessage msg = spy(new SQSTextMessage(messageBody1));
-
-        Map<String, MessageAttributeValue> messageAttributes = createMessageAttribute("text");
+        String messageBody = "MyText1";
+        SQSTextMessage msg = spy(new SQSTextMessage(messageBody));
+        msg.setStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID, GROUP_ID);
+        msg.setStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID, DEDUP_ID);
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_2));
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER));
 
         producer.sendInternal(destination, msg);
 
-        /*
-         * Re send the message
-         */
-        msg.setText(messageBody2);
-        producer.sendInternal(destination, msg);
-
-        List<String> messagesBody = Arrays.asList(messageBody1, messageBody2);
-        verify(amazonSQSClient, times(2)).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messagesBody, messageAttributes)));
-        verify(msg, times(2)).setJMSDestination(destination);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_2);
-        verify(msg).setSQSMessageId(MESSAGE_ID_1);
-        verify(msg).setSQSMessageId(MESSAGE_ID_2);
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.TEXT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(msg).setJMSDestination(destination);
+        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
+        verify(msg).setSQSMessageId(MESSAGE_ID);
+        verify(msg).setSequenceNumber(SEQ_NUMBER);
     }
 
     /**
@@ -367,6 +245,9 @@ public class SQSMessageProducerTest {
 
         Map<String, String> mapAttributes = new HashMap<String, String>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
+        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
+        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
 
         com.amazonaws.services.sqs.model.Message message =
                 new com.amazonaws.services.sqs.model.Message()
@@ -377,15 +258,15 @@ public class SQSMessageProducerTest {
         SQSTextMessage msg = spy(new SQSTextMessage(acknowledger, QUEUE_URL, message));
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1));
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER_2));
 
         producer.sendInternal(destination, msg);
 
-        List<String> messagesBody = Arrays.asList("MessageBody");
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messagesBody, mapMessageAttributes)));
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, "MessageBody", SQSMessage.TEXT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
-        verify(msg).setSQSMessageId(MESSAGE_ID_1);
+        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
+        verify(msg).setSQSMessageId(MESSAGE_ID);
+        verify(msg).setSequenceNumber(SEQ_NUMBER_2);
     }
 
     /**
@@ -394,40 +275,24 @@ public class SQSMessageProducerTest {
     @Test
     public void testSendInternalSQSObjectMessage() throws JMSException {
 
-        HashSet<String> set1 = new HashSet<String>();
-        set1.add("data1");
-        HashSet<String> set2 = new HashSet<String>();
-        set2.add("data2");
+        HashSet<String> set = new HashSet<String>();
+        set.add("data1");
 
-        SQSObjectMessage msg = spy(new SQSObjectMessage(set1));
-        String megBody1 = msg.getMessageBody();
-
-        Map<String, MessageAttributeValue> messageAttributes = createMessageAttribute("object");
+        SQSObjectMessage msg = spy(new SQSObjectMessage(set));
+        msg.setStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID, GROUP_ID);
+        msg.setStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID, DEDUP_ID);
+        String msgBody = msg.getMessageBody();
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_2));
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER));
 
         producer.sendInternal(destination, msg);
 
-        /*
-         * Re send the message
-         */
-        msg.clearBody();
-        msg.setObject(set2);
-        String megBody2 = msg.getMessageBody();
-        producer.sendInternal(destination, msg);
-        
-        ArgumentCaptor<SendMessageRequest> argumentCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
-        verify(amazonSQSClient, times(2)).sendMessage(argumentCaptor.capture());
-        
-        assertEquals(megBody1, argumentCaptor.getAllValues().get(0).getMessageBody());
-        assertEquals(megBody2, argumentCaptor.getAllValues().get(1).getMessageBody());
-        verify(msg, times(2)).setJMSDestination(destination);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_2);
-        verify(msg).setSQSMessageId(MESSAGE_ID_1);
-        verify(msg).setSQSMessageId(MESSAGE_ID_2);
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, msgBody, SQSMessage.OBJECT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(msg).setJMSDestination(destination);
+        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
+        verify(msg).setSQSMessageId(MESSAGE_ID);
+        verify(msg).setSequenceNumber(SEQ_NUMBER);
     }
 
     /**
@@ -448,6 +313,9 @@ public class SQSMessageProducerTest {
 
         Map<String, String> mapAttributes = new HashMap<String, String>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
+        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
+        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
 
         // Encode an object to byte array
         Integer integer = new Integer("10");
@@ -465,19 +333,16 @@ public class SQSMessageProducerTest {
 
         SQSObjectMessage msg = spy(new SQSObjectMessage(acknowledger, QUEUE_URL, message));
 
-        Map<String, MessageAttributeValue> messageAttributes = createMessageAttribute("object");
-
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_2));
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER_2));
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, Arrays.asList(messageBody),
-                messageAttributes)));
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.OBJECT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
-        verify(msg).setSQSMessageId(MESSAGE_ID_1);
+        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
+        verify(msg).setSQSMessageId(MESSAGE_ID);
+        verify(msg).setSequenceNumber(SEQ_NUMBER_2);
     }
 
     /**
@@ -487,34 +352,23 @@ public class SQSMessageProducerTest {
     public void testSendInternalSQSByteMessage() throws JMSException {
 
         SQSBytesMessage msg = spy(new SQSBytesMessage());
+        msg.setStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID, GROUP_ID);
+        msg.setStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID, DEDUP_ID);
         msg.writeByte((byte)0);
         msg.reset();
 
-        Map<String, MessageAttributeValue> messageAttributes = createMessageAttribute("byte");
-
-        String messageId = "MessageId";
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_2));
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER));
 
         producer.sendInternal(destination, msg);
 
-        /*
-         * Re send the message
-         */
-        msg.clearBody();
-        msg.writeInt(42);
-        producer.sendInternal(destination, msg);
+        String messageBody = "AA==";
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.BYTE_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
 
-        List<String> messagesBody = Arrays.asList("AA==", "AAAAKg==");
-        verify(amazonSQSClient, times(2)).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messagesBody,
-                                                                                            messageAttributes)));
-
-        verify(msg, times(2)).setJMSDestination(destination);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_2);
-        verify(msg).setSQSMessageId(MESSAGE_ID_1);
-        verify(msg).setSQSMessageId(MESSAGE_ID_2);
+        verify(msg).setJMSDestination(destination);
+        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
+        verify(msg).setSQSMessageId(MESSAGE_ID);
+        verify(msg).setSequenceNumber(SEQ_NUMBER);
     }
 
     /**
@@ -534,6 +388,9 @@ public class SQSMessageProducerTest {
 
         Map<String, String> mapAttributes = new HashMap<String, String>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
+        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
+        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
 
         byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
         String messageBody = Base64.encodeAsString(byteArray);
@@ -543,183 +400,34 @@ public class SQSMessageProducerTest {
                         .withAttributes(mapAttributes)
                         .withBody(messageBody);
 
-        SQSObjectMessage msg = spy(new SQSObjectMessage(acknowledger, QUEUE_URL, message));
-
-        Map<String, MessageAttributeValue> messageAttributes = createMessageAttribute("object");
+        SQSBytesMessage msg = spy(new SQSBytesMessage(acknowledger, QUEUE_URL, message));
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_2));
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER_2));
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, Arrays.asList(messageBody),
-                messageAttributes)));
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.BYTE_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
-        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
-        verify(msg).setSQSMessageId(MESSAGE_ID_1);
-    }
-
-    /**
-     * Test getQueue
-     */
-    @Test
-    public void testGetQueue() throws JMSException {
-        assertEquals(destination, producer.getQueue());
-    }
-
-    /**
-     * Test send with non SQSDestination
-     */
-    @Test
-    public void testSendNonSQSDestination() throws JMSException {
-
-        Queue queue = mock(Queue.class);
-
-        SQSTextMessage msg = spy(new SQSTextMessage("MyText"));
-
-        try {
-            producer.send(queue, msg);
-            fail();
-        } catch (InvalidDestinationException ide) {
-            // expected
-        }
-
-        Destination destination = mock(Destination.class);
-        try {
-            producer.send(destination, msg);
-            fail();
-        } catch (InvalidDestinationException ide) {
-            // expected
-        }
-
-        try {
-            producer.send(null, msg);
-            fail();
-        } catch (InvalidDestinationException ide) {
-            // expected
-        }
-    }
-
-    /**
-     * Test send when destination already specified
-     */
-    @Test
-    public void testSendDestinationAlreadySpecified() throws JMSException {
-
-        SQSTextMessage msg = spy(new SQSTextMessage("MyText"));
-
-        try {
-            producer.send(destination, msg);
-            fail();
-        } catch (UnsupportedOperationException ide) {
-            // expected
-        }
-
-        verify(producer).checkIfDestinationAlreadySet();
-    }
-
-    /**
-     * Test send with destination
-     */
-    @Test
-    public void testSendWithDestination() throws JMSException {
-
-        SQSTextMessage msg = spy(new SQSTextMessage("MyText"));
-        producer = spy(new SQSMessageProducer(amazonSQSClient, sqsSession, null));
-
-        doNothing()
-                .when(producer).sendInternal(destination, msg);
-
-        producer.send(destination, msg);
-
-        verify(producer).checkIfDestinationAlreadySet();
-        verify(producer).sendInternal(destination, msg);
-    }
-
-    /**
-     * Test send API with unsupported feature are not used
-     */
-    @Test
-    public void testSendDropUnsupportedFeatures() throws JMSException {
-
-        int deliveryMode = 1;
-        int priority = 1;
-        long timeToLive = 1;
-        SQSTextMessage msg = spy(new SQSTextMessage("MyText"));
-
-        doNothing()
-                .when(producer).send(destination, msg);
-        doNothing()
-                .when(producer).send(msg);
-
-        producer.send(destination, msg, deliveryMode, priority, timeToLive);
-        producer.send(msg, deliveryMode, priority, timeToLive);
-
-        verify(producer).send(destination, msg);
-        verify(producer).send(msg);
-    }
-
-    /**
-     * Test send without destination
-     */
-    @Test
-    public void testSendWithoutDestination() throws JMSException {
-
-        SQSTextMessage msg = spy(new SQSTextMessage("MyText"));
-
-        doNothing()
-                .when(producer).sendInternal(destination, msg);
-
-        producer.send(msg);
-        verify(producer).sendInternal(destination, msg);
-    }
-
-    /**
-     * Test Close when producer is already closed
-     */
-    @Test
-    public void testCloseAlreadyClosed() throws JMSException {
-
-        producer.isClosed().set(true);
-
-        producer.close();
-
-        verify(sqsSession, never()).removeProducer(producer);
-    }
-
-    /**
-     * Test Close
-     */
-    @Test
-    public void testClose() throws JMSException {
-
-        producer.close();
-
-        verify(sqsSession).removeProducer(producer);
-    }
-
-    private Map<String, MessageAttributeValue> createMessageAttribute(String type) {
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-        messageAttributeValue.setDataType("String");
-        messageAttributeValue.setStringValue(type);
-
-        Map<String, MessageAttributeValue> messageAttributes = new HashMap<String, MessageAttributeValue>();
-        messageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
-        return messageAttributes;
+        verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
+        verify(msg).setSQSMessageId(MESSAGE_ID);
+        verify(msg).setSequenceNumber(SEQ_NUMBER_2);
     }
 
     private class sendMessageRequestMatcher extends ArgumentMatcher<SendMessageRequest> {
 
         private String queueUrl;
-        private List<String> messagesBody;
-        private Map<String, MessageAttributeValue> messageAttributes;
+        private String messagesBody;
+        private String messageType;
+        private String groupId;
+        private String deduplicationId;
 
-        private sendMessageRequestMatcher(String queueUrl, List<String> messagesBody,
-                                          Map<String, MessageAttributeValue> messageAttributes) {
+        private sendMessageRequestMatcher(String queueUrl, String messagesBody, String messageType, String groupId, String deduplicationId) {
             this.queueUrl = queueUrl;
             this.messagesBody = messagesBody;
-            this.messageAttributes = messageAttributes;
+            this.messageType = messageType;
+            this.groupId = groupId;
+            this.deduplicationId = deduplicationId;
         }
 
         @Override
@@ -729,10 +437,13 @@ public class SQSMessageProducerTest {
                 return false;
             }
 
-            SendMessageRequest reqeust = (SendMessageRequest)argument;
-            assertEquals(queueUrl, reqeust.getQueueUrl());
-            assertTrue(messagesBody.contains(reqeust.getMessageBody()));
-            assertEquals(messageAttributes , reqeust.getMessageAttributes());
+            SendMessageRequest request = (SendMessageRequest)argument;
+            assertEquals(queueUrl, request.getQueueUrl());
+            assertEquals(messagesBody, request.getMessageBody());
+            String messageType = request.getMessageAttributes().get(SQSMessage.JMS_SQS_MESSAGE_TYPE).getStringValue();
+            assertEquals(this.messageType, messageType);
+            assertEquals(this.groupId, request.getMessageGroupId());
+            assertEquals(this.deduplicationId, request.getMessageDeduplicationId());
             return true;
         }
     }

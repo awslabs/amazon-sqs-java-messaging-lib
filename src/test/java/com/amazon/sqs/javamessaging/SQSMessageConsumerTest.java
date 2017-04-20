@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -197,34 +197,6 @@ public class SQSMessageConsumerTest {
          * Verify results
          */
         verifyNoMoreInteractions(sqsMessageConsumerPrefetch);
-    }
-
-    /**
-     * Test recover
-     */
-    @Test
-    public void testRecover() throws InterruptedException, JMSException {
-
-        /*
-         * Set up the mocks
-         */
-        List<SQSMessageIdentifier> unAckIdentifiers = new ArrayList<SQSMessageIdentifier>();
-        unAckIdentifiers.add(new SQSMessageIdentifier(QUEUE_URL_1, "r1", "messageId1"));
-        unAckIdentifiers.add(new SQSMessageIdentifier(QUEUE_URL_2, "r2", "messageId2"));
-
-        when(acknowledger.getUnAckMessages())
-                .thenReturn(unAckIdentifiers);
-
-        /*
-         * Recover the consumer
-         */
-        consumer.recover();
-
-        /*
-         * Verify results
-         */
-        verify(negativeAcknowledger).bulkAction(unAckIdentifiers, unAckIdentifiers.size());
-        verify(acknowledger).forgetUnAckMessages();
     }
 
     /**

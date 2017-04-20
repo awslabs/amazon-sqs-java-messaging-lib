@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@ import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage.JMSMessagePropertyValue;
 import com.amazonaws.util.Base64;
-
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
+import com.amazonaws.services.sqs.model.SendMessageResult;
 
 /**
  * A client uses a MessageProducer object to send messages to a queue
@@ -83,39 +83,57 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         this.parentSQSSession = parentSQSSession;
     }
 
-    void sendInternal(Queue queue, Message message) throws JMSException {
+    void sendInternal(SQSQueueDestination queue, Message rawMessage) throws JMSException {
         checkClosed();
         String sqsMessageBody = null;
         String messageType = null;
-        if (message instanceof SQSMessage) {           
-            message.setJMSDestination(queue);
-            if (message instanceof SQSBytesMessage) {
-                sqsMessageBody = Base64.encodeAsString(((SQSBytesMessage) message).getBodyAsBytes());
-                messageType = SQSMessage.BYTE_MESSAGE_TYPE;
-            } else if (message instanceof SQSObjectMessage) {
-                sqsMessageBody = ((SQSObjectMessage) message).getMessageBody();
-                messageType = SQSMessage.OBJECT_MESSAGE_TYPE;
-            } else if (message instanceof SQSTextMessage) {            
-                sqsMessageBody = ((SQSTextMessage) message).getText();
-                messageType = SQSMessage.TEXT_MESSAGE_TYPE;
-            }
-        } else {
+        if (!(rawMessage instanceof SQSMessage)) {
             throw new MessageFormatException(
-                    "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");
+                    "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");            
         }
+        
+        SQSMessage message = (SQSMessage)rawMessage;
+        message.setJMSDestination(queue);
+        if (message instanceof SQSBytesMessage) {
+            sqsMessageBody = Base64.encodeAsString(((SQSBytesMessage) message).getBodyAsBytes());
+            messageType = SQSMessage.BYTE_MESSAGE_TYPE;
+        } else if (message instanceof SQSObjectMessage) {
+            sqsMessageBody = ((SQSObjectMessage) message).getMessageBody();
+            messageType = SQSMessage.OBJECT_MESSAGE_TYPE;
+        } else if (message instanceof SQSTextMessage) {            
+            sqsMessageBody = ((SQSTextMessage) message).getText();
+            messageType = SQSMessage.TEXT_MESSAGE_TYPE;
+        }
+        
         if (sqsMessageBody == null || sqsMessageBody.isEmpty()) {
             throw new JMSException("Message body cannot be null or empty");
         }
         Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute((SQSMessage) message);
         addMessageTypeReservedAttribute(messageAttributes, (SQSMessage) message, messageType);
-        SendMessageRequest sendMessageRequest = new SendMessageRequest(((SQSQueueDestination) queue).getQueueUrl(), sqsMessageBody);
+        SendMessageRequest sendMessageRequest = new SendMessageRequest(queue.getQueueUrl(), sqsMessageBody);
         sendMessageRequest.setMessageAttributes(messageAttributes);
 
-        String messageId = amazonSQSClient.sendMessage(sendMessageRequest).getMessageId();
+        //for FIFO queues, we have to specify both MessageGroupId, which we obtain from standard property JMSX_GROUP_ID
+        //and MessageDeduplicationId, which we obtain from a custom provider specific property JMS_SQS_DEDUPLICATION_ID
+        //notice that this code does not validate if the values are actually set by the JMS user
+        //this means that failure to provide the required values will fail server side and throw a JMSException
+        if (queue.isFifo()) {
+            sendMessageRequest.setMessageGroupId(message.getSQSMessageGroupId());
+            sendMessageRequest.setMessageDeduplicationId(message.getSQSMessageDeduplicationId());
+        }
+
+        SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
+        String messageId = sendMessageResult.getMessageId();
         LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
-        /** TODO: Do not support disableMessageID for now.*/
-        message.setJMSMessageID(String.format(SQSMessagingClientConstants.MESSAGE_ID_FORMAT, messageId));
-        ((SQSMessage)message).setSQSMessageId(messageId);
+        /** TODO: Do not support disableMessageID for now. */
+        message.setSQSMessageId(messageId);
+
+        // if the message was sent to FIFO queue, the sequence number will be
+        // set in the response
+        // pass it to JMS user through provider specific JMS property
+        if (sendMessageResult.getSequenceNumber() != null) {
+            message.setSequenceNumber(sendMessageResult.getSequenceNumber());
+        }
     }
 
     @Override
@@ -148,7 +166,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
                     "Incompatible implementation of Queue. Please use SQSQueueDestination implementation.");
         }
         checkIfDestinationAlreadySet();
-        sendInternal(queue, message);
+        sendInternal((SQSQueueDestination)queue, message);
     }
 
     /**
@@ -170,6 +188,18 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             if (propertyName.equals(SQSMessagingClientConstants.JMSX_DELIVERY_COUNT)) {
                 continue;
             }
+
+            // This property will be used as DeduplicationId argument of SendMessage call
+            // On receive it is mapped back to this JMS property
+            if (propertyName.equals(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID)) {
+                continue;
+            }
+
+            // the JMSXGroupID and JMSXGroupSeq are always stored as message
+            // properties, so they are not lost between send and receive
+            // even though SQS Classic does not respect those values when returning messages
+            // and SQS FIFO has a different understanding of message groups
+
             JMSMessagePropertyValue propertyObject = message.getJMSMessagePropertyValue(propertyName);
             MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
 
@@ -272,7 +302,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             throw new UnsupportedOperationException(
                     "MessageProducer has to specify a destination at creation time.");
         }
-        sendInternal((Queue) sqsDestination, message);
+        sendInternal(sqsDestination, message);
     }
   
     /**

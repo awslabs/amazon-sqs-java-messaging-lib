@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -32,10 +32,12 @@ import com.amazonaws.services.sqs.model.*;
 
 import javax.jms.*;
 import javax.jms.Message;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +46,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -124,7 +131,7 @@ public class SQSMessageConsumerPrefetchTest {
         consumerPrefetch.start();
 
         // Create messages return from SQS
-        List<String> receipt = new ArrayList<String>();
+        final List<String> receipt = new ArrayList<String>();
         for (int i = 0; i < 10; ++i) {
             receipt.add("r" + i);
         }
@@ -144,7 +151,21 @@ public class SQSMessageConsumerPrefetchTest {
                 .thenReturn(false)
                 .thenReturn(false)
                 .thenReturn(false)
-                .thenReturn(true);
+                .thenAnswer(new Answer<Boolean>() {
+
+                    @Override
+                    public Boolean answer(InvocationOnMock invocation) throws Throwable {
+                        // Ensure message queue was filled with expected messages
+                        //after we return 'isClosed() == true' we will empty the prefetch queue while nacking messages
+                        assertEquals(10, consumerPrefetch.messageQueue.size());
+                        for (SQSMessageConsumerPrefetch.MessageManager messageManager : consumerPrefetch.messageQueue) {
+                            SQSMessage sqsMessage = (SQSMessage)messageManager.getMessage();
+                            assertTrue(receipt.contains(sqsMessage.getReceiptHandle()));
+                        }
+                        
+                        return true;
+                    }
+                });
 
         /*
          * Run the prefetch
@@ -276,9 +297,9 @@ public class SQSMessageConsumerPrefetchTest {
          */
         try {
             consumerPrefetch.run();
-            fail("expect error");
-        } catch (Error e) {
-            // Expected error
+            fail("expect exception");
+        } catch (RuntimeException e) {
+            // Expected exception
         }
 
         /*
@@ -354,8 +375,8 @@ public class SQSMessageConsumerPrefetchTest {
         try {
             consumerPrefetch.run();
             fail("expect error");
-        } catch (Error e) {
-            // Expected error
+        } catch (RuntimeException e) {
+            // Expected exception
         }
 
         /*
@@ -435,8 +456,8 @@ public class SQSMessageConsumerPrefetchTest {
         try {
             consumerPrefetch.run();
             fail("expect error");
-        } catch (Error e) {
-            // Expected error
+        } catch (RuntimeException e) {
+            // Expected exception
         }
 
         /*
@@ -505,8 +526,10 @@ public class SQSMessageConsumerPrefetchTest {
               
         assertTrue(consumerPrefetch.messageQueue.isEmpty());
 
-        verify(sqsSessionRunnable).scheduleCallBack(msgListener, msgManager1);
-        verify(sqsSessionRunnable).scheduleCallBack(msgListener, msgManager2);
+        List<MessageManager> expectedList = new ArrayList<MessageManager>();
+        expectedList.add(msgManager1);
+        expectedList.add(msgManager2);
+        verify(sqsSessionRunnable).scheduleCallBacks(msgListener, expectedList);
 
         verifyNoMoreInteractions(sqsSessionRunnable);
     }
@@ -1209,8 +1232,9 @@ public class SQSMessageConsumerPrefetchTest {
 
         assertNull(msg);
 
-        // verify that we did not exist early
-        assertTrue(System.currentTimeMillis() - startTime > waitTime);
+        // verify that we did not exit early
+        long measuredTime = System.currentTimeMillis() - startTime; 
+        assertTrue(String.format("Expected wait time = %1$s ms and has to be less than or equal to measured time = %2$s ms", waitTime, measuredTime), waitTime <= measuredTime);
     }
 
     /**
@@ -1284,7 +1308,9 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Verify results
          */
-        verify(sqsSessionRunnable, times(3)).scheduleCallBack(eq(msgListener), any(MessageManager.class));
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(sqsSessionRunnable, times(1)).scheduleCallBacks(eq(msgListener), captor.capture());
+        assertEquals(3, captor.getValue().size());
 
         // Ensure no messages were added to the queue
         assertEquals(0, consumerPrefetch.messageQueue.size());
@@ -1365,7 +1391,9 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Verify results
          */
-        verify(sqsSessionRunnable, times(3)).scheduleCallBack(eq(msgListener), any(MessageManager.class));
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(sqsSessionRunnable, times(1)).scheduleCallBacks(eq(msgListener), captor.capture());
+        assertEquals(3, captor.getValue().size());
 
         // Ensure no messages were added to the queue
         assertEquals(0, consumerPrefetch.messageQueue.size());
@@ -1392,7 +1420,7 @@ public class SQSMessageConsumerPrefetchTest {
                 .withMessageAttributeNames(SQSMessageConsumerPrefetch.ALL)
                 .withWaitTimeSeconds(SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS);
 
-        List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<>();
+        List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<com.amazonaws.services.sqs.model.Message>();
         messages.add(new com.amazonaws.services.sqs.model.Message().withReceiptHandle("r1"));
         messages.add(new com.amazonaws.services.sqs.model.Message().withReceiptHandle("r2"));
         messages.add(new com.amazonaws.services.sqs.model.Message().withReceiptHandle("r3"));
@@ -1755,7 +1783,7 @@ public class SQSMessageConsumerPrefetchTest {
         Map<String,String> mapAttributes = new HashMap<String, String>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
 
-        List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<>();
+        List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<com.amazonaws.services.sqs.model.Message>();
         for (String receipt : receiptList) {
             messages.add(new com.amazonaws.services.sqs.model.Message()
                                                                 .withReceiptHandle(receipt)

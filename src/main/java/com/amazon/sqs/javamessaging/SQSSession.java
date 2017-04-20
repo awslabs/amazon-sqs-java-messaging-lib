@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@ package com.amazon.sqs.javamessaging;
 
 import java.io.Serializable;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -52,6 +56,7 @@ import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
+import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
@@ -133,6 +138,11 @@ public class SQSSession implements Session, QueueSession {
      * Acknowledger of this Session.
      */
     private final Acknowledger acknowledger;
+    
+    /**
+     * Negative acknowledger of this Session
+     */
+    private final NegativeAcknowledger negativeAcknowledger;
 
     /**
      * Set of MessageProducer under this Session
@@ -182,7 +192,8 @@ public class SQSSession implements Session, QueueSession {
         this.amazonSQSClient = parentSQSConnection.getWrappedAmazonSQSClient();
         this.acknowledgeMode = acknowledgeMode;
         this.acknowledger = this.acknowledgeMode.createAcknowledger(amazonSQSClient, this);
-        this.sqsSessionRunnable = new SQSSessionCallbackScheduler(this, acknowledgeMode, acknowledger);
+        this.negativeAcknowledger = new NegativeAcknowledger(amazonSQSClient);
+        this.sqsSessionRunnable = new SQSSessionCallbackScheduler(this, acknowledgeMode, acknowledger, negativeAcknowledger);
         this.executor = Executors.newSingleThreadExecutor(SESSION_THREAD_FACTORY);
         this.messageConsumers = messageConsumers;
         this.messageProducers = messageProducers;
@@ -401,9 +412,9 @@ public class SQSSession implements Session, QueueSession {
 
                 for (SQSMessageConsumer messageConsumer : messageConsumers) {
                     messageConsumer.close();
-                    /** Nack the messages that were delivered but not acked */
-                    messageConsumer.recover();
                 }
+                
+                recover();
                 
                 try {
                     if (executor != null) {
@@ -464,9 +475,44 @@ public class SQSSession implements Session, QueueSession {
     @Override
     public void recover() throws JMSException {
         checkClosed();
-        for (SQSMessageConsumer messageConsumer : messageConsumers) {
-            messageConsumer.recover();
+        
+        //let's get all unacknowledged message identifiers
+        List<SQSMessageIdentifier> unAckedMessages = acknowledger.getUnAckMessages();
+        acknowledger.forgetUnAckMessages();
+        
+        //let's summarize which queues and which message groups we're nacked
+        //we have to purge all prefetched messages and queued up callback entries for affected queues and groups
+        //if not, we would end up consuming messages out of order
+        Map<String, Set<String>> queueToGroupsMapping = getAffectedGroupsPerQueueUrl(unAckedMessages);
+
+        for (SQSMessageConsumer consumer : this.messageConsumers) {
+            SQSQueueDestination sqsQueue = (SQSQueueDestination)consumer.getQueue();
+            Set<String> affectedGroups = queueToGroupsMapping.get(sqsQueue.getQueueUrl());
+            if (affectedGroups != null) {
+                unAckedMessages.addAll(consumer.purgePrefetchedMessagesWithGroups(affectedGroups));
+            }
         }
+        
+        unAckedMessages.addAll(sqsSessionRunnable.purgeScheduledCallbacksForQueuesAndGroups(queueToGroupsMapping));
+        
+        if (!unAckedMessages.isEmpty()) {
+            negativeAcknowledger.bulkAction(unAckedMessages, unAckedMessages.size());
+        }
+    }
+
+    private Map<String, Set<String>> getAffectedGroupsPerQueueUrl(List<SQSMessageIdentifier> messages) {
+        Map<String, Set<String>> queueToGroupsMapping = new HashMap<String, Set<String>>();
+        for (SQSMessageIdentifier message : messages) {
+            String groupId = message.getGroupId();
+            if (groupId != null) {
+                String queueUrl = message.getQueueUrl();
+                if (!queueToGroupsMapping.containsKey(queueUrl)) {
+                    queueToGroupsMapping.put(queueUrl, new HashSet<String>());
+                }
+                queueToGroupsMapping.get(queueUrl).add(groupId);
+            }
+        }
+        return queueToGroupsMapping;
     }
 
     @Override
@@ -529,7 +575,7 @@ public class SQSSession implements Session, QueueSession {
     SQSMessageConsumer createSQSMessageConsumer(SQSQueueDestination destination) {
         return new SQSMessageConsumer(
                 parentSQSConnection, this, sqsSessionRunnable, (SQSQueueDestination) destination,
-                acknowledger,  new NegativeAcknowledger(amazonSQSClient),
+                acknowledger,  negativeAcknowledger,
                 CONSUMER_PREFETCH_THREAD_FACTORY);
     }
 

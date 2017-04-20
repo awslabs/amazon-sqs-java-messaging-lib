@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -28,9 +28,12 @@ import com.amazon.sqs.javamessaging.message.SQSMessage;
 
 import javax.jms.*;
 import javax.jms.IllegalStateException;
+
+import java.util.Collections;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -91,7 +94,7 @@ public class MessageListenerConcurrentOperationTest {
 
         connection = new SQSConnection(amazonSQSClient, NUMBER_OF_MESSAGES_TO_PREFETCH);
         session = new SQSSession(connection, AcknowledgeMode.ACK_AUTO);
-        SQSSessionCallbackScheduler sqsSessionRunnable = new SQSSessionCallbackScheduler(session, AcknowledgeMode.ACK_AUTO, acknowledger);
+        SQSSessionCallbackScheduler sqsSessionRunnable = new SQSSessionCallbackScheduler(session, AcknowledgeMode.ACK_AUTO, acknowledger, negativeAcknowledger);
 
         SQSMessageConsumer consumer = mock(SQSMessageConsumer.class);
 
@@ -326,7 +329,7 @@ public class MessageListenerConcurrentOperationTest {
                 } catch (BrokenBarrierException e) {
                     e.printStackTrace();
                 }
-                session.getSqsSessionRunnable().scheduleCallBack(msgListener, msgManager);
+                session.getSqsSessionRunnable().scheduleCallBacks(msgListener, Collections.singletonList(msgManager));
             }
         });
 

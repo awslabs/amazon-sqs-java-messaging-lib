@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -64,8 +64,7 @@ public class UnorderedAcknowledger implements Acknowledger {
      */
     @Override
     public void notifyMessageReceived(SQSMessage message) throws JMSException {
-        SQSMessageIdentifier messageIdentifier = new SQSMessageIdentifier(
-                message.getQueueUrl(), message.getReceiptHandle(), message.getSQSMessageId());
+        SQSMessageIdentifier messageIdentifier = SQSMessageIdentifier.fromSQSMessage(message);
         unAckMessages.put(message.getReceiptHandle(), messageIdentifier);
     }
     
