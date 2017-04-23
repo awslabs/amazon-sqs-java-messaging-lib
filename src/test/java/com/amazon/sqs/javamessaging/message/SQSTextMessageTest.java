@@ -16,9 +16,11 @@ package com.amazon.sqs.javamessaging.message;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.mockito.Mockito.mock;
 
 import javax.jms.JMSException;
 
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import org.junit.Test;
 
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
@@ -48,6 +50,22 @@ public class SQSTextMessageTest {
         String actualPayload = sqsTextMessage.getText();
         assertEquals(expectedPayload, actualPayload);
     }
+
+    /**
+     * Test create message from SQS Message
+     */
+    @Test
+    public void testCreateMessageFromSQSMessage() throws JMSException {
+        String messageBody = "theBody";
+        com.amazonaws.services.sqs.model.Message message =
+                new com.amazonaws.services.sqs.model.Message().withBody(messageBody);
+        Acknowledger acknowledger = mock(Acknowledger.class);
+
+        SQSTextMessage sqsTextMessage = new SQSTextMessage(acknowledger, "theQueueUrl", message);
+
+        assertEquals(messageBody, sqsTextMessage.getText());
+    }
+
 
     /**
      * Test create message and setting text
