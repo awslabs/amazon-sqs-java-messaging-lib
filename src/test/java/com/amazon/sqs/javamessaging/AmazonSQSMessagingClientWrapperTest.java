@@ -366,7 +366,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     public void testCreateQueueWithName() throws JMSException {
 
         wrapper.createQueue(QUEUE_NAME);
-        verify(amazonSQSClient).createQueue(QUEUE_NAME);
+        verify(amazonSQSClient).createQueue(new CreateQueueRequest(QUEUE_NAME));
     }
 
     /*
@@ -376,7 +376,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     public void testCreateQueueWithNameThrowAmazonClientException() throws JMSException {
 
         doThrow(new AmazonClientException("ace"))
-                .when(amazonSQSClient).createQueue(eq(QUEUE_NAME));
+                .when(amazonSQSClient).createQueue(eq(new CreateQueueRequest(QUEUE_NAME)));
 
         wrapper.createQueue(QUEUE_NAME);
     }
@@ -388,7 +388,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     public void testCreateQueueWithNameThrowAmazonServiceException() throws JMSException {
 
         doThrow(new AmazonServiceException("ase"))
-                .when(amazonSQSClient).createQueue(eq(QUEUE_NAME));
+                .when(amazonSQSClient).createQueue(eq(new CreateQueueRequest(QUEUE_NAME)));
 
         wrapper.createQueue(QUEUE_NAME);
     }
