@@ -392,4 +392,12 @@ public class SQSMessageTest {
         propertyNames = message.getPropertyNames();
         assertFalse(propertyNames.hasMoreElements());
     }
+
+   @Test
+   public void testDelaySeconds() throws JMSException {
+       SQSMessage message = new SQSMessage();
+       Assert.assertEquals(0,message.getDelaySeconds());
+       message.setIntProperty(SQSMessagingClientConstants.JMS_SQS_DELAY_SECONDS,30);
+       Assert.assertEquals(30,message.getDelaySeconds());
+   }
 }

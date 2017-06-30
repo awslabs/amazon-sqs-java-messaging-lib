@@ -120,7 +120,10 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         if (queue.isFifo()) {
             sendMessageRequest.setMessageGroupId(message.getSQSMessageGroupId());
             sendMessageRequest.setMessageDeduplicationId(message.getSQSMessageDeduplicationId());
+        } else if (message.getDelaySeconds() > 0) {
+            sendMessageRequest.setDelaySeconds(message.getDelaySeconds());
         }
+
 
         SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
         String messageId = sendMessageResult.getMessageId();

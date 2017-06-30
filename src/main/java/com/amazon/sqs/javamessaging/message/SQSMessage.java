@@ -406,6 +406,24 @@ public class SQSMessage implements Message {
     public void setJMSPriority(int priority) throws JMSException {
         this.priority = priority;
     }
+
+    /**
+     * Gets delay in seconds
+     */
+    public int getDelaySeconds() throws JMSException {
+        if (propertyExists(SQSMessagingClientConstants.JMS_SQS_DELAY_SECONDS)) {
+            return getIntProperty(SQSMessagingClientConstants.JMS_SQS_DELAY_SECONDS);
+        } else {
+            return 0;
+        }
+    }
+
+    /**
+     * Sets delay in seconds
+     */
+    public void setDelaySeconds(int delay) throws JMSException {
+        setIntProperty(SQSMessagingClientConstants.JMS_SQS_DELAY_SECONDS,delay);
+    }
     
     /**
      * Clears a message's properties and set the write permissions for

@@ -64,6 +64,8 @@ public class SQSMessagingClientConstants {
 
     public static final String JMS_SQS_SEQUENCE_NUMBER = "JMS_SQS_SequenceNumber";
 
+    public static final String JMS_SQS_DELAY_SECONDS = "JMS_SQS_DelaySeconds";
+
     public static final String APPROXIMATE_RECEIVE_COUNT = "ApproximateReceiveCount";
 
     public static final String MESSAGE_DEDUPLICATION_ID = "MessageDeduplicationId";

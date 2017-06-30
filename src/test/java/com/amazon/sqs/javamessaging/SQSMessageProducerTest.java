@@ -699,6 +699,30 @@ public class SQSMessageProducerTest {
         verify(sqsSession).removeProducer(producer);
     }
 
+    /**
+     * Test sendInternal input with delay
+     */
+    @Test
+    public void testSendWithDelay() throws JMSException {
+
+        String messageBody1 = "MyText1";
+        SQSTextMessage msg = spy(new SQSTextMessage(messageBody1));
+        msg.setDelaySeconds(10);
+
+        Map<String, MessageAttributeValue> messageAttributes = new HashMap<String, MessageAttributeValue>();
+        messageAttributes.put(SQSMessagingClientConstants.JMS_SQS_DELAY_SECONDS, new MessageAttributeValue().withDataType("Number.int").withStringValue("10"));
+        messageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, new MessageAttributeValue().withDataType("String").withStringValue("text"));
+
+        List<String> messagesBody = Arrays.asList(messageBody1);
+
+        when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
+                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1));
+
+        producer.sendInternal(destination, msg);
+
+        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messagesBody, messageAttributes)));
+    }
+
     private Map<String, MessageAttributeValue> createMessageAttribute(String type) {
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setDataType("String");
