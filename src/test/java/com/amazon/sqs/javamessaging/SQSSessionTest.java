@@ -503,6 +503,10 @@ public class SQSSessionTest  {
             }
 
             @Override
+            public void messageListenerReady() {
+            }
+
+            @Override
             public SQSMessageConsumer getMessageConsumer() {
                 return consumer1;
             }

@@ -182,6 +182,10 @@ public class SQSSessionCallbackScheduler implements Runnable {
                         }
                     } finally {
                         session.finishedCallback();
+                        
+                        // Let the prefetch manager know we're available to
+                        // process another message (if there is a still a listener attached).
+                        messageManager.getPrefetchManager().messageListenerReady();
                     }
                 } catch (Throwable ex) {
                     LOG.error("Unexpected exception thrown during the run of the scheduled callback", ex);
@@ -211,7 +215,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
             }
         }
     }
-            
+    
     void nackQueuedMessages() {
         synchronized (callbackQueue) {
             try {

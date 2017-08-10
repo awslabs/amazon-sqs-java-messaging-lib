@@ -28,6 +28,12 @@ public interface PrefetchManager {
     public void messageDispatched();
 
     /**
+     * Notify the prefetchThread that the message listener has finished with any
+     * previous message and is ready to accept another.
+     */
+    public void messageListenerReady();
+    
+    /**
      * This is used to determine the state of the consumer, when the message
      * listener scheduler is processing the messages.
      * 

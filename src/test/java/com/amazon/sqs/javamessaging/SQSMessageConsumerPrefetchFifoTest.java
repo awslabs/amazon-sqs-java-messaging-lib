@@ -35,12 +35,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.mockito.ArgumentMatcher;
 
 import static org.junit.Assert.assertEquals;
@@ -55,12 +59,12 @@ import static org.mockito.Mockito.when;
 /**
  * Test the SQSMessageConsumerPrefetchTest class
  */
+@RunWith(Parameterized.class)
 public class SQSMessageConsumerPrefetchFifoTest {
 
     private static final String NAMESPACE = "123456789012";
     private static final String QUEUE_NAME = "QueueName.fifo";
     private static final  String QUEUE_URL = NAMESPACE + "/" + QUEUE_NAME;
-    private static final int NUMBER_OF_MESSAGES_TO_PREFETCH = 10;
 
     private Acknowledger acknowledger;
     private NegativeAcknowledger negativeAcknowledger;
@@ -70,6 +74,17 @@ public class SQSMessageConsumerPrefetchFifoTest {
 
     private AmazonSQSMessagingClientWrapper amazonSQSClient;
 
+    @Parameters
+    public static List<Object[]> getParameters() {
+        return Arrays.asList(new Object[][] { {0}, {1}, {5}, {10}, {15} });
+    }
+   
+    private final int numberOfMessagesToPrefetch;
+    
+    public SQSMessageConsumerPrefetchFifoTest(int numberOfMessagesToPrefetch) {
+        this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
+    }
+    
     @Before
     public void setup() {
 
@@ -90,7 +105,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
 
         consumerPrefetch =
                 spy(new SQSMessageConsumerPrefetch(sqsSessionRunnable, acknowledger, negativeAcknowledger,
-                        sqsDestination, amazonSQSClient, NUMBER_OF_MESSAGES_TO_PREFETCH));
+                        sqsDestination, amazonSQSClient, numberOfMessagesToPrefetch));
 
         consumerPrefetch.backoffStrategy = backoffStrategy;
     }
@@ -105,8 +120,9 @@ public class SQSMessageConsumerPrefetchFifoTest {
          * Set up consumer prefetch and mocks
          */
 
+        final int numMessages = numberOfMessagesToPrefetch > 0 ? numberOfMessagesToPrefetch : 1;
         List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<com.amazonaws.services.sqs.model.Message>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < numMessages; i++) {
             messages.add(createValidFifoMessage(i, "G" + i));
         }
 
@@ -114,6 +130,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         consumerPrefetch.start();
 
         // Mock SQS call for receive message and return messages
+        final int receiveMessageLimit = Math.min(10, numMessages);
         when(amazonSQSClient.receiveMessage(argThat(new ArgumentMatcher<ReceiveMessageRequest>() {
                     @Override
                     public boolean matches(Object argument) {
@@ -122,7 +139,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
                         ReceiveMessageRequest other = (ReceiveMessageRequest)argument;
                         
                         return other.getQueueUrl().equals(QUEUE_URL)
-                                && other.getMaxNumberOfMessages() == 10
+                                && other.getMaxNumberOfMessages() == receiveMessageLimit
                                 && other.getMessageAttributeNames().size() == 1
                                 && other.getMessageAttributeNames().get(0).equals(SQSMessageConsumerPrefetch.ALL)
                                 && other.getWaitTimeSeconds() == SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS
@@ -139,6 +156,11 @@ public class SQSMessageConsumerPrefetchFifoTest {
                 .thenReturn(false)
                 .thenReturn(true);
 
+        /*
+         * Request a message (only relevant when prefetching is off).
+         */
+        consumerPrefetch.requestMessage();
+        
         /*
          * Run the prefetch
          */
@@ -161,7 +183,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         assertEquals(0, consumerPrefetch.retriesAttempted);
 
         // Ensure message queue was filled with expected messages
-        assertEquals(10, consumerPrefetch.messageQueue.size());
+        assertEquals(numMessages, consumerPrefetch.messageQueue.size());
         int index = 0;
         for (SQSMessageConsumerPrefetch.MessageManager messageManager : consumerPrefetch.messageQueue) {
             com.amazonaws.services.sqs.model.Message mockedMessage = messages.get(index);

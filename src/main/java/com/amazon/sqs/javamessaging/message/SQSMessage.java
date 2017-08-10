@@ -31,6 +31,7 @@ import javax.jms.MessageNotWriteableException;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
+import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 
@@ -66,6 +67,8 @@ public class SQSMessage implements Message {
     public static final String OBJECT_MESSAGE_TYPE = "object";
     public static final String TEXT_MESSAGE_TYPE = "text";
     public static final String JMS_SQS_MESSAGE_TYPE = "JMS_SQSMessageType";
+    public static final String JMS_SQS_REPLY_TO_QUEUE_NAME = "JMS_SQSReplyToQueueName";
+    public static final String JMS_SQS_REPLY_TO_QUEUE_URL = "JMS_SQSReplyToQueueURL";
     
     // Default JMS Message properties
     private int deliveryMode = Message.DEFAULT_DELIVERY_MODE;
@@ -76,7 +79,7 @@ public class SQSMessage implements Message {
     private long expiration = Message.DEFAULT_TIME_TO_LIVE;
     private String messageID;
     private String type;
-    private Destination replyTo;
+    private SQSQueueDestination replyTo;
     private Destination destination;
 
     private final Map<String, JMSMessagePropertyValue> properties = new HashMap<String, JMSMessagePropertyValue>();
@@ -320,7 +323,10 @@ public class SQSMessage implements Message {
 
     @Override
     public void setJMSReplyTo(Destination replyTo) throws JMSException {
-        this.replyTo = replyTo;
+        if (replyTo != null && !(replyTo instanceof SQSQueueDestination)) {
+            throw new IllegalArgumentException("The replyTo Destination must be a SQSQueueDestination");
+        }
+        this.replyTo = (SQSQueueDestination)replyTo;
     }
     
     /**

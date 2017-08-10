@@ -18,11 +18,8 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 import javax.jms.IllegalStateException;
-
 import javax.jms.Connection;
-
 import javax.jms.ConnectionConsumer;
 import javax.jms.ConnectionMetaData;
 import javax.jms.Destination;
@@ -93,7 +90,8 @@ public class SQSConnection implements Connection, QueueConnection {
 
     /**
      * Configures the amount of messages that can be prefetched by a consumer. A
-     * single consumer cannot prefetch more than 10 messages.
+     * single consumer cannot prefetch more than 10 messages in a single call to SQS,
+     * but it will make multiple calls as necessary.
      */
     private final int numberOfMessagesToPrefetch;
     private volatile boolean closed = false;

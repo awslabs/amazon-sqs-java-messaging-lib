@@ -14,6 +14,7 @@
  */
 package com.amazon.sqs.javamessaging;
 
+import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
 
@@ -92,7 +94,14 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * Counter on how many messages are prefetched into internal messageQueue.
      */
     protected int messagesPrefetched = 0;
-
+    
+    /**
+     * Counter on how many messages have been explicitly requested.
+     * TODO: Consider renaming this class and several other variables now that
+     * this logic factors in message requests as well as prefetching.
+     */
+    protected int messagesRequested = 0;
+    
     /**
      * States of the prefetch thread
      */
@@ -163,7 +172,22 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             List<MessageManager> allPrefetchedMessages = new ArrayList<MessageManager>(messageQueue);
             sqsSessionRunnable.scheduleCallBacks(messageListener, allPrefetchedMessages);
             messageQueue.clear();
+
+            // This will request the first message if necessary.
+            // TODO: This may overfetch if setMessageListener is being called multiple
+            // times, as the session callback scheduler may already have entries for this consumer.
+            messageListenerReady();
         }
+    }
+    
+    /**
+     * Determine the number of messages we should attempt to fetch from SQS.
+     * Returns the difference between the number of messages needed (either for
+     * prefetching or by request) and the number currently fetched.
+     */
+    private int numberOfMessagesToFetch() {
+        int numberOfMessagesNeeded = Math.max(numberOfMessagesToPrefetch, messagesRequested);
+        return Math.max(numberOfMessagesNeeded - messagesPrefetched, 0);
     }
     
     /**
@@ -190,8 +214,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 synchronized (stateLock) {
                     waitForStart();
                     waitForPrefetch();
-                    prefetchBatchSize = Math.min(
-                            (numberOfMessagesToPrefetch - messagesPrefetched), SQSMessagingClientConstants.MAX_BATCH);
+                    prefetchBatchSize = Math.min(numberOfMessagesToFetch(), SQSMessagingClientConstants.MAX_BATCH);
                 }
 
                 if (!isClosed()) {
@@ -290,7 +313,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     protected void waitForPrefetch() throws InterruptedException {
         synchronized (stateLock) {
-            while (messagesPrefetched >= numberOfMessagesToPrefetch && !isClosed()) {
+            while (numberOfMessagesToFetch() <= 0 && !isClosed()) {
                 try {
                     stateLock.wait();
                 } catch (InterruptedException e) {
@@ -332,7 +355,20 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 throw new JMSException("Not a supported JMS message type");
             }
         }
+        
         jmsMessage.setJMSDestination(sqsDestination);
+        
+        MessageAttributeValue replyToQueueNameAttribute = message.getMessageAttributes().get(
+                SQSMessage.JMS_SQS_REPLY_TO_QUEUE_NAME);
+        MessageAttributeValue replyToQueueUrlAttribute = message.getMessageAttributes().get(
+                SQSMessage.JMS_SQS_REPLY_TO_QUEUE_URL);
+        if (replyToQueueNameAttribute != null && replyToQueueUrlAttribute != null) {
+            String replyToQueueUrl = replyToQueueUrlAttribute.getStringValue();
+            String replyToQueueName = replyToQueueNameAttribute.getStringValue();
+            Destination replyToQueue = new SQSQueueDestination(replyToQueueName, replyToQueueUrl);
+            jmsMessage.setJMSReplyTo(replyToQueue);
+        }
+        
         return jmsMessage;
     }
 
@@ -366,12 +402,38 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     public void messageDispatched() {
         synchronized (stateLock) {
             messagesPrefetched--;
-            if (messagesPrefetched < numberOfMessagesToPrefetch) {
+            messagesRequested--;
+            if (numberOfMessagesToFetch() > 0) {
                 notifyStateChange();
             }
         }
     }
 
+    @Override
+    public void messageListenerReady() {
+        synchronized (stateLock) {
+            // messagesRequested may still be more than zero if there were pending receive()
+            // calls when the message listener was set.
+            if (messagesRequested <= 0 && !isClosed() && messageListener != null) {
+                requestMessage();
+            }
+        }
+    }
+    
+    void requestMessage() {
+        synchronized (stateLock) {
+            messagesRequested++;
+            notifyStateChange();
+        }
+    }
+
+    private void unrequestMessage() {
+        synchronized (stateLock) {
+            messagesRequested--;
+            notifyStateChange();
+        }
+    }
+    
     public static class MessageManager {
 
         private final PrefetchManager prefetchManager;
@@ -405,28 +467,35 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             timeout = 0;
         }
         
-        MessageManager messageManager;
+        MessageManager messageManager = null;
         synchronized (stateLock) {
             // If message exists in queue poll.
             if (!messageQueue.isEmpty()) {
                 messageManager = messageQueue.pollFirst();
             } else {
-                long startTime = System.currentTimeMillis();
-
-                long waitTime = 0;
-                while (messageQueue.isEmpty() && !isClosed() &&
-                        (timeout == 0 || (waitTime = getWaitTime(timeout, startTime)) > 0)) {
-                    try {
-                        stateLock.wait(waitTime);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+                requestMessage();
+            	try {
+                    long startTime = System.currentTimeMillis();
+    
+                    long waitTime = 0;
+                    while (messageQueue.isEmpty() && !isClosed() &&
+                            (timeout == 0 || (waitTime = getWaitTime(timeout, startTime)) > 0)) {
+                        try {
+                            stateLock.wait(waitTime);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return null;
+                        }
+                    }
+                    if (messageQueue.isEmpty() || isClosed()) {
                         return null;
                     }
-                }
-                if (messageQueue.isEmpty() || isClosed()) {
-                    return null;
-                }
-                messageManager = messageQueue.pollFirst();
+                    messageManager = messageQueue.pollFirst();
+            	} finally {
+            	    if (messageManager == null) {
+            	        unrequestMessage();
+            	    }
+            	}
             }
         }
         return messageHandler(messageManager);

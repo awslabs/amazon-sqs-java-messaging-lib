@@ -27,6 +27,8 @@ public class SQSMessagingClientConstants {
     public static final int MAX_BATCH = 10;
     
     public static final int MIN_BATCH = 1;
+    
+    public static final int MIN_PREFETCH = 0;
 
     /**
      * JMSMessage available user property types, which are mapped to message

@@ -34,13 +34,13 @@ import org.apache.commons.logging.LogFactory;
 
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
+import com.amazon.sqs.javamessaging.message.SQSMessage.JMSMessagePropertyValue;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazon.sqs.javamessaging.message.SQSMessage.JMSMessagePropertyValue;
-import com.amazonaws.util.Base64;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
+import com.amazonaws.util.Base64;
 
 /**
  * A client uses a MessageProducer object to send messages to a queue
@@ -109,7 +109,15 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             throw new JMSException("Message body cannot be null or empty");
         }
         Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute((SQSMessage) message);
-        addMessageTypeReservedAttribute(messageAttributes, (SQSMessage) message, messageType);
+
+        /**
+         * These will override existing attributes if they exist. Everything that
+         * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
+         * attribute, it will be overwritten.
+         */
+        addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_MESSAGE_TYPE, messageType);
+        addReplyToQueueReservedAttributes(messageAttributes, message);
+
         SendMessageRequest sendMessageRequest = new SendMessageRequest(queue.getQueueUrl(), sqsMessageBody);
         sendMessageRequest.setMessageAttributes(messageAttributes);
 
@@ -218,19 +226,42 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     private void addMessageTypeReservedAttribute(Map<String, MessageAttributeValue> messageAttributes,
                                                  SQSMessage message, String value) throws JMSException {
 
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
 
-        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
-        messageAttributeValue.setStringValue(value);
-
-        /**
-         * This will override the existing attribute if exists. Everything that
-         * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
-         * attribute, it will be overwritten.
-         */
-        messageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
+        addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_MESSAGE_TYPE, value);
     }
 
+    /**
+     * Adds the reply-to queue name and url attributes during send as part of the send message
+     * request, if necessary
+     */
+    private void addReplyToQueueReservedAttributes(Map<String, MessageAttributeValue> messageAttributes,
+                                                   SQSMessage message) throws JMSException {
+
+        Destination replyTo = message.getJMSReplyTo();
+        if (replyTo instanceof SQSQueueDestination) {
+            SQSQueueDestination replyToQueue = (SQSQueueDestination)replyTo;
+    
+            /**
+             * This will override the existing attributes if exists. Everything that
+             * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
+             * attribute, it will be overwritten.
+             */
+            addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_REPLY_TO_QUEUE_NAME, replyToQueue.getQueueName());
+            addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_REPLY_TO_QUEUE_URL, replyToQueue.getQueueUrl());
+        }
+    }
+
+    /**
+     * Convenience method for adding a single string attribute.
+     */
+    private void addStringAttribute(Map<String, MessageAttributeValue> messageAttributes,
+                                    String key, String value) {
+        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
+        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
+        messageAttributeValue.setStringValue(value);
+        messageAttributes.put(key, messageAttributeValue);
+    }
+    
     /**
      * Sends a message to a queue.
      * <P>
