@@ -14,21 +14,6 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import javax.jms.JMSException;
-import javax.jms.MessageListener;
-import javax.jms.Session;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.SQSSession.CallbackEntry;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
@@ -36,6 +21,13 @@ import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import javax.jms.JMSException;
+import javax.jms.MessageListener;
+import javax.jms.Session;
+import java.util.*;
 
 /**
  * Used internally to guarantee serial execution of message processing on
@@ -92,14 +84,14 @@ public class SQSSessionCallbackScheduler implements Runnable {
         try {            
             while (true) {
                 try {
-                    if (closed) {
+                    if (!session.isRunning() || closed) {
                         break;
                     }
                     synchronized (callbackQueue) {
                         callbackEntry = callbackQueue.pollFirst();
                         if (callbackEntry == null) {
                             try {
-                                callbackQueue.wait();
+                                callbackQueue.wait(2000L);
                             } catch (InterruptedException e) {
                                 /**
                                  * Will be retried on the next loop, and
