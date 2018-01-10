@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.jms.JMSException;
 
@@ -43,6 +44,8 @@ import com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry;
 public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger {
     private static final Log LOG = LogFactory.getLog(RangedAcknowledger.class);
     
+    protected static final AtomicLong batchIdGenerator = new AtomicLong();
+
     private final AmazonSQSMessagingClientWrapper amazonSQSClient;
 
     private final SQSSession session;
@@ -64,7 +67,8 @@ public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger
     public void acknowledge(SQSMessage message) throws JMSException {
         session.checkClosed();
 
-        SQSMessageIdentifier ackMessage = SQSMessageIdentifier.fromSQSMessage(message);
+        SQSMessageIdentifier ackMessage = new SQSMessageIdentifier(
+                message.getQueueUrl(), message.getReceiptHandle(), message.getSQSMessageId());
 
         int indexOfMessage = indexOf(ackMessage);
 
@@ -102,7 +106,8 @@ public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger
      */
     @Override
     public void notifyMessageReceived(SQSMessage message) throws JMSException {
-        SQSMessageIdentifier messageIdentifier = SQSMessageIdentifier.fromSQSMessage(message);
+        SQSMessageIdentifier messageIdentifier = new SQSMessageIdentifier(
+                message.getQueueUrl(), message.getReceiptHandle(), message.getSQSMessageId());
         if (!unAckMessages.contains(messageIdentifier)) {
             unAckMessages.add(messageIdentifier);
         }
@@ -135,15 +140,13 @@ public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger
         }
 
         List<DeleteMessageBatchRequestEntry> deleteMessageBatchRequestEntries = new ArrayList<DeleteMessageBatchRequestEntry>();
-        int batchId = 0;
         for (String receiptHandle : receiptHandles) {
             // Remove the message from queue of unAckMessages
             unAckMessages.poll();
             
             DeleteMessageBatchRequestEntry entry = new DeleteMessageBatchRequestEntry(
-                    Integer.toString(batchId), receiptHandle);
+                    Long.toString(batchIdGenerator.incrementAndGet()), receiptHandle);
             deleteMessageBatchRequestEntries.add(entry);
-            batchId++;
         }
         
         DeleteMessageBatchRequest deleteMessageBatchRequest = new DeleteMessageBatchRequest(

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -30,8 +30,6 @@ import javax.jms.MessageFormatException;
 import javax.jms.MessageNotWriteableException;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 
@@ -67,8 +65,6 @@ public class SQSMessage implements Message {
     public static final String OBJECT_MESSAGE_TYPE = "object";
     public static final String TEXT_MESSAGE_TYPE = "text";
     public static final String JMS_SQS_MESSAGE_TYPE = "JMS_SQSMessageType";
-    public static final String JMS_SQS_REPLY_TO_QUEUE_NAME = "JMS_SQSReplyToQueueName";
-    public static final String JMS_SQS_REPLY_TO_QUEUE_URL = "JMS_SQSReplyToQueueURL";
     
     // Default JMS Message properties
     private int deliveryMode = Message.DEFAULT_DELIVERY_MODE;
@@ -79,7 +75,7 @@ public class SQSMessage implements Message {
     private long expiration = Message.DEFAULT_TIME_TO_LIVE;
     private String messageID;
     private String type;
-    private SQSQueueDestination replyTo;
+    private Destination replyTo;
     private Destination destination;
 
     private final Map<String, JMSMessagePropertyValue> properties = new HashMap<String, JMSMessagePropertyValue>();
@@ -114,7 +110,8 @@ public class SQSMessage implements Message {
         this.acknowledger = acknowledger;
         this.queueUrl = queueUrl;
         receiptHandle = sqsMessage.getReceiptHandle();
-        this.setSQSMessageId(sqsMessage.getMessageId());
+        sqsMessageID = sqsMessage.getMessageId();
+        this.messageID = String.format(MESSAGE_ID_FORMAT,sqsMessageID);
         Map<String,String> systemAttributes = sqsMessage.getAttributes();
         int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
         
@@ -130,21 +127,9 @@ public class SQSMessage implements Message {
         if (sqsMessage.getMessageAttributes() != null) {
             addMessageAttributes(sqsMessage);
         }
-
-        // map the SequenceNumber, MessageGroupId and MessageDeduplicationId to JMS specific properties
-        mapSystemAttributeToJmsMessageProperty(systemAttributes, SEQUENCE_NUMBER, JMS_SQS_SEQUENCE_NUMBER);
-        mapSystemAttributeToJmsMessageProperty(systemAttributes, MESSAGE_DEDUPLICATION_ID, JMS_SQS_DEDUPLICATION_ID);
-        mapSystemAttributeToJmsMessageProperty(systemAttributes, MESSAGE_GROUP_ID, JMSX_GROUP_ID);
-
+        
         writePermissionsForBody = false;
         writePermissionsForProperties = false;
-    }
-    
-    private void mapSystemAttributeToJmsMessageProperty(Map<String,String> systemAttributes, String systemAttributeName, String jmsMessagePropertyName) throws JMSException {
-        String systemAttributeValue = systemAttributes.get(systemAttributeName);
-        if (systemAttributeValue != null) {
-            properties.put(jmsMessagePropertyName, new JMSMessagePropertyValue(systemAttributeValue, STRING));
-        }
     }
 
     /**
@@ -193,30 +178,6 @@ public class SQSMessage implements Message {
     }
     
     /**
-     * Get SQS Message Group Id (applicable for FIFO queues, available also as JMS property 'JMSXGroupId')
-     * @throws JMSException 
-     */
-    public String getSQSMessageGroupId() throws JMSException {
-        return getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID);
-    }
-    
-    /**
-     * Get SQS Message Deduplication Id (applicable for FIFO queues, available also as JMS property 'JMS_SQS_DeduplicationId')
-     * @throws JMSException 
-     */
-    public String getSQSMessageDeduplicationId() throws JMSException {
-        return getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID);
-    }
-    
-    /**
-     * Get SQS Message Sequence Number (applicable for FIFO queues, available also as JMS property 'JMS_SQS_SequenceNumber')
-     * @throws JMSException 
-     */
-    public String getSQSMessageSequenceNumber() throws JMSException {
-        return getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER);
-    }
-    
-    /**
      * Get SQS Message Id.
      * 
      * @return SQS Message Id.
@@ -233,7 +194,6 @@ public class SQSMessage implements Message {
      */
     public void setSQSMessageId(String sqsMessageID) throws JMSException {
         this.sqsMessageID = sqsMessageID;
-        this.setJMSMessageID(String.format(SQSMessagingClientConstants.MESSAGE_ID_FORMAT, sqsMessageID));
     }
         
     /**
@@ -323,10 +283,7 @@ public class SQSMessage implements Message {
 
     @Override
     public void setJMSReplyTo(Destination replyTo) throws JMSException {
-        if (replyTo != null && !(replyTo instanceof SQSQueueDestination)) {
-            throw new IllegalArgumentException("The replyTo Destination must be a SQSQueueDestination");
-        }
-        this.replyTo = (SQSQueueDestination)replyTo;
+        this.replyTo = replyTo;
     }
     
     /**
@@ -1225,23 +1182,6 @@ public class SQSMessage implements Message {
         
         public String getStringMessageAttributeValue() {
             return stringMessageAttributeValue;
-        }
-    }
-
-
-    /**
-     * This method sets the JMS_SQS_SEQUENCE_NUMBER property on the message. It is exposed explicitly here, so that
-     * it can be invoked even on read-only message object obtained through receing a message. 
-     * This support the use case of send a received message by using the same JMSMessage object.
-     * 
-     * @param sequenceNumber Sequence number to set. If null or empty, the stored sequence number will be removed.
-     * @throws JMSException
-     */
-    public void setSequenceNumber(String sequenceNumber) throws JMSException {
-        if (sequenceNumber == null || sequenceNumber.isEmpty()) {
-            properties.remove(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER);
-        } else {
-            properties.put(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER, new JMSMessagePropertyValue(sequenceNumber));
         }
     }
 

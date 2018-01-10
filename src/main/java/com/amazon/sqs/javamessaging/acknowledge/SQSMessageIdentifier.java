@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -14,10 +14,6 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import javax.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-
 /**
  * Identifies an SQS message, when (negative)acknowledging the message
  */
@@ -31,26 +27,11 @@ public class SQSMessageIdentifier {
 
     // The SQS message id assigned on send.
     private String sqsMessageId;
-    
-    // The group id to which the message belongs
-    private String groupId;
 
     public SQSMessageIdentifier(String queueUrl, String receiptHandle, String sqsMessageId) {
-        this(queueUrl, receiptHandle, sqsMessageId, null);
-    }
-    
-    public SQSMessageIdentifier(String queueUrl, String receiptHandle, String sqsMessageId, String groupId) {
         this.queueUrl = queueUrl;
         this.receiptHandle = receiptHandle;
         this.sqsMessageId = sqsMessageId;
-        this.groupId = groupId;
-        if (this.groupId != null && this.groupId.isEmpty()) {
-            this.groupId = null;
-        }
-    }
-    
-    public static SQSMessageIdentifier fromSQSMessage(SQSMessage sqsMessage) throws JMSException {
-        return new SQSMessageIdentifier(sqsMessage.getQueueUrl(), sqsMessage.getReceiptHandle(), sqsMessage.getSQSMessageId(), sqsMessage.getSQSMessageGroupId());
     }
 
     /**
@@ -79,15 +60,6 @@ public class SQSMessageIdentifier {
      */
     public String getSQSMessageID() {
         return this.sqsMessageId;
-    }
-    
-    /**
-     * Returns the group id to which the message belongs. Non-null only for messages received from FIFO queues.
-     * 
-     * @return groupId
-     */
-    public String getGroupId() {
-        return this.groupId;
     }
 
     @Override
