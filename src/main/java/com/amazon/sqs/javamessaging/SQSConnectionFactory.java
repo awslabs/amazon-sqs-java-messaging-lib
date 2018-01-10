@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -16,19 +16,20 @@ package com.amazon.sqs.javamessaging;
 
 import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
-import javax.jms.JMSSecurityException;
 import javax.jms.QueueConnection;
 import javax.jms.QueueConnectionFactory;
-
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
+import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 /**
  * A ConnectionFactory object encapsulates a set of connection configuration
@@ -50,31 +51,92 @@ import com.amazonaws.services.sqs.AmazonSQSClient;
  */
 
 public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionFactory {
+    private final ProviderConfiguration providerConfiguration;
+    private final AmazonSQSClientSupplier amazonSQSClientSupplier;
     
-    private final ClientConfiguration clientConfig;
-    private final Region region;
-    private final String endpoint;
-    private final String signerRegionOverride;
-    private final AWSCredentialsProvider awsCredentialsProvider;
+    /*
+     * At the time when the library will stop supporting Java 7, this can be removed and Supplier<T> from Java 8 can be used directly.
+     */
+    private interface AmazonSQSClientSupplier {
+        AmazonSQS get();
+    }
 
-    /** Controls the size of the prefetch buffers used by consumers. */
-    private final int numberOfMessagesToPrefetch;
-
-    private SQSConnectionFactory(Builder builder) {
-        this.region = builder.region;
-        this.endpoint = builder.endpoint;
-        this.signerRegionOverride = builder.signerRegionOverride;
-        this.clientConfig = builder.clientConfiguration;
-        this.awsCredentialsProvider = builder.awsCredentialsProvider;
-        this.numberOfMessagesToPrefetch = builder.numberOfMessagesToPrefetch;
+    /*
+     * Creates a SQSConnectionFactory that uses AmazonSQSClientBuilder.standard() for creating AmazonSQS client connections.
+     * Every SQSConnection will have its own copy of AmazonSQS client.
+     */
+    public SQSConnectionFactory(ProviderConfiguration providerConfiguration) {
+        this(providerConfiguration, AmazonSQSClientBuilder.standard());
+    }
+    
+    /*
+     * Creates a SQSConnectionFactory that uses the provided AmazonSQS client connection.
+     * Every SQSConnection will use the same provided AmazonSQS client.
+     */
+    public SQSConnectionFactory(ProviderConfiguration providerConfiguration, final AmazonSQS client) {
+        if (providerConfiguration == null) {
+            throw new IllegalArgumentException("Provider configuration cannot be null");
+        }
+        if (client == null) {
+            throw new IllegalArgumentException("AmazonSQS client cannot be null");
+        }
+        this.providerConfiguration = providerConfiguration;
+        this.amazonSQSClientSupplier = new AmazonSQSClientSupplier() {
+            @Override
+            public AmazonSQS get() {
+                return client;
+            }
+        };
+    }
+    
+    /*
+     * Creates a SQSConnectionFactory that uses the provided AmazonSQSClientBuilder for creating AmazonSQS client connections.
+     * Every SQSConnection will have its own copy of AmazonSQS client created through the provided builder.
+     */
+    public SQSConnectionFactory(ProviderConfiguration providerConfiguration, final AmazonSQSClientBuilder clientBuilder) {
+        if (providerConfiguration == null) {
+            throw new IllegalArgumentException("Provider configuration cannot be null");
+        }
+        if (clientBuilder == null) {
+            throw new IllegalArgumentException("AmazonSQS client builder cannot be null");
+        }
+        this.providerConfiguration = providerConfiguration;
+        this.amazonSQSClientSupplier = new AmazonSQSClientSupplier() {
+            @Override
+            public AmazonSQS get() {
+                return clientBuilder.build();
+            }
+        };
+    }
+    
+    private SQSConnectionFactory(final Builder builder) {
+        this.providerConfiguration = builder.providerConfiguration;
+        this.amazonSQSClientSupplier = new AmazonSQSClientSupplier() {
+            @Override
+            public AmazonSQS get() {
+                AmazonSQSClient amazonSQSClient = new AmazonSQSClient(builder.awsCredentialsProvider, builder.clientConfiguration);
+                if (builder.region != null) {
+                    amazonSQSClient.setRegion(builder.region);
+                }
+                if (builder.endpoint != null) {
+                    amazonSQSClient.setEndpoint(builder.endpoint);
+                }
+                if (builder.signerRegionOverride != null) {
+                    amazonSQSClient.setSignerRegionOverride(builder.signerRegionOverride);
+                }
+                return amazonSQSClient;
+            }
+        };
     }
 
     @Override
     public SQSConnection createConnection() throws JMSException {
-        if (awsCredentialsProvider == null) {
-            throw new JMSSecurityException("AWS credentials cannot be null");
+        try {
+            AmazonSQS amazonSQS = amazonSQSClientSupplier.get();
+            return createConnection(amazonSQS, null);
+        } catch (RuntimeException e) {
+            throw (JMSException) new JMSException("Error creating SQS client: " + e.getMessage()).initCause(e);
         }
-        return createConnection(awsCredentialsProvider);
     }
 
     @Override
@@ -84,17 +146,22 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     }
 
     public SQSConnection createConnection(AWSCredentials awsCredentials) throws JMSException {
-        AmazonSQSClient amazonSQSClient = new AmazonSQSClient(awsCredentials, clientConfig);
-        configureClient(amazonSQSClient);
-        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQSClient);
-        return new SQSConnection(amazonSQSClientJMSWrapper, numberOfMessagesToPrefetch);
+        AWSCredentialsProvider awsCredentialsProvider = new AWSStaticCredentialsProvider(awsCredentials);
+        return createConnection(awsCredentialsProvider);
     }
     
     public SQSConnection createConnection(AWSCredentialsProvider awsCredentialsProvider) throws JMSException {
-        AmazonSQSClient amazonSQSClient = new AmazonSQSClient(awsCredentialsProvider, clientConfig);
-        configureClient(amazonSQSClient);
-        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQSClient);
-        return new SQSConnection(amazonSQSClientJMSWrapper, numberOfMessagesToPrefetch);
+        try {
+            AmazonSQS amazonSQS = amazonSQSClientSupplier.get();
+            return createConnection(amazonSQS, awsCredentialsProvider);
+        } catch(Exception e) {
+            throw (JMSException) new JMSException("Error creating SQS client: " + e.getMessage()).initCause(e);
+        }
+    }
+    
+    private SQSConnection createConnection(AmazonSQS amazonSQS, AWSCredentialsProvider awsCredentialsProvider) throws JMSException {
+        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQS, awsCredentialsProvider);
+        return new SQSConnection(amazonSQSClientJMSWrapper, providerConfiguration.getNumberOfMessagesToPrefetch());
     }
     
     @Override
@@ -107,17 +174,27 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         return (QueueConnection) createConnection(userName, password);
     }
     
+    /**
+     * Deprecated. Use one of the constructors of this class instead and provide either AmazonSQS client or AmazonSQSClientBuilder.
+     * @return
+     */
+    @Deprecated
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Deprecated. Use one of the constructors of SQSConnectionFactory instead.
+     * @return
+     */
+    @Deprecated
     public static class Builder {
         private Region region;
         private String endpoint;
         private String signerRegionOverride;
         private ClientConfiguration clientConfiguration;
-        private int numberOfMessagesToPrefetch;
         private AWSCredentialsProvider awsCredentialsProvider = new DefaultAWSCredentialsProviderChain();
+        private ProviderConfiguration providerConfiguration;
         
         public Builder(Region region) {
             this();
@@ -130,12 +207,8 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         }
 
         public Builder() {
+            providerConfiguration = new ProviderConfiguration();
             clientConfiguration = new ClientConfiguration();
-            clientConfiguration.setUserAgent(
-                    clientConfiguration.getUserAgent() + SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION );
-            
-            // Set default numberOfMessagesToPrefetch to MIN_BATCH.
-            this.numberOfMessagesToPrefetch = SQSMessagingClientConstants.MIN_BATCH;
         }
         
         public Builder withRegion(Region region) {
@@ -176,7 +249,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         }
 
         public Builder withNumberOfMessagesToPrefetch(int numberOfMessagesToPrefetch) {
-            setNumberOfMessagesToPrefetch(numberOfMessagesToPrefetch);
+            providerConfiguration.setNumberOfMessagesToPrefetch(numberOfMessagesToPrefetch);
             return this;
         }
 
@@ -219,23 +292,15 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         }
 
         public void setClientConfiguration(ClientConfiguration clientConfig) {
-            clientConfiguration = new ClientConfiguration( clientConfig );
-            if( clientConfig.getUserAgent() == null || clientConfig.getUserAgent().isEmpty() ) {
-                clientConfig.setUserAgent( ClientConfiguration.DEFAULT_USER_AGENT );
-            }
-            clientConfiguration.setUserAgent(
-                    clientConfig.getUserAgent() + SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION );
+            clientConfiguration = clientConfig;
         }
 
         public int getNumberOfMessagesToPrefetch() {
-            return numberOfMessagesToPrefetch;
+            return providerConfiguration.getNumberOfMessagesToPrefetch();
         }
 
         public void setNumberOfMessagesToPrefetch(int numberOfMessagesToPrefetch) {
-            if (numberOfMessagesToPrefetch <= 0 ) {
-                throw new IllegalArgumentException("Invalid prefetch size.");
-            }
-            this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
+            providerConfiguration.setNumberOfMessagesToPrefetch(numberOfMessagesToPrefetch);
         }
 
         public AWSCredentialsProvider getAwsCredentialsProvider() {
@@ -248,20 +313,4 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         }
     }
     
-    private void configureClient(AmazonSQSClient client) throws JMSException {
-        try {
-            if( region != null ) {
-                client.setRegion(region);
-            }
-            if( endpoint != null ) {
-                client.setEndpoint(endpoint);
-            }
-            if( signerRegionOverride != null ) {
-                client.setSignerRegionOverride(signerRegionOverride);
-            }
-        } catch( IllegalArgumentException e ) {
-            throw (JMSException)
-                new JMSException( "Bad endpoint configuration: " + e.getMessage() ).initCause(e);
-        }
-    }
 }

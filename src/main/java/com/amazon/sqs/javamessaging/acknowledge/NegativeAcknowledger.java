@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package com.amazon.sqs.javamessaging.acknowledge;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 import javax.jms.JMSException;
 
@@ -39,22 +38,12 @@ import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry
  */
 public class NegativeAcknowledger extends BulkSQSOperation {
 
-    private static final AtomicLong DEFAULT_BATCH_ID_GENERATOR = new AtomicLong();
-
     private static final int NACK_TIMEOUT = 0;
-
-    private final AtomicLong batchIdGenerator;
 
     private final AmazonSQSMessagingClientWrapper amazonSQSClient;
 
-    public NegativeAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, AtomicLong batchIdGenerator) {
-        this.amazonSQSClient = amazonSQSClient;
-        this.batchIdGenerator = batchIdGenerator;
-    }
-
     public NegativeAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient) {
         this.amazonSQSClient = amazonSQSClient;
-        this.batchIdGenerator = DEFAULT_BATCH_ID_GENERATOR;
     }
     
     /**
@@ -105,10 +94,12 @@ public class NegativeAcknowledger extends BulkSQSOperation {
 
         List<ChangeMessageVisibilityBatchRequestEntry> nackEntries = new ArrayList<ChangeMessageVisibilityBatchRequestEntry>(
                 receiptHandles.size());
+        int batchId = 0;
         for (String messageReceiptHandle : receiptHandles) {
             ChangeMessageVisibilityBatchRequestEntry changeMessageVisibilityBatchRequestEntry = new ChangeMessageVisibilityBatchRequestEntry(
-                    batchIdGenerator.getAndIncrement() + "", messageReceiptHandle).withVisibilityTimeout(NACK_TIMEOUT);
+                    Integer.toString(batchId), messageReceiptHandle).withVisibilityTimeout(NACK_TIMEOUT);
             nackEntries.add(changeMessageVisibilityBatchRequestEntry);
+            batchId++;
         }
         amazonSQSClient.changeMessageVisibilityBatch(new ChangeMessageVisibilityBatchRequest(
                 queueUrl, nackEntries));

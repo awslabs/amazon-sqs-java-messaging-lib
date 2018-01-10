@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,11 +18,8 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 import javax.jms.IllegalStateException;
-
 import javax.jms.Connection;
-
 import javax.jms.ConnectionConsumer;
 import javax.jms.ConnectionMetaData;
 import javax.jms.Destination;
@@ -93,7 +90,8 @@ public class SQSConnection implements Connection, QueueConnection {
 
     /**
      * Configures the amount of messages that can be prefetched by a consumer. A
-     * single consumer cannot prefetch more than 10 messages.
+     * single consumer cannot prefetch more than 10 messages in a single call to SQS,
+     * but it will make multiple calls as necessary.
      */
     private final int numberOfMessagesToPrefetch;
     private volatile boolean closed = false;

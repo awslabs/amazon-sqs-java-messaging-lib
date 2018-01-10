@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -14,20 +14,25 @@
  */
 package com.amazon.sqs.javamessaging;
 
+import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
+import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
-
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
+import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
@@ -90,7 +95,14 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * Counter on how many messages are prefetched into internal messageQueue.
      */
     protected int messagesPrefetched = 0;
-
+    
+    /**
+     * Counter on how many messages have been explicitly requested.
+     * TODO: Consider renaming this class and several other variables now that
+     * this logic factors in message requests as well as prefetching.
+     */
+    protected int messagesRequested = 0;
+    
     /**
      * States of the prefetch thread
      */
@@ -157,10 +169,26 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             if (!running || isClosed()) {
                 return;
             }
-            while (!messageQueue.isEmpty()) {
-                sqsSessionRunnable.scheduleCallBack(messageListener, messageQueue.pollFirst());
-            }
+            
+            List<MessageManager> allPrefetchedMessages = new ArrayList<MessageManager>(messageQueue);
+            sqsSessionRunnable.scheduleCallBacks(messageListener, allPrefetchedMessages);
+            messageQueue.clear();
+
+            // This will request the first message if necessary.
+            // TODO: This may overfetch if setMessageListener is being called multiple
+            // times, as the session callback scheduler may already have entries for this consumer.
+            messageListenerReady();
         }
+    }
+    
+    /**
+     * Determine the number of messages we should attempt to fetch from SQS.
+     * Returns the difference between the number of messages needed (either for
+     * prefetching or by request) and the number currently fetched.
+     */
+    private int numberOfMessagesToFetch() {
+        int numberOfMessagesNeeded = Math.max(numberOfMessagesToPrefetch, messagesRequested);
+        return Math.max(numberOfMessagesNeeded - messagesPrefetched, 0);
     }
     
     /**
@@ -187,8 +215,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 synchronized (stateLock) {
                     waitForStart();
                     waitForPrefetch();
-                    prefetchBatchSize = Math.min(
-                            (numberOfMessagesToPrefetch - messagesPrefetched), SQSMessagingClientConstants.MAX_BATCH);
+                    prefetchBatchSize = Math.min(numberOfMessagesToFetch(), SQSMessagingClientConstants.MAX_BATCH);
                 }
 
                 if (!isClosed()) {
@@ -204,7 +231,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             } catch (Throwable e) {
                 LOG.error("Unexpected exception when prefetch messages:", e);
                 nackQueueMessages = true;
-                throw e;
+                throw new RuntimeException(e);
             } finally {
                 if (isClosed() || nackQueueMessages) {
                     nackQueueMessages();
@@ -226,6 +253,11 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                                                               .withAttributeNames(ALL)
                                                               .withMessageAttributeNames(ALL)
                                                               .withWaitTimeSeconds(WAIT_TIME_SECONDS);
+        //if the receive request is for FIFO queue, provide a unique receive request attempt it, so that
+        //failed calls retried by SDK will claim the same messages
+        if (sqsDestination.isFifo()) {
+            receiveMessageRequest.withReceiveRequestAttemptId(UUID.randomUUID().toString());
+        }
         List<Message> messages = null;
         try {
             ReceiveMessageResult receivedMessageResult = amazonSQSClient.receiveMessage(receiveMessageRequest);
@@ -251,26 +283,25 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      */
     protected void processReceivedMessages(List<Message> messages) {
         List<String> nackMessages = new ArrayList<String>();
+        List<MessageManager> messageManagers = new ArrayList<MessageManager>();
         for (Message message : messages) {
             try {
                 javax.jms.Message jmsMessage = convertToJMSMessage(message);
-
-                if (messageListener != null) {
-                    sqsSessionRunnable.scheduleCallBack(messageListener, new MessageManager(this, jmsMessage));
-                    synchronized (stateLock) {
-                        messagesPrefetched++;                        
-                        notifyStateChange();
-                    }
-                } else {
-                    synchronized (stateLock) {
-                        messageQueue.addLast(new MessageManager(this, jmsMessage));
-                        messagesPrefetched++;
-                        notifyStateChange();
-                    }
-                }
+                messageManagers.add(new MessageManager(this, jmsMessage));
             } catch (JMSException e) {
                 nackMessages.add(message.getReceiptHandle());
             }
+        }
+        
+        synchronized (stateLock) {
+            if (messageListener != null) {
+                sqsSessionRunnable.scheduleCallBacks(messageListener, messageManagers);
+            } else {
+                messageQueue.addAll(messageManagers);
+            }
+            
+            messagesPrefetched += messageManagers.size();
+            notifyStateChange();
         }
 
         // Nack any messages that cannot be serialized to JMSMessage.
@@ -283,7 +314,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     protected void waitForPrefetch() throws InterruptedException {
         synchronized (stateLock) {
-            while (messagesPrefetched >= numberOfMessagesToPrefetch && !isClosed()) {
+            while (numberOfMessagesToFetch() <= 0 && !isClosed()) {
                 try {
                     stateLock.wait();
                 } catch (InterruptedException e) {
@@ -325,20 +356,34 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 throw new JMSException("Not a supported JMS message type");
             }
         }
+        
         jmsMessage.setJMSDestination(sqsDestination);
-        jmsMessage.setJMSTimestamp(getJMSTimestamp(message));
-		return jmsMessage;
-	}
 
-	private long getJMSTimestamp(Message message) {
-		Map<String, String> systemAttributes = message.getAttributes();
-		String timestamp = systemAttributes.get(SQSMessagingClientConstants.SENT_TIMESTAMP);
-		if (timestamp != null) {
-			return Long.parseLong(timestamp);
-		} else {
-			return 0L;
-		}
-	}
+        MessageAttributeValue replyToQueueNameAttribute = message.getMessageAttributes().get(
+                SQSMessage.JMS_SQS_REPLY_TO_QUEUE_NAME);
+        MessageAttributeValue replyToQueueUrlAttribute = message.getMessageAttributes().get(
+                SQSMessage.JMS_SQS_REPLY_TO_QUEUE_URL);
+        if (replyToQueueNameAttribute != null && replyToQueueUrlAttribute != null) {
+            String replyToQueueUrl = replyToQueueUrlAttribute.getStringValue();
+            String replyToQueueName = replyToQueueNameAttribute.getStringValue();
+            Destination replyToQueue = new SQSQueueDestination(replyToQueueName, replyToQueueUrl);
+            jmsMessage.setJMSReplyTo(replyToQueue);
+        }
+
+        jmsMessage.setJMSTimestamp(getJMSTimestamp(message));
+
+        return jmsMessage;
+    }
+
+    private long getJMSTimestamp(Message message) {
+      Map<String, String> systemAttributes = message.getAttributes();
+      String timestamp = systemAttributes.get(SQSMessagingClientConstants.SENT_TIMESTAMP);
+      if (timestamp != null) {
+        return Long.parseLong(timestamp);
+      } else {
+        return 0L;
+      }
+    }
 
     protected void nackQueueMessages() {
         // Also nack messages already in the messageQueue
@@ -370,12 +415,38 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     public void messageDispatched() {
         synchronized (stateLock) {
             messagesPrefetched--;
-            if (messagesPrefetched < numberOfMessagesToPrefetch) {
+            messagesRequested--;
+            if (numberOfMessagesToFetch() > 0) {
                 notifyStateChange();
             }
         }
     }
 
+    @Override
+    public void messageListenerReady() {
+        synchronized (stateLock) {
+            // messagesRequested may still be more than zero if there were pending receive()
+            // calls when the message listener was set.
+            if (messagesRequested <= 0 && !isClosed() && messageListener != null) {
+                requestMessage();
+            }
+        }
+    }
+    
+    void requestMessage() {
+        synchronized (stateLock) {
+            messagesRequested++;
+            notifyStateChange();
+        }
+    }
+
+    private void unrequestMessage() {
+        synchronized (stateLock) {
+            messagesRequested--;
+            notifyStateChange();
+        }
+    }
+    
     public static class MessageManager {
 
         private final PrefetchManager prefetchManager;
@@ -409,28 +480,35 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             timeout = 0;
         }
         
-        MessageManager messageManager;
+        MessageManager messageManager = null;
         synchronized (stateLock) {
             // If message exists in queue poll.
             if (!messageQueue.isEmpty()) {
                 messageManager = messageQueue.pollFirst();
             } else {
-                long startTime = System.currentTimeMillis();
-
-                long waitTime = 0;
-                while (messageQueue.isEmpty() && !isClosed() &&
-                        (timeout == 0 || (waitTime = getWaitTime(timeout, startTime)) > 0)) {
-                    try {
-                        stateLock.wait(waitTime);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+                requestMessage();
+            	try {
+                    long startTime = System.currentTimeMillis();
+    
+                    long waitTime = 0;
+                    while (messageQueue.isEmpty() && !isClosed() &&
+                            (timeout == 0 || (waitTime = getWaitTime(timeout, startTime)) > 0)) {
+                        try {
+                            stateLock.wait(waitTime);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return null;
+                        }
+                    }
+                    if (messageQueue.isEmpty() || isClosed()) {
                         return null;
                     }
-                }
-                if (messageQueue.isEmpty() || isClosed()) {
-                    return null;
-                }
-                messageManager = messageQueue.pollFirst();
+                    messageManager = messageQueue.pollFirst();
+            	} finally {
+            	    if (messageManager == null) {
+            	        unrequestMessage();
+            	    }
+            	}
             }
         }
         return messageHandler(messageManager);
@@ -527,5 +605,32 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     
     protected boolean isClosed() {
         return closed;
+    }
+
+    List<SQSMessageIdentifier> purgePrefetchedMessagesWithGroups(Set<String> affectedGroups) throws JMSException {
+        List<SQSMessageIdentifier> purgedMessages = new ArrayList<SQSMessageIdentifier>();
+        synchronized (stateLock) {
+            //let's walk over the prefetched messages
+            Iterator<MessageManager> managerIterator = messageQueue.iterator();
+            while (managerIterator.hasNext()) {
+                MessageManager messageManager = managerIterator.next();
+                SQSMessage prefetchedMessage = (SQSMessage)messageManager.getMessage();
+                SQSMessageIdentifier messageIdentifier = SQSMessageIdentifier.fromSQSMessage(prefetchedMessage);
+
+                //is the prefetch entry for one of the affected group ids?
+                if (affectedGroups.contains(messageIdentifier.getGroupId())) {
+                    //we will purge this prefetched message
+                    purgedMessages.add(messageIdentifier);
+                    //remove from prefetch queue
+                    managerIterator.remove();
+                    //we are done with it and can prefetch more messages
+                    this.messagesPrefetched--;
+                }
+            }
+
+            notifyStateChange();
+        }
+        
+        return purgedMessages;
     }
 }

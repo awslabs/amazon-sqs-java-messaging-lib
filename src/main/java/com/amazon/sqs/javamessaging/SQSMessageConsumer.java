@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package com.amazon.sqs.javamessaging;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -30,7 +31,6 @@ import javax.jms.QueueReceiver;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
@@ -57,10 +57,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
     protected volatile boolean closed = false;
     
     private final SQSQueueDestination sqsDestination;
-    private final Acknowledger acknowledger;
     private final SQSSession parentSQSSession;
-
-    private final NegativeAcknowledger negativeAcknowledger;
 
     private final SQSSessionCallbackScheduler sqsSessionRunnable; 
 
@@ -92,11 +89,9 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
                        SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch) {
         this.parentSQSSession = parentSQSSession;
         this.sqsDestination = destination;
-        this.acknowledger = acknowledger;
         this.sqsSessionRunnable = sqsSessionRunnable;
         this.sqsMessageConsumerPrefetch = sqsMessageConsumerPrefetch;
         this.sqsMessageConsumerPrefetch.setMessageConsumer(this);
-        this.negativeAcknowledger = negativeAcknowledger;
 
         prefetchExecutor = Executors.newSingleThreadExecutor(threadFactory);
         prefetchExecutor.execute(sqsMessageConsumerPrefetch);
@@ -249,21 +244,6 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
         closed = true;
     }
     
-
-    /**
-     * Set the message visibility as zero for the list of messages which are not
-     * acknowledged and delete them from the list of unacknowledged messages.
-     */
-    void recover() throws JMSException {
-        List<SQSMessageIdentifier> unAckedMessages = acknowledger.getUnAckMessages();
-        if (!unAckedMessages.isEmpty()) {
-            negativeAcknowledger.bulkAction(unAckedMessages, unAckedMessages.size());
-            acknowledger.forgetUnAckMessages();
-        }
-
-        
-    }
-    
     boolean isClosed() {
         return closed;
     }
@@ -292,5 +272,9 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
         if (closed) {
             throw new IllegalStateException("Consumer is closed");
         }
+    }
+
+    List<SQSMessageIdentifier> purgePrefetchedMessagesWithGroups(Set<String> affectedGroups) throws JMSException {
+        return sqsMessageConsumerPrefetch.purgePrefetchedMessagesWithGroups(affectedGroups);
     }
 }

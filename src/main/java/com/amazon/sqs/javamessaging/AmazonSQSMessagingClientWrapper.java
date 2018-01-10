@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import org.apache.commons.logging.LogFactory;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.AmazonWebServiceRequest;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
@@ -67,6 +69,7 @@ public class AmazonSQSMessagingClientWrapper {
     }
 
     private final AmazonSQS amazonSQSClient;
+    private final AWSCredentialsProvider credentialsProvider;
     
     /**
      * @param amazonSQSClient
@@ -75,10 +78,21 @@ public class AmazonSQSMessagingClientWrapper {
      *            if the client is null
      */
     public AmazonSQSMessagingClientWrapper(AmazonSQS amazonSQSClient) throws JMSException {
+        this(amazonSQSClient, null);
+    }
+    
+    /**
+     * @param amazonSQSClient
+     *            The AWS SDK Client for SQS.
+     * @throws JMSException
+     *            if the client is null
+     */
+    public AmazonSQSMessagingClientWrapper(AmazonSQS amazonSQSClient, AWSCredentialsProvider credentialsProvider) throws JMSException {
         if (amazonSQSClient == null) {
             throw new JMSException("Amazon SQS client cannot be null");
         }
         this.amazonSQSClient = amazonSQSClient;
+        this.credentialsProvider = credentialsProvider;
     }
     
     /**
@@ -92,13 +106,15 @@ public class AmazonSQSMessagingClientWrapper {
     }
 
     /**
-     * Sets SQS endpoint and wraps IllegalArgumentException.
+     * Sets SQS endpoint and wraps IllegalArgumentException. 
+     * Deprecated. Instead of manipulating settings of existing AmazonSQS client, provide correct configuration when creating it through SQSConnectionFactory constructors.
      * 
      * @param endpoint
      *            The endpoint (ex: "sqs.us-east-1.amazonaws.com") of the region
      *            specific AWS endpoint this client will communicate with.
      * @throws JMSException
      */
+    @Deprecated
     public void setEndpoint(String endpoint) throws JMSException {
         try {
             amazonSQSClient.setEndpoint(endpoint);
@@ -109,8 +125,8 @@ public class AmazonSQSMessagingClientWrapper {
     }
     
     /**
-     * Sets SQS region and wraps <code>IllegalArgumentException</code>. This is the recommend
-     * way to set-up the SQS end-points.
+     * Sets SQS region and wraps <code>IllegalArgumentException</code>. 
+     * Deprecated. Instead of manipulating settings of existing AmazonSQS client, provide correct configuration when creating it through SQSConnectionFactory constructors.
      * 
      * @param region
      *            The region this client will communicate with. See
@@ -118,6 +134,7 @@ public class AmazonSQSMessagingClientWrapper {
      *            accessing a given region.
      * @throws JMSException
      */
+    @Deprecated
     public void setRegion(Region region) throws JMSException {
         try {
             amazonSQSClient.setRegion(region);
@@ -138,6 +155,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public void deleteMessage(DeleteMessageRequest deleteMessageRequest) throws JMSException {
         try {
+            prepareRequest(deleteMessageRequest);
             amazonSQSClient.deleteMessage(deleteMessageRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "deleteMessage");
@@ -160,6 +178,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public DeleteMessageBatchResult deleteMessageBatch(DeleteMessageBatchRequest deleteMessageBatchRequest) throws JMSException {
         try {
+            prepareRequest(deleteMessageBatchRequest);
             return amazonSQSClient.deleteMessageBatch(deleteMessageBatchRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "deleteMessageBatch");
@@ -179,6 +198,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public SendMessageResult sendMessage(SendMessageRequest sendMessageRequest) throws JMSException {
         try {
+            prepareRequest(sendMessageRequest);
             return amazonSQSClient.sendMessage(sendMessageRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "sendMessage");
@@ -197,7 +217,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public boolean queueExists(String queueName) throws JMSException {
         try {
-            amazonSQSClient.getQueueUrl(new GetQueueUrlRequest(queueName));
+            amazonSQSClient.getQueueUrl(prepareRequest(new GetQueueUrlRequest(queueName)));
             return true;
         } catch (QueueDoesNotExistException e) {
             return false;
@@ -223,6 +243,7 @@ public class AmazonSQSMessagingClientWrapper {
         try {
             GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(queueName);
             getQueueUrlRequest.setQueueOwnerAWSAccountId(queueOwnerAccountId);
+            prepareRequest(getQueueUrlRequest);
             amazonSQSClient.getQueueUrl(getQueueUrlRequest);
             return true;
         } catch (QueueDoesNotExistException e) {
@@ -254,9 +275,7 @@ public class AmazonSQSMessagingClientWrapper {
      * @throws JMSException
      */
     public GetQueueUrlResult getQueueUrl(String queueName, String queueOwnerAccountId) throws JMSException {
-        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(queueName);
-        getQueueUrlRequest.setQueueOwnerAWSAccountId(queueOwnerAccountId);
-        return getQueueUrl(getQueueUrlRequest);
+        return getQueueUrl(new GetQueueUrlRequest(queueName).withQueueOwnerAWSAccountId(queueOwnerAccountId));
     }
      
     /**
@@ -271,6 +290,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public GetQueueUrlResult getQueueUrl(GetQueueUrlRequest getQueueUrlRequest) throws JMSException {
         try {
+            prepareRequest(getQueueUrlRequest);
             return amazonSQSClient.getQueueUrl(getQueueUrlRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "getQueueUrl");  
@@ -288,11 +308,7 @@ public class AmazonSQSMessagingClientWrapper {
      * @throws JMSException
      */
     public CreateQueueResult createQueue(String queueName) throws JMSException {
-        try {
-            return amazonSQSClient.createQueue(queueName);
-        } catch (AmazonClientException e) {
-            throw handleException(e, "createQueue");   
-        }    
+        return createQueue(new CreateQueueRequest(queueName));
     }
     
     /**
@@ -309,6 +325,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public CreateQueueResult createQueue(CreateQueueRequest createQueueRequest) throws JMSException {
         try {
+            prepareRequest(createQueueRequest);
             return amazonSQSClient.createQueue(createQueueRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "createQueue");   
@@ -330,6 +347,7 @@ public class AmazonSQSMessagingClientWrapper {
      */    
     public ReceiveMessageResult receiveMessage(ReceiveMessageRequest receiveMessageRequest) throws JMSException {
         try {
+            prepareRequest(receiveMessageRequest);
             return amazonSQSClient.receiveMessage(receiveMessageRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "receiveMessage");
@@ -347,6 +365,7 @@ public class AmazonSQSMessagingClientWrapper {
      */
     public void changeMessageVisibility(ChangeMessageVisibilityRequest changeMessageVisibilityRequest) throws JMSException {
         try {
+            prepareRequest(changeMessageVisibilityRequest);
             amazonSQSClient.changeMessageVisibility(changeMessageVisibilityRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "changeMessageVisibility");
@@ -368,6 +387,7 @@ public class AmazonSQSMessagingClientWrapper {
     public ChangeMessageVisibilityBatchResult changeMessageVisibilityBatch(ChangeMessageVisibilityBatchRequest changeMessageVisibilityBatchRequest)
             throws JMSException {
         try {
+            prepareRequest(changeMessageVisibilityBatchRequest);
             return amazonSQSClient.changeMessageVisibilityBatch(changeMessageVisibilityBatchRequest);
         } catch (AmazonClientException e) {
             throw handleException(e, "changeMessageVisibilityBatch");
@@ -422,4 +442,13 @@ public class AmazonSQSMessagingClientWrapper {
     private boolean isJMSSecurityException(AmazonServiceException e) {
         return SECURITY_EXCEPTION_ERROR_CODES.contains(e.getErrorCode()) ;
     }
+    
+    private <T extends AmazonWebServiceRequest> T prepareRequest(T request) {
+        request.getRequestClientOptions().appendUserAgent(SQSMessagingClientConstants.APPENDED_USER_AGENT_HEADER_VERSION);
+        if (credentialsProvider != null) {
+            request.setRequestCredentialsProvider(credentialsProvider);
+        }
+        return request;
+    }
+    
 }

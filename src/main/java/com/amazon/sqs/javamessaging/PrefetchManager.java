@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,6 +27,12 @@ public interface PrefetchManager {
      */
     public void messageDispatched();
 
+    /**
+     * Notify the prefetchThread that the message listener has finished with any
+     * previous message and is ready to accept another.
+     */
+    public void messageListenerReady();
+    
     /**
      * This is used to determine the state of the consumer, when the message
      * listener scheduler is processing the messages.

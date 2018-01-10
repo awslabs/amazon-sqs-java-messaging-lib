@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,16 +27,19 @@ import javax.jms.Queue;
 public class SQSQueueDestination implements Destination, Queue {
     
     private final String queueName;
-    
+
     private final String queueUrl;
-    
+
+    private final boolean isFifo;
+
     SQSQueueDestination(String queueName, String queueUrl) {
         this.queueName = queueName;
         this.queueUrl = queueUrl;
+        this.isFifo = this.queueName.endsWith(".fifo");
     }
-    
+
     /**
-     * Returns the name of this queue. 
+     * Returns the name of this queue.
      * 
      * @return queueName
      */
@@ -44,14 +47,18 @@ public class SQSQueueDestination implements Destination, Queue {
     public String getQueueName() throws JMSException {
         return this.queueName;
     }
-    
+
     /**
-     * Returns the queueUrl of this queue. 
+     * Returns the queueUrl of this queue.
      * 
      * @return queueUrl
      */
     public String getQueueUrl() {
         return queueUrl;
+    }
+
+    public boolean isFifo() {
+        return isFifo;
     }
 
     @Override

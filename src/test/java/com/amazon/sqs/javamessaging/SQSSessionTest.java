@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,34 +23,52 @@ import com.amazon.sqs.javamessaging.SQSMessageProducer;
 import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
+import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
 import com.amazonaws.services.sqs.model.GetQueueUrlResult;
+import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
+import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 
 import javax.jms.Destination;
 import javax.jms.IllegalStateException;
 import javax.jms.JMSException;
+import javax.jms.Message;
 import javax.jms.MessageConsumer;
 import javax.jms.MessageListener;
 import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
 import javax.jms.Queue;
 import javax.jms.TextMessage;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -91,7 +109,9 @@ public class SQSSessionTest  {
         messageProducers = new HashSet<SQSMessageProducer>();
 
         consumer1 = mock(SQSMessageConsumer.class);
+        when(consumer1.getQueue()).thenReturn(new SQSQueueDestination("name1", "url1"));
         consumer2 = mock(SQSMessageConsumer.class);
+        when(consumer2.getQueue()).thenReturn(new SQSQueueDestination("name2", "url2"));
         messageConsumers.add(consumer1);
         messageConsumers.add(consumer2);
 
@@ -483,6 +503,10 @@ public class SQSSessionTest  {
             }
 
             @Override
+            public void messageListenerReady() {
+            }
+
+            @Override
             public SQSMessageConsumer getMessageConsumer() {
                 return consumer1;
             }
@@ -491,7 +515,7 @@ public class SQSSessionTest  {
         when(msgManager.getPrefetchManager())
                 .thenReturn(prefetchManager);
 
-        sqsSession.getSqsSessionRunnable().scheduleCallBack(null, msgManager);
+        sqsSession.getSqsSessionRunnable().scheduleCallBacks(null, Collections.singletonList(msgManager));
 
         // Waiting for the thread to hold state lock
         holdStateLock.await();
@@ -1031,15 +1055,131 @@ public class SQSSessionTest  {
      * Test recover
      */
     @Test
-    public void testRecover() throws JMSException {
+    public void testRecover() throws JMSException, InterruptedException {
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_UNORDERED);
+        when(parentSQSConnection.getNumberOfMessagesToPrefetch()).thenReturn(4);
 
+        when(sqsClientJMSWrapper.getQueueUrl("queue1"))
+            .thenReturn(new GetQueueUrlResult().withQueueUrl("queueUrl1"));
+        when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl1"))))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message1", "queue1-group1-message1")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message2", "queue1-group2-message2")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message3", "queue1-group3-message3")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message4", "queue1-group1-message4")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message5", "queue1-group2-message5")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message6", "queue1-group3-message6")))
+            .thenReturn(new ReceiveMessageResult());
+        
+        when(sqsClientJMSWrapper.getQueueUrl("queue2"))
+            .thenReturn(new GetQueueUrlResult().withQueueUrl("queueUrl2"));
+        when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl2"))))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message1", "queue2-group1-message1")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message2", "queue2-group2-message2")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message3", "queue2-group3-message3")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message4", "queue2-group1-message4")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message5", "queue2-group2-message5")))
+            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message6", "queue2-group3-message6")))
+            .thenReturn(new ReceiveMessageResult());
+    
+        MessageConsumer consumer1 = sqsSession.createConsumer(sqsSession.createQueue("queue1"));
+        MessageConsumer consumer2 = sqsSession.createConsumer(sqsSession.createQueue("queue2"));
+        final CountDownLatch listenerRelease = new CountDownLatch(1);
+        consumer2.setMessageListener(new MessageListener() {
+            @Override
+            public void onMessage(Message message) {
+                try {
+                    listenerRelease.await();
+                } catch (InterruptedException e) {
+                }
+            }
+        });
+        
+        sqsSession.start();
+        
+        Message message1 = consumer1.receive();
+        
+        //let's give a moment for the background threads to:
+        //prefetch another message for queue1
+        //dispatch message to listener for queue2
+        //prefetch another message for queue2
+        Thread.sleep(100);
         /*
          * Recover
          */
         sqsSession.recover();
+        
+        //at this point we have two unacked messages:
+        //queue1-group1-message1
+        //queue2-group1-message1
+        //and we should have 4 more messages prefetched for queue1:
+        //queue1-group2-message2
+        //queue1-group3-message3
+        //queue1-group1-message4
+        //queue1-group2-message5
+        //and we should have 4 more callbacks scheduled for queue2:
+        //queue2-group2-message2
+        //queue2-group3-message3
+        //queue2-group1-message4
+        //queue2-group2-message5
+        //after calling recovery, we should nack the two unacked messages and all other messages for the same queue / group, so these:
+        //queue1-group1-message1
+        //queue2-group1-message1
+        //queue1-group1-message4
+        //queue2-group1-message4
+        
+        ArgumentCaptor<ChangeMessageVisibilityBatchRequest> changeVisibilityCaptor = ArgumentCaptor.forClass(ChangeMessageVisibilityBatchRequest.class);
+        verify(sqsClientJMSWrapper, times(2)).changeMessageVisibilityBatch(changeVisibilityCaptor.capture());
+        List<ChangeMessageVisibilityBatchRequest> changeVisibilityRequests = changeVisibilityCaptor.getAllValues();
+        
+        Set<String> handles = new HashSet<String>();
+        for (ChangeMessageVisibilityBatchRequest request : changeVisibilityRequests) {
+            for (ChangeMessageVisibilityBatchRequestEntry entry : request.getEntries()) {
+                handles.add(entry.getReceiptHandle());
+            }
+        }
+        
+        assertEquals(4, handles.size());
+        assertTrue(handles.contains("queue1-group1-message1"));
+        assertTrue(handles.contains("queue1-group1-message4"));
+        assertTrue(handles.contains("queue2-group1-message1"));
+        assertTrue(handles.contains("queue2-group1-message4"));
+        
+        listenerRelease.countDown();
+        
+        sqsSession.close();
+    }
+    
+    private static class ReceiveRequestMatcher extends ArgumentMatcher<ReceiveMessageRequest> {
+        private String queueUrl;
+        
+        public ReceiveRequestMatcher(String queueUrl) {
+            this.queueUrl = queueUrl;
+        }
 
-        verify(consumer1).recover();
-        verify(consumer2).recover();
+        @Override
+        public boolean matches(Object argument) {
+            if (argument instanceof ReceiveMessageRequest) {
+                ReceiveMessageRequest request = (ReceiveMessageRequest)argument;
+                return queueUrl.equals(request.getQueueUrl());
+            } else {
+                return false;
+            }
+        }
+        
+    }
+
+    private com.amazonaws.services.sqs.model.Message createFifoMessage(String groupId, String messageId, String receiptHandle) throws JMSException {
+        com.amazonaws.services.sqs.model.Message message = new com.amazonaws.services.sqs.model.Message();
+        message.setBody("body");
+        message.setMessageId(messageId);
+        message.setReceiptHandle(receiptHandle);
+        Map<String, String> attributes = new HashMap<String, String>();
+        attributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "728374687246872364");
+        attributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, messageId);
+        attributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
+        attributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "0");
+        message.setAttributes(attributes);
+        return message;
     }
 
     /**

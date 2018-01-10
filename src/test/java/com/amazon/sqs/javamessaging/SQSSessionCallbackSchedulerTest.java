@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,16 +27,23 @@ import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
+import com.amazon.sqs.javamessaging.message.SQSTextMessage;
+import com.amazonaws.services.sqs.model.Message;
 
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
 import javax.jms.Session;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 import static junit.framework.Assert.fail;
 import static org.junit.Assert.assertEquals;
@@ -93,9 +100,7 @@ public class SQSSessionCallbackSchedulerTest {
         consumer = mock(SQSMessageConsumer.class);
 
         sqsSessionRunnable = spy(new SQSSessionCallbackScheduler(sqsSession,
-                AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(Session.AUTO_ACKNOWLEDGE), acknowledger));
-
-        sqsSessionRunnable.negativeAcknowledger = negativeAcknowledger;
+                AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(Session.AUTO_ACKNOWLEDGE), acknowledger, negativeAcknowledger));
 
         sqsSessionRunnable.callbackQueue = callbackQueue;
     }
@@ -361,8 +366,15 @@ public class SQSSessionCallbackSchedulerTest {
         verify(sqsSessionRunnable).nackQueuedMessages();
 
         // Verify that we nack the message
-        verify(negativeAcknowledger).action(QUEUE_URL_1, Collections.singletonList("r1"));
-        verify(negativeAcknowledger).action(QUEUE_URL_2, Collections.singletonList("r2"));
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(negativeAcknowledger, times(2)).bulkAction(captor.capture(), eq(1));
+        List allCaptured = captor.getAllValues();
+        List<SQSMessageIdentifier> captured = (List<SQSMessageIdentifier>)allCaptured.get(0);
+        assertEquals(QUEUE_URL_1, captured.get(0).getQueueUrl());
+        assertEquals("r1", captured.get(0).getReceiptHandle());
+        captured = (List<SQSMessageIdentifier>)allCaptured.get(1);
+        assertEquals(QUEUE_URL_2, captured.get(0).getQueueUrl());
+        assertEquals("r2", captured.get(0).getReceiptHandle());
 
         // Verify do close is called on set ConsumerCloseAfterCallback
         verify(messageConsumer).doClose();
@@ -431,8 +443,15 @@ public class SQSSessionCallbackSchedulerTest {
 
         verify(sqsMessage1).acknowledge();
         // Verify that we nack the message
-        verify(negativeAcknowledger).action(QUEUE_URL_1, Collections.singletonList("r1"));
-        verify(negativeAcknowledger).action(QUEUE_URL_2, Collections.singletonList("r2"));
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(negativeAcknowledger, times(2)).bulkAction(captor.capture(), eq(1));
+        List allCaptured = captor.getAllValues();
+        List<SQSMessageIdentifier> captured = (List<SQSMessageIdentifier>)allCaptured.get(0);
+        assertEquals(QUEUE_URL_1, captured.get(0).getQueueUrl());
+        assertEquals("r1", captured.get(0).getReceiptHandle());
+        captured = (List<SQSMessageIdentifier>)allCaptured.get(1);
+        assertEquals(QUEUE_URL_2, captured.get(0).getQueueUrl());
+        assertEquals("r2", captured.get(0).getReceiptHandle());
 
         verify(sqsSession).finishedCallback();
     }
@@ -495,8 +514,17 @@ public class SQSSessionCallbackSchedulerTest {
          */
         verify(sqsSession, times(2)).startingCallback(consumer);
         verify(sqsSessionRunnable).nackQueuedMessages();
-        verify(negativeAcknowledger).action(QUEUE_URL_1, Collections.singletonList("r1"));
-        verify(negativeAcknowledger).action(QUEUE_URL_2, Collections.singletonList("r2"));
+        
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(negativeAcknowledger, times(2)).bulkAction(captor.capture(), eq(1));
+        List allCaptured = captor.getAllValues();
+        List<SQSMessageIdentifier> captured = (List<SQSMessageIdentifier>)allCaptured.get(0);
+        assertEquals(QUEUE_URL_1, captured.get(0).getQueueUrl());
+        assertEquals("r1", captured.get(0).getReceiptHandle());
+        captured = (List<SQSMessageIdentifier>)allCaptured.get(1);
+        assertEquals(QUEUE_URL_2, captured.get(0).getQueueUrl());
+        assertEquals("r2", captured.get(0).getReceiptHandle());
+        
         verify(sqsSession).finishedCallback();
     }
 
@@ -516,7 +544,7 @@ public class SQSSessionCallbackSchedulerTest {
         /*
          * Nack the messages, exception expected
          */
-        sqsSessionRunnable.scheduleCallBack(msgListener, msgManager);
+        sqsSessionRunnable.scheduleCallBacks(msgListener, Collections.singletonList(msgManager));
 
         assertEquals(1, sqsSessionRunnable.callbackQueue.size());
 
@@ -537,7 +565,7 @@ public class SQSSessionCallbackSchedulerTest {
          */
         sqsSessionRunnable = spy(new SQSSessionCallbackScheduler(sqsSession,
                                         AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(Session.CLIENT_ACKNOWLEDGE),
-                                        acknowledger));
+                                        acknowledger, negativeAcknowledger));
         sqsSessionRunnable.callbackQueue = callbackQueue;
 
         doNothing()
@@ -585,6 +613,70 @@ public class SQSSessionCallbackSchedulerTest {
         verify(sqsMessage1, never()).acknowledge();
         verify(negativeAcknowledger, never()).action(QUEUE_URL_1, Collections.singletonList("r1"));
         verify(sqsSession).finishedCallback();
+    }
+
+    /**
+     * Test that no auto ack messages occurs when client acknowledge is set
+     */
+    @Test
+    public void testWhenListenerThrowsWhenAutoAckThenCallbackQueuePurgedFromMessagesWithSameQueueAndGroup() throws JMSException, InterruptedException {
+
+        /**
+         * Set up mocks
+         */
+        sqsSessionRunnable = spy(new SQSSessionCallbackScheduler(sqsSession,
+                                        AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(Session.AUTO_ACKNOWLEDGE),
+                                        acknowledger, negativeAcknowledger));
+
+        MessageListener messageListener = mock(MessageListener.class);
+        doThrow(RuntimeException.class)
+            .when(messageListener).onMessage(any(javax.jms.Message.class));
+        
+        List<SQSMessageConsumerPrefetch.MessageManager> messages = new ArrayList<SQSMessageConsumerPrefetch.MessageManager>();
+        messages.add(createFifoMessageManager("queue1", "group1", "message1", "handle1"));
+        messages.add(createFifoMessageManager("queue1", "group1", "message2", "handle2"));
+        messages.add(createFifoMessageManager("queue2", "group1", "message3", "handle3"));
+        messages.add(createFifoMessageManager("queue1", "group2", "message4", "handle4"));
+        messages.add(createFifoMessageManager("queue1", "group1", "message5", "handle5"));
+        messages.add(createFifoMessageManager("queue2", "group2", "message6", "handle6"));
+        sqsSessionRunnable.scheduleCallBacks(messageListener, messages);
+        
+        doNothing()
+            .doThrow(new JMSException("Closing"))
+            .when(sqsSession).startingCallback(consumer);
+        
+        sqsSessionRunnable.run();
+        
+        ArgumentCaptor<List> messageIdentifierListCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<Integer> indexOfMessageCaptor = ArgumentCaptor.forClass(Integer.class);
+        verify(negativeAcknowledger, times(3)).bulkAction(messageIdentifierListCaptor.capture(), indexOfMessageCaptor.capture());
+        List<SQSMessageIdentifier> nackedMessages = messageIdentifierListCaptor.getAllValues().get(0);
+        int nackedMessagesSize = indexOfMessageCaptor.getAllValues().get(0).intValue();
+        
+        //failing to process 'message1' should nack all messages for queue1 and group1, that is 'message1', 'message2' and 'message5'
+        assertEquals(3, nackedMessagesSize);
+        assertEquals("message1", nackedMessages.get(0).getSQSMessageID());
+        assertEquals("message2", nackedMessages.get(1).getSQSMessageID());
+        assertEquals("message5", nackedMessages.get(2).getSQSMessageID());
+    }
+
+    private SQSMessageConsumerPrefetch.MessageManager createFifoMessageManager(String queueUrl, String groupId, String messageId, String receiptHandle) throws JMSException {
+        Message message = new Message();
+        message.setBody("body");
+        message.setMessageId(messageId);
+        message.setReceiptHandle(receiptHandle);
+        Map<String, String> attributes = new HashMap<String, String>();
+        attributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "728374687246872364");
+        attributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, messageId);
+        attributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
+        attributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "0");
+        message.setAttributes(attributes);
+        SQSMessage sqsMessage = new SQSTextMessage(acknowledger, queueUrl, message);
+        PrefetchManager prefetchManager = mock(PrefetchManager.class);
+        when(prefetchManager.getMessageConsumer())
+            .thenReturn(consumer);
+        SQSMessageConsumerPrefetch.MessageManager msgManager = new SQSMessageConsumerPrefetch.MessageManager(prefetchManager, sqsMessage);
+        return msgManager;
     }
 
     private SQSMessageConsumerPrefetch.MessageManager createMessageManager(int index) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -366,7 +366,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     public void testCreateQueueWithName() throws JMSException {
 
         wrapper.createQueue(QUEUE_NAME);
-        verify(amazonSQSClient).createQueue(QUEUE_NAME);
+        verify(amazonSQSClient).createQueue(new CreateQueueRequest(QUEUE_NAME));
     }
 
     /*
@@ -376,7 +376,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     public void testCreateQueueWithNameThrowAmazonClientException() throws JMSException {
 
         doThrow(new AmazonClientException("ace"))
-                .when(amazonSQSClient).createQueue(eq(QUEUE_NAME));
+                .when(amazonSQSClient).createQueue(eq(new CreateQueueRequest(QUEUE_NAME)));
 
         wrapper.createQueue(QUEUE_NAME);
     }
@@ -388,7 +388,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     public void testCreateQueueWithNameThrowAmazonServiceException() throws JMSException {
 
         doThrow(new AmazonServiceException("ase"))
-                .when(amazonSQSClient).createQueue(eq(QUEUE_NAME));
+                .when(amazonSQSClient).createQueue(eq(new CreateQueueRequest(QUEUE_NAME)));
 
         wrapper.createQueue(QUEUE_NAME);
     }

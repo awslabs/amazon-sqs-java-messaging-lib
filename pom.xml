@@ -6,7 +6,7 @@
 
   <groupId>com.amazonaws</groupId>
   <artifactId>amazon-sqs-java-messaging-lib</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.4</version>
   <packaging>jar</packaging>
   <name>Amazon SQS Java Messaging Library</name>
   <description>The Amazon SQS Java Messaging Library holds the Java Message Service compatible classes, that are used
@@ -38,7 +38,7 @@
   </developers>
 
   <properties>
-    <aws-java-sdk.version>1.11.18</aws-java-sdk.version>
+    <aws-java-sdk.version>1.11.106</aws-java-sdk.version>
   </properties>
 
   <dependencies>
