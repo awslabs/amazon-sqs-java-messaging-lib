@@ -14,6 +14,15 @@
  */
 package com.amazon.sqs.javamessaging;
 
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.SQSConnection;
+import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
+import com.amazon.sqs.javamessaging.SQSQueueDestination;
+import com.amazon.sqs.javamessaging.SQSSessionCallbackScheduler;
+import com.amazonaws.services.sqs.model.*;
+
+import org.joda.time.DateTime;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -33,6 +42,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import org.joda.time.DateTime;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -51,6 +62,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.jms.*;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageConsumer;
@@ -1068,6 +1080,8 @@ public class SQSMessageConsumerPrefetchTest {
 
         Map<String, String> mapAttributes = new HashMap<String, String>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        Long now = DateTime.now().getMillis();
+		mapAttributes.put(SQSMessagingClientConstants.SENT_TIMESTAMP, now.toString());
 
         com.amazonaws.services.sqs.model.Message message = mock(com.amazonaws.services.sqs.model.Message.class);
         // Return message attributes with message type 'TEXT'
@@ -1085,6 +1099,7 @@ public class SQSMessageConsumerPrefetchTest {
          */
         assertTrue(jsmMessage instanceof SQSTextMessage);
         assertEquals(message.getBody(), "MessageBody");
+        assertEquals(jsmMessage.getJMSTimestamp(), now.longValue());
     }
 
     /**

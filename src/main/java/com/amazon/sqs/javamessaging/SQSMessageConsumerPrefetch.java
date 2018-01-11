@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Map;
 
 import javax.jms.Destination;
 import javax.jms.JMSException;
@@ -368,8 +369,18 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             Destination replyToQueue = new SQSQueueDestination(replyToQueueName, replyToQueueUrl);
             jmsMessage.setJMSReplyTo(replyToQueue);
         }
-        
-        return jmsMessage;
+        jmsMessage.setJMSTimestamp(getJMSTimestamp(message));
+		    return jmsMessage;
+	  }
+
+    private long getJMSTimestamp(Message message) {
+      Map<String, String> systemAttributes = message.getAttributes();
+      String timestamp = systemAttributes.get(SQSMessagingClientConstants.SENT_TIMESTAMP);
+      if (timestamp != null) {
+        return Long.parseLong(timestamp);
+      } else {
+        return 0L;
+      }
     }
 
     protected void nackQueueMessages() {
