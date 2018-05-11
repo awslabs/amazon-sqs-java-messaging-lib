@@ -159,8 +159,7 @@ public class SQSMessage implements Message {
 
     private void addMessageAttributes(com.amazonaws.services.sqs.model.Message sqsMessage) throws JMSException {
         for (Entry<String, MessageAttributeValue> entry : sqsMessage.getMessageAttributes().entrySet()) {
-            properties.put(entry.getKey(), new JMSMessagePropertyValue(
-                    entry.getValue().getStringValue(), entry.getValue().getDataType()));
+        	properties.put(entry.getKey(), new JMSMessagePropertyValue(entry.getValue().getStringValue(), entry.getValue().getDataType()));
         }
     }
 
@@ -1210,6 +1209,9 @@ public class SQSMessage implements Message {
                 return Float.valueOf(value);
             } else if (SHORT.equals(type)) {
                 return Short.valueOf(value);
+            } else if (NUMBER.equals(type)) {
+            	// This may not be a JMS Type but it is a SQS Type, so we had better support it.
+            	return value;
             } else {
                 throw new JMSException(type + " is not a supported JMS property type");
             }
