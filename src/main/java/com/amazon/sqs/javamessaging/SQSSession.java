@@ -15,12 +15,7 @@
 package com.amazon.sqs.javamessaging;
 
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,6 +44,7 @@ import javax.jms.Topic;
 import javax.jms.TopicSubscriber;
 import javax.jms.IllegalStateException;
 
+import com.amazonaws.services.sqs.model.CreateQueueResult;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -784,10 +780,11 @@ public class SQSSession implements Session, QueueSession {
         throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
-    /** This method is not supported. */
     @Override
     public TemporaryQueue createTemporaryQueue() throws JMSException {
-        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        String tempQueueName = "tmp-" + UUID.randomUUID().toString();
+        amazonSQSClient.createQueue(tempQueueName);
+        return new SqsTemporaryQueue(tempQueueName, amazonSQSClient);
     }
 
     /** This method is not supported. */
