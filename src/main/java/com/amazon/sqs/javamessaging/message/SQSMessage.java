@@ -1194,6 +1194,8 @@ public class SQSMessage implements Message {
         private static Object getObjectValue(String value, String type) throws JMSException {
             if (INT.equals(type)) {
                 return Integer.valueOf(value);
+            } else if (STRING.equals(type) || NUMBER.equals(type) || BINARY.equals(type)) {
+                return value;
             } else if (LONG.equals(type)) {
                 return Long.valueOf(value);
             } else if (BOOLEAN.equals(type)) {
