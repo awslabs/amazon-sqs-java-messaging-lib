@@ -1191,7 +1191,7 @@ public class SQSMessage implements Message {
         }
 
         private static Object getObjectValue(String value, String type) throws JMSException {
-            if (STRING.equals(type)) {
+            if (STRING.equals(type) || NUMBER.equals(type)) {
                 return value;
             } else if (INT.equals(type)) {
                 return Integer.valueOf(value);
