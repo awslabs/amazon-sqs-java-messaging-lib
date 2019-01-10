@@ -495,9 +495,6 @@ public class SQSSession implements Session, QueueSession {
         
         unAckedMessages.addAll(sqsSessionRunnable.purgeScheduledCallbacksForQueuesAndGroups(queueToGroupsMapping));
         
-        if (!unAckedMessages.isEmpty()) {
-            negativeAcknowledger.bulkAction(unAckedMessages, unAckedMessages.size());
-        }
     }
 
     private Map<String, Set<String>> getAffectedGroupsPerQueueUrl(List<SQSMessageIdentifier> messages) {
