@@ -369,6 +369,12 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             jmsMessage.setJMSReplyTo(replyToQueue);
         }
         
+        MessageAttributeValue correlationIdAttribute = message.getMessageAttributes().get(
+                SQSMessage.JMS_SQS_CORRELATION_ID);
+        if (correlationIdAttribute != null) {
+                jmsMessage.setJMSCorrelationID(correlationIdAttribute.getStringValue());
+        }
+        
         return jmsMessage;
     }
 

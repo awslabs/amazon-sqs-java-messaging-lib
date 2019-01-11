@@ -69,6 +69,7 @@ public class SQSMessage implements Message {
     public static final String JMS_SQS_MESSAGE_TYPE = "JMS_SQSMessageType";
     public static final String JMS_SQS_REPLY_TO_QUEUE_NAME = "JMS_SQSReplyToQueueName";
     public static final String JMS_SQS_REPLY_TO_QUEUE_URL = "JMS_SQSReplyToQueueURL";
+    public static final String JMS_SQS_CORRELATION_ID = "JMS_SQSCorrelationID";
     
     // Default JMS Message properties
     private int deliveryMode = Message.DEFAULT_DELIVERY_MODE;

@@ -117,6 +117,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
          */
         addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_MESSAGE_TYPE, messageType);
         addReplyToQueueReservedAttributes(messageAttributes, message);
+        addCorrelationIDToQueueReservedAttributes(messageAttributes, message);
 
         SendMessageRequest sendMessageRequest = new SendMessageRequest(queue.getQueueUrl(), sqsMessageBody);
         sendMessageRequest.setMessageAttributes(messageAttributes);
@@ -248,6 +249,19 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
              */
             addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_REPLY_TO_QUEUE_NAME, replyToQueue.getQueueName());
             addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_REPLY_TO_QUEUE_URL, replyToQueue.getQueueUrl());
+        }
+    }
+
+    /**
+     * Adds the correlation ID attribute during send as part of the send message
+     * request, if necessary
+     */
+    private void addCorrelationIDToQueueReservedAttributes(Map<String, MessageAttributeValue> messageAttributes,
+                                                   SQSMessage message) throws JMSException {
+
+        String correlationID = message.getJMSCorrelationID();
+        if (correlationID != null) {
+            addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_CORRELATION_ID, correlationID);
         }
     }
 
