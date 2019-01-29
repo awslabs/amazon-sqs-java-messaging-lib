@@ -475,13 +475,13 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         
         MessageManager messageManager = null;
         synchronized (stateLock) {
-            // If message exists in queue poll.
-            if (!messageQueue.isEmpty()) {
-                messageManager = messageQueue.pollFirst();
-            } else {
-                requestMessage();
-            	try {
-                    long startTime = System.currentTimeMillis();
+            requestMessage();
+            try {
+                // If message exists in queue poll.
+                if (!messageQueue.isEmpty()) {
+                    messageManager = messageQueue.pollFirst();
+                } else {
+            	    long startTime = System.currentTimeMillis();
     
                     long waitTime = 0;
                     while (messageQueue.isEmpty() && !isClosed() &&
@@ -497,12 +497,12 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                         return null;
                     }
                     messageManager = messageQueue.pollFirst();
-            	} finally {
-            	    if (messageManager == null) {
-            	        unrequestMessage();
-            	    }
-            	}
-            }
+                }
+        	} finally {
+        	    if (messageManager == null) {
+        	        unrequestMessage();
+        	    }
+        	}
         }
         return messageHandler(messageManager);
     }
@@ -525,6 +525,9 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         MessageManager messageManager;
         synchronized (stateLock) {
             messageManager = messageQueue.pollFirst();
+        }
+        if (messageManager != null) {
+            requestMessage();
         }
         return messageHandler(messageManager);
     }
