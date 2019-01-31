@@ -22,9 +22,9 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -53,9 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
-import javax.jms.MessageConsumer;
 import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
 
 import org.junit.Assert;
@@ -1096,8 +1094,16 @@ public class SQSMessageConsumerPrefetchTest {
         consumerPrefetch.running = false;
 
         assertNull(consumerPrefetch.receive());
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
+        
         assertNull(consumerPrefetch.receive(100));
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
+        
         assertNull(consumerPrefetch.receiveNoWait());
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
     }
 
     /**
@@ -1109,8 +1115,16 @@ public class SQSMessageConsumerPrefetchTest {
         consumerPrefetch.closed = true;
 
         assertNull(consumerPrefetch.receive());
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
+        
         assertNull(consumerPrefetch.receive(100));
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
+        
         assertNull(consumerPrefetch.receiveNoWait());
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
     }
 
     /**
@@ -1138,7 +1152,41 @@ public class SQSMessageConsumerPrefetchTest {
          */
         receiptHandlers.contains(msg.getReceiptHandle());
         verify(acknowledger).notifyMessageReceived(msg);
-        verify(consumerPrefetch).notifyStateChange();
+        verify(consumerPrefetch, times(2)).notifyStateChange();
+        
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
+    }
+
+    /**
+     * Test received messages
+     */
+    @Test
+    public void testReceiveNoWaitPrefetch() throws JMSException {
+
+        /*
+         * Set up consumer prefetch and mocks
+         */
+        consumerPrefetch.running = true;
+
+        List<String> receiptHandlers = createReceiptHandlersList(20);
+
+        addMessagesToQueue(receiptHandlers);
+
+        /*
+         * Call receive messages
+         */
+        SQSMessage msg = (SQSMessage)consumerPrefetch.receiveNoWait();
+
+        /*
+         * Verify results
+         */
+        receiptHandlers.contains(msg.getReceiptHandle());
+        verify(acknowledger).notifyMessageReceived(msg);
+        verify(consumerPrefetch, times(2)).notifyStateChange();
+        
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
     }
 
     /**
@@ -1185,6 +1233,9 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Validate that after session is closed receive returns null
         assertEquals(true, noMessageReturned.get());
+        
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
     }
 
     /**
@@ -1194,7 +1245,7 @@ public class SQSMessageConsumerPrefetchTest {
     public void testReceiveMessageEmptyThenAddMessage() throws InterruptedException, JMSException {
 
         /*
-         * Set up consumer prefetch and lactches
+         * Set up consumer prefetch and latches
          */
         consumerPrefetch.running = true;
 
@@ -1236,6 +1287,9 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Validate that after adding a single message it was receive correctly
         assertEquals(true, messageReceived.get());
+        
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
     }
 
     /**
@@ -1262,6 +1316,31 @@ public class SQSMessageConsumerPrefetchTest {
         // verify that we did not exit early
         long measuredTime = System.currentTimeMillis() - startTime; 
         assertTrue(String.format("Expected wait time = %1$s ms and has to be less than or equal to measured time = %2$s ms", waitTime, measuredTime), waitTime <= measuredTime);
+        
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
+    }
+    
+    /**
+     * Test received messages with timeout
+     */
+    @Test
+    public void testReceiveNoWaitEmpty() throws InterruptedException, JMSException {
+
+        /*
+         * Set up consumer prefetch and time stamps
+         */
+        consumerPrefetch.running = true;
+
+        /*
+         * Call receive messages
+         */
+        SQSMessage msg = (SQSMessage) consumerPrefetch.receiveNoWait();
+
+        assertNull(msg);
+
+        // Ensure the messagesRequested counter is reset correctly
+        assertEquals(0, consumerPrefetch.messagesRequested);
     }
 
     /**
