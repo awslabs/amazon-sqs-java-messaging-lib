@@ -36,6 +36,8 @@ public class SQSMessagingClientConstants {
      */
     public static final String STRING = "String";
 
+    public static final String NUMBER = "Number";
+
     public static final String INT = "Number.int";
 
     public static final String BOOLEAN = "Number.Boolean";
