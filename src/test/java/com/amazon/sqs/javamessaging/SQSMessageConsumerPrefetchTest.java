@@ -435,7 +435,7 @@ public class SQSMessageConsumerPrefetchTest {
         doNothing()
                 .when(consumerPrefetch).waitForPrefetch();
         doThrow(new InterruptedException("Interrupt"))
-                .when(consumerPrefetch).getMessages(anyInt());
+                .when(consumerPrefetch).getMessagesWithBackoff(anyInt());
 
         /*
          * Run the prefetch
@@ -449,7 +449,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).waitForStart();
         verify(consumerPrefetch).waitForPrefetch();
         verify(consumerPrefetch).nackQueueMessages();
-        verify(consumerPrefetch).getMessages(anyInt());
+        verify(consumerPrefetch).getMessagesWithBackoff(anyInt());
 
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
 
@@ -1332,6 +1332,11 @@ public class SQSMessageConsumerPrefetchTest {
          */
         consumerPrefetch.running = true;
 
+        if (numberOfMessagesToPrefetch == 0) {
+            when(amazonSQSClient.receiveMessage(any(ReceiveMessageRequest.class)))
+                    .thenReturn(new ReceiveMessageResult());
+        }
+        
         /*
          * Call receive messages
          */
@@ -1542,7 +1547,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Get messages
          */
-        List<com.amazonaws.services.sqs.model.Message> result = consumerPrefetch.getMessages(prefetchBatchSize);
+        List<com.amazonaws.services.sqs.model.Message> result = consumerPrefetch.getMessagesWithBackoff(prefetchBatchSize);
 
         /*
          * Verify results
@@ -1555,7 +1560,7 @@ public class SQSMessageConsumerPrefetchTest {
      * Test Get Messages with illegal prefetch size
      */
     @Test
-    public void testGetMessagesIllegalPrefetchSize() throws InterruptedException {
+    public void testGetMessagesIllegalPrefetchSize() throws JMSException {
 
         int negativeSize = -10;
         try {
@@ -1597,9 +1602,9 @@ public class SQSMessageConsumerPrefetchTest {
         when(backoffStrategy.delayBeforeNextRetry(retriesAttempted + 1))
                 .thenReturn(secondSleepTime);
 
-        consumerPrefetch.getMessages(prefetchBatchSize);
+        consumerPrefetch.getMessagesWithBackoff(prefetchBatchSize);
 
-        consumerPrefetch.getMessages(prefetchBatchSize);
+        consumerPrefetch.getMessagesWithBackoff(prefetchBatchSize);
 
         /*
          * Verify results
@@ -1638,7 +1643,7 @@ public class SQSMessageConsumerPrefetchTest {
             public void run() {
                 try {
                     beforeGetMessagesCall.countDown();
-                    consumerPrefetch.getMessages(prefetchBatchSize);
+                    consumerPrefetch.getMessagesWithBackoff(prefetchBatchSize);
                 } catch (InterruptedException e) {
                     recvInterruptedExceptionLatch.countDown();
                     e.printStackTrace();

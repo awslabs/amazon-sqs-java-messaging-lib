@@ -14,9 +14,9 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -218,7 +218,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 }
 
                 if (!isClosed()) {
-                    messages = getMessages(prefetchBatchSize);
+                    messages = getMessagesWithBackoff(prefetchBatchSize);
                 }
 
                 if (messages != null && !messages.isEmpty()) {
@@ -243,7 +243,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * Call <code>receiveMessage</code> with long-poll wait time of 20 seconds
      * with available prefetch batch size and potential re-tries.
      */
-    protected List<Message> getMessages(int prefetchBatchSize) throws InterruptedException {
+    protected List<Message> getMessages(int prefetchBatchSize) throws JMSException {
 
         assert prefetchBatchSize > 0;
 
@@ -257,21 +257,8 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         if (sqsDestination.isFifo()) {
             receiveMessageRequest.withReceiveRequestAttemptId(UUID.randomUUID().toString());
         }
-        List<Message> messages = null;
-        try {
-            ReceiveMessageResult receivedMessageResult = amazonSQSClient.receiveMessage(receiveMessageRequest);
-            messages = receivedMessageResult.getMessages();
-            retriesAttempted = 0;
-        } catch (JMSException e) {
-            LOG.warn("Encountered exception during receive in ConsumerPrefetch thread", e);
-            try {
-                sleep(backoffStrategy.delayBeforeNextRetry(retriesAttempted++));
-            } catch (InterruptedException ex) {
-                LOG.warn("Interrupted while retrying on receive", ex);
-                throw ex;
-            }
-        }
-        return messages;
+        ReceiveMessageResult receivedMessageResult = amazonSQSClient.receiveMessage(receiveMessageRequest);
+        return receivedMessageResult.getMessages();
     }
     
     /**
@@ -308,6 +295,23 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             negativeAcknowledger.action(queueUrl, nackMessages);
         } catch (JMSException e) {
             LOG.warn("Caught exception while nacking received messages", e);
+        }
+    }
+
+    protected List<Message> getMessagesWithBackoff(int batchSize) throws InterruptedException {
+        try {
+            List<Message> result = getMessages(batchSize);
+            retriesAttempted = 0;
+            return result;
+        } catch (JMSException e) {
+            LOG.warn("Encountered exception during receive in ConsumerPrefetch thread", e);
+            try {
+                sleep(backoffStrategy.delayBeforeNextRetry(retriesAttempted++));
+                return Collections.emptyList();
+            } catch (InterruptedException ex) {
+                LOG.warn("Interrupted while retrying on receive", ex);
+                throw ex;
+            }
         }
     }
 
@@ -524,6 +528,12 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         
         MessageManager messageManager;
         synchronized (stateLock) {
+            if (messageQueue.isEmpty() && numberOfMessagesToPrefetch == 0) {
+                List<Message> messages = getMessages(1);
+                if (messages != null && !messages.isEmpty()) {
+                    processReceivedMessages(messages);
+                }
+            }
             messageManager = messageQueue.pollFirst();
         }
         if (messageManager != null) {
