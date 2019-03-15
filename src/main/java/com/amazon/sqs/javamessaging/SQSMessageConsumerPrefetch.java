@@ -240,18 +240,17 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     }
     
     /**
-     * Call <code>receiveMessage</code> with long-poll wait time of 20 seconds
-     * with available prefetch batch size and potential re-tries.
+     * Call <code>receiveMessage</code> with the given wait time.
      */
-    protected List<Message> getMessages(int prefetchBatchSize) throws JMSException {
+    protected List<Message> getMessages(int batchSize, int waitTimeSeconds) throws JMSException {
 
-        assert prefetchBatchSize > 0;
+        assert batchSize > 0;
 
         ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(queueUrl)
-                                                              .withMaxNumberOfMessages(prefetchBatchSize)
+                                                              .withMaxNumberOfMessages(batchSize)
                                                               .withAttributeNames(ALL)
                                                               .withMessageAttributeNames(ALL)
-                                                              .withWaitTimeSeconds(WAIT_TIME_SECONDS);
+                                                              .withWaitTimeSeconds(waitTimeSeconds);
         //if the receive request is for FIFO queue, provide a unique receive request attempt it, so that
         //failed calls retried by SDK will claim the same messages
         if (sqsDestination.isFifo()) {
@@ -300,7 +299,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     protected List<Message> getMessagesWithBackoff(int batchSize) throws InterruptedException {
         try {
-            List<Message> result = getMessages(batchSize);
+            List<Message> result = getMessages(batchSize, WAIT_TIME_SECONDS);
             retriesAttempted = 0;
             return result;
         } catch (JMSException e) {
@@ -529,7 +528,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         MessageManager messageManager;
         synchronized (stateLock) {
             if (messageQueue.isEmpty() && numberOfMessagesToPrefetch == 0) {
-                List<Message> messages = getMessages(1);
+                List<Message> messages = getMessages(1, 0);
                 if (messages != null && !messages.isEmpty()) {
                     processReceivedMessages(messages);
                 }

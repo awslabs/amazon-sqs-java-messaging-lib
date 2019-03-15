@@ -260,7 +260,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch, times(2)).nackQueueMessages();
 
         // Ensure we do not get messages when closed while waiting for prefetch
-        verify(consumerPrefetch, never()).getMessages(anyInt());
+        verify(consumerPrefetch, never()).getMessages(anyInt(), anyInt());
 
         // Ensure we do not process any messages
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
@@ -296,7 +296,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).nackQueueMessages();
 
         verify(consumerPrefetch, never()).waitForPrefetch();
-        verify(consumerPrefetch, never()).getMessages(anyInt());
+        verify(consumerPrefetch, never()).getMessages(anyInt(), anyInt());
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
 
         // Ensure retries attempt was not increased
@@ -335,7 +335,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).nackQueueMessages();
 
         verify(consumerPrefetch, never()).waitForPrefetch();
-        verify(consumerPrefetch, never()).getMessages(anyInt());
+        verify(consumerPrefetch, never()).getMessages(anyInt(), anyInt());
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
 
         // Ensure retries attempt was not increased
@@ -371,7 +371,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).waitForPrefetch();
         verify(consumerPrefetch).nackQueueMessages();
 
-        verify(consumerPrefetch, never()).getMessages(anyInt());
+        verify(consumerPrefetch, never()).getMessages(anyInt(), anyInt());
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
 
         // Ensure retries attempt was not increased
@@ -412,7 +412,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).waitForPrefetch();
         verify(consumerPrefetch).nackQueueMessages();
 
-        verify(consumerPrefetch, never()).getMessages(anyInt());
+        verify(consumerPrefetch, never()).getMessages(anyInt(), anyInt());
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
 
         // Ensure retries attempt was not increased
@@ -473,7 +473,7 @@ public class SQSMessageConsumerPrefetchTest {
         doNothing()
                 .when(consumerPrefetch).waitForPrefetch();
         doThrow(new Error("error"))
-                .when(consumerPrefetch).getMessages(anyInt());
+                .when(consumerPrefetch).getMessages(anyInt(), anyInt());
 
         /*
          * Run the prefetch
@@ -492,7 +492,7 @@ public class SQSMessageConsumerPrefetchTest {
         verify(consumerPrefetch).waitForStart();
         verify(consumerPrefetch).waitForPrefetch();
         verify(consumerPrefetch).nackQueueMessages();
-        verify(consumerPrefetch).getMessages(anyInt());
+        verify(consumerPrefetch).getMessages(anyInt(), anyInt());
 
         verify(consumerPrefetch, never()).processReceivedMessages(any(List.class));
 
@@ -1564,14 +1564,14 @@ public class SQSMessageConsumerPrefetchTest {
 
         int negativeSize = -10;
         try {
-            consumerPrefetch.getMessages(negativeSize);
+            consumerPrefetch.getMessages(negativeSize, 0);
             fail();
         } catch(AssertionError ae) {
             // expected exception
         }
 
         try {
-            consumerPrefetch.getMessages(0);
+            consumerPrefetch.getMessages(0, 0);
             fail();
         } catch(AssertionError ae) {
             // expected exception
@@ -1677,7 +1677,7 @@ public class SQSMessageConsumerPrefetchTest {
                 .thenThrow(new Error());
 
         try {
-            consumerPrefetch.getMessages(prefetchBatchSize);
+            consumerPrefetch.getMessages(prefetchBatchSize, 0);
         } catch (Error e) {
             // Expected error exception
         }
