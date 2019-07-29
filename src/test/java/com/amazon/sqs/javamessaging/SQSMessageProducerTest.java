@@ -46,6 +46,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -699,6 +701,50 @@ public class SQSMessageProducerTest {
         verify(sqsSession).removeProducer(producer);
     }
 
+    @Test
+    public void testSetDeliveryDelay() throws JMSException {
+        assertEquals(0, producer.getDeliveryDelay());
+        
+        producer.setDeliveryDelay(2000);
+        
+        assertEquals(2000, producer.getDeliveryDelay());
+        
+        ArgumentCaptor<SendMessageRequest> requestCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
+        when(amazonSQSClient.sendMessage(requestCaptor.capture()))
+            .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1));
+
+        SQSTextMessage msg = new SQSTextMessage("Sorry I'm late!");
+        producer.send(msg);
+        
+        assertEquals(2, requestCaptor.getValue().getDelaySeconds().intValue());
+    }
+    
+    
+    @Test
+    public void testSetDeliveryDelayInvalidDelays() throws JMSException {
+        try {
+            producer.setDeliveryDelay(-1);
+            fail();
+        } catch (IllegalArgumentException ide) {
+            // expected
+        }
+        
+        try {
+            producer.setDeliveryDelay(TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS));
+            fail();
+        } catch (IllegalArgumentException ide) {
+            // expected
+        }
+        
+        try {
+            producer.setDeliveryDelay(20);
+            fail();
+        } catch (IllegalArgumentException ide) {
+            // expected
+        }
+    }
+    
+    
     private Map<String, MessageAttributeValue> createMessageAttribute(String type) {
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setDataType("String");
