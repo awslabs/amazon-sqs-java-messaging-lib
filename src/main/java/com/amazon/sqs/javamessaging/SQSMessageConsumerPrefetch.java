@@ -274,6 +274,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 javax.jms.Message jmsMessage = convertToJMSMessage(message);
                 messageManagers.add(new MessageManager(this, jmsMessage));
             } catch (JMSException e) {
+                LOG.warn("Caught exception while converting received messages", e);
                 nackMessages.add(message.getReceiptHandle());
             }
         }
