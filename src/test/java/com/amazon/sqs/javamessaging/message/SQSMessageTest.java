@@ -53,6 +53,7 @@ public class SQSMessageTest {
     final String myShort = "myShort";
     final String myByte = "myByte";
     final String myString = "myString";
+    final String myCustomString = "myCustomString";
     final String myNumber = "myNumber";
 
     @Before
@@ -326,6 +327,10 @@ public class SQSMessageTest {
                                                     .withDataType(SQSMessagingClientConstants.STRING)
                                                     .withStringValue("StringValue"));
 
+        messageAttributes.put(myCustomString, new MessageAttributeValue()
+                                                    .withDataType(SQSMessagingClientConstants.NUMBER + ".custom")
+                                                    .withStringValue("['one', 'two']"));
+
         messageAttributes.put(myNumber, new MessageAttributeValue()
                                                     .withDataType(SQSMessagingClientConstants.NUMBER)
                                                     .withStringValue("500"));
@@ -374,6 +379,10 @@ public class SQSMessageTest {
         Assert.assertEquals(message.getObjectProperty(myString), "StringValue");
         Assert.assertEquals(message.getStringProperty(myString), "StringValue");
 
+        Assert.assertTrue(message.propertyExists(myCustomString));
+        Assert.assertEquals(message.getObjectProperty(myCustomString), "['one', 'two']");
+        Assert.assertEquals(message.getStringProperty(myCustomString), "['one', 'two']");
+
         Assert.assertTrue(message.propertyExists(myNumber));
         Assert.assertEquals(message.getObjectProperty(myNumber), "500");
         Assert.assertEquals(message.getStringProperty(myNumber), "500");
@@ -395,6 +404,7 @@ public class SQSMessageTest {
                 myShort,
                 myByte,
                 myString,
+                myCustomString,
                 myNumber,
                 JMSX_DELIVERY_COUNT));
 
