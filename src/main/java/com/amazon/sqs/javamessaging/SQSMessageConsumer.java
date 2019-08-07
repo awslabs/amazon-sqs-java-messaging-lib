@@ -140,12 +140,13 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      * paused.
      * 
      * @return the next message produced for this message consumer, or null if
-     *         this message consumer is closed
+     *         this message consumer is closed during the receive call
      * @throws JMSException
      *             On internal error
      */
     @Override
     public Message receive() throws JMSException {
+        checkClosed();
         return sqsMessageConsumerPrefetch.receive();
     }
 
@@ -157,12 +158,13 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      * @param timeout
      *            the timeout value (in milliseconds)
      * @return the next message produced for this message consumer, or null if
-     *         the timeout expires or this message consumer is closed
+     *         the timeout expires or this message consumer is closed during the receive call
      * @throws JMSException
      *             On internal error
      */
     @Override
     public Message receive(long timeout) throws JMSException {
+        checkClosed();
         return sqsMessageConsumerPrefetch.receive(timeout);
     }
 
@@ -176,6 +178,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      */
     @Override
     public Message receiveNoWait() throws JMSException {
+        checkClosed();
         return sqsMessageConsumerPrefetch.receiveNoWait();
     }
     

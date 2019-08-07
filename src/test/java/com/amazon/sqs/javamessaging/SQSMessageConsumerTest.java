@@ -348,6 +348,88 @@ public class SQSMessageConsumerTest {
     }
 
     /**
+     * Test receive fails when consumer is already closed
+     */
+    @Test
+    public void testReceiveAlreadyClosed() throws InterruptedException, JMSException {
+
+        /*
+         * Set up consumer
+         */
+        consumer = spy(new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
+                destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch));
+
+        consumer.close();
+
+        /*
+         * Call receive
+         */
+        try {
+            consumer.receive();
+            fail();
+        } catch (JMSException ex) {
+            assertEquals("Consumer is closed", ex.getMessage());
+        }
+
+
+    }
+
+    /**
+     * Test set message listener fails when consumer is already closed
+     */
+    @Test
+    public void testReceiveWithTimeoutAlreadyClosed() throws InterruptedException, JMSException {
+
+        /*
+         * Set up consumer
+         */
+        consumer = spy(new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
+                destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch));
+
+        consumer.close();
+
+        long timeout = 10;
+
+        /*
+         * Call receive with timeout
+         */
+        try {
+            consumer.receive(timeout);
+            fail();
+        } catch (JMSException ex) {
+            assertEquals("Consumer is closed", ex.getMessage());
+        }
+
+
+    }
+
+    /**
+     * Test set message listener fails when consumer is already closed
+     */
+    @Test
+    public void testReceiveNoWaitAlreadyClosed() throws InterruptedException, JMSException {
+
+        /*
+         * Set up consumer
+         */
+        consumer = spy(new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
+                destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch));
+
+        consumer.close();
+
+        /*
+         * Call receive no wait
+         */
+        try {
+
+            consumer.receiveNoWait();
+            fail();
+        } catch (JMSException ex) {
+            assertEquals("Consumer is closed", ex.getMessage());
+        }
+    }
+
+    /**
      * Test set message listener
      */
     @Test
