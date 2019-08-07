@@ -589,9 +589,14 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     }
     
     private boolean cannotDeliver() throws JMSException {
-        if (isClosed() || !running) {
-            return true;
+        if (!running) {
+          return true;
         }
+
+        if (isClosed()) {
+          throw new JMSException("Cannot receive messages when the consumer is closed");
+        }
+
         if (messageListener != null) {
             throw new JMSException("Cannot receive messages synchronously after a message listener is set");
         }
