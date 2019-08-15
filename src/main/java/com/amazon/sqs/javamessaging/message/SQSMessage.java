@@ -117,16 +117,19 @@ public class SQSMessage implements Message {
         receiptHandle = sqsMessage.getReceiptHandle();
         this.setSQSMessageId(sqsMessage.getMessageId());
         Map<String,String> systemAttributes = sqsMessage.getAttributes();
-        int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
-        
-        /**
-         * JMSXDeliveryCount is set based on SQS ApproximateReceiveCount
-         * attribute.
-         */
-        properties.put(JMSX_DELIVERY_COUNT, new JMSMessagePropertyValue(
-                receiveCount, INT));
-        if (receiveCount > 1) {
-            setJMSRedelivered(true);
+        String receiveCountAttrValue = systemAttributes.get(APPROXIMATE_RECEIVE_COUNT);
+        if (receiveCountAttrValue != null) {
+            int receiveCount = Integer.parseInt(receiveCountAttrValue);
+
+            /**
+             * JMSXDeliveryCount is set based on SQS ApproximateReceiveCount
+             * attribute.
+             */
+            properties.put(JMSX_DELIVERY_COUNT, new JMSMessagePropertyValue(
+                    receiveCount, INT));
+            if (receiveCount > 1) {
+                setJMSRedelivered(true);
+            }
         }
         if (sqsMessage.getMessageAttributes() != null) {
             addMessageAttributes(sqsMessage);

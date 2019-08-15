@@ -161,7 +161,7 @@ public class SQSMessageConsumerPrefetchTest {
         when(amazonSQSClient.receiveMessage(
                 eq(new ReceiveMessageRequest(QUEUE_URL)
                         .withMaxNumberOfMessages(receiveMessageLimit)
-                        .withAttributeNames(SQSMessageConsumerPrefetch.ALL)
+//                        .withAttributeNames(SQSMessageConsumerPrefetch.ALL)
                         .withMessageAttributeNames(SQSMessageConsumerPrefetch.ALL)
                         .withWaitTimeSeconds(SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS))))
                 .thenReturn(receivedMessageResult);
@@ -1527,7 +1527,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(QUEUE_URL)
                 .withMaxNumberOfMessages(prefetchBatchSize)
-                .withAttributeNames(SQSMessageConsumerPrefetch.ALL)
+//                .withAttributeNames(SQSMessageConsumerPrefetch.ALL)
                 .withMessageAttributeNames(SQSMessageConsumerPrefetch.ALL)
                 .withWaitTimeSeconds(SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS);
 
@@ -1868,7 +1868,7 @@ public class SQSMessageConsumerPrefetchTest {
         when(amazonSQSClient.receiveMessage(
                 eq(new ReceiveMessageRequest(QUEUE_URL)
                         .withMaxNumberOfMessages(receiveBatchSize)
-                        .withAttributeNames(SQSMessageConsumerPrefetch.ALL)
+//                        .withAttributeNames(SQSMessageConsumerPrefetch.ALL)
                         .withMessageAttributeNames(SQSMessageConsumerPrefetch.ALL)
                         .withWaitTimeSeconds(SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS))))
                 .thenReturn(receivedMessageResult);

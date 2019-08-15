@@ -248,7 +248,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
         ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(queueUrl)
                                                               .withMaxNumberOfMessages(batchSize)
-                                                              .withAttributeNames(ALL)
+//                                                              .withAttributeNames(ALL)
                                                               .withMessageAttributeNames(ALL)
                                                               .withWaitTimeSeconds(waitTimeSeconds);
         //if the receive request is for FIFO queue, provide a unique receive request attempt it, so that
