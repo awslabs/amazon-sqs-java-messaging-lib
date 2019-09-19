@@ -17,6 +17,7 @@ package com.amazon.sqs.javamessaging;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -30,6 +31,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.QueueSender;
 
+import com.amazonaws.handlers.AsyncHandler;
+import com.amazonaws.services.sqs.AmazonSQSAsync;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -90,13 +93,75 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
 
     void sendInternal(SQSQueueDestination queue, Message rawMessage) throws JMSException {
         checkClosed();
-        String sqsMessageBody = null;
-        String messageType = null;
         if (!(rawMessage instanceof SQSMessage)) {
             throw new MessageFormatException(
-                    "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");            
+                    "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");
         }
-        
+        SendMessageRequest sendMessageRequest = createSendMessageRequest(queue, rawMessage);
+        SQSMessage message = (SQSMessage) rawMessage;
+
+        SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
+        String messageId = sendMessageResult.getMessageId();
+        LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
+        applySendMessageResult(sendMessageResult, message);
+    }
+
+    private void sendInternalAsync(SQSQueueDestination queue, Message rawMessage, final CompletionListener completionListener) throws JMSException {
+        checkClosed();
+        if (!(amazonSQSClient.getAmazonSQSClient() instanceof AmazonSQSAsync)) {
+            throw new UnsupportedOperationException("Expected instance of " + SQSMessageProducer.class.getName() + " to be backed by an instance of " +
+                    AmazonSQSAsync.class.getName() +
+                    " but was: " + amazonSQSClient.getAmazonSQSClient().getClass().getName());
+        }
+        if (!(rawMessage instanceof SQSMessage)) {
+            throw new MessageFormatException(
+                    "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");
+        }
+        AmazonSQSAsync amazonSQSAsync = (AmazonSQSAsync) amazonSQSClient.getAmazonSQSClient();
+
+        SendMessageRequest sendMessageRequest = createSendMessageRequest(queue, rawMessage);
+        final SQSMessage message = (SQSMessage) rawMessage;
+
+        amazonSQSAsync.sendMessageAsync(sendMessageRequest, new AsyncHandler<SendMessageRequest, SendMessageResult>() {
+            @Override
+            public void onError(Exception e) {
+                if (completionListener != null) {
+                    completionListener.onException(message, e);
+                }
+            }
+
+            @Override
+            public void onSuccess(SendMessageRequest request, SendMessageResult sendMessageResult) {
+                String messageId = sendMessageResult.getMessageId();
+                LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
+                try {
+                    applySendMessageResult(sendMessageResult, message);
+                } catch (JMSException e) {
+                    throw new RuntimeException(e);
+                }
+                if (completionListener != null) {
+                    completionListener.onCompletion(message);
+                }
+            }
+        });
+    }
+
+    private void applySendMessageResult(SendMessageResult sendMessageResult, SQSMessage message) throws JMSException {
+        /** TODO: Do not support disableMessageID for now. */
+        message.setSQSMessageId(sendMessageResult.getMessageId());
+
+        // if the message was sent to FIFO queue, the sequence number will be
+        // set in the response
+        // pass it to JMS user through provider specific JMS property
+        if (sendMessageResult.getSequenceNumber() != null) {
+            message.setSequenceNumber(sendMessageResult.getSequenceNumber());
+        }
+    }
+
+    private SendMessageRequest createSendMessageRequest(SQSQueueDestination queue, Message rawMessage) throws JMSException {
+        String sqsMessageBody = null;
+        String messageType = null;
+
         SQSMessage message = (SQSMessage)rawMessage;
         message.setJMSDestination(queue);
         if (message instanceof SQSBytesMessage) {
@@ -105,11 +170,11 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         } else if (message instanceof SQSObjectMessage) {
             sqsMessageBody = ((SQSObjectMessage) message).getMessageBody();
             messageType = SQSMessage.OBJECT_MESSAGE_TYPE;
-        } else if (message instanceof SQSTextMessage) {            
+        } else if (message instanceof SQSTextMessage) {
             sqsMessageBody = ((SQSTextMessage) message).getText();
             messageType = SQSMessage.TEXT_MESSAGE_TYPE;
         }
-        
+
         if (sqsMessageBody == null || sqsMessageBody.isEmpty()) {
             throw new JMSException("Message body cannot be null or empty");
         }
@@ -139,19 +204,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             sendMessageRequest.setMessageGroupId(message.getSQSMessageGroupId());
             sendMessageRequest.setMessageDeduplicationId(message.getSQSMessageDeduplicationId());
         }
-
-        SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
-        String messageId = sendMessageResult.getMessageId();
-        LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
-        /** TODO: Do not support disableMessageID for now. */
-        message.setSQSMessageId(messageId);
-
-        // if the message was sent to FIFO queue, the sequence number will be
-        // set in the response
-        // pass it to JMS user through provider specific JMS property
-        if (sendMessageResult.getSequenceNumber() != null) {
-            message.setSequenceNumber(sendMessageResult.getSequenceNumber());
-        }
+        return sendMessageRequest;
     }
 
     @Override
@@ -185,6 +238,15 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         }
         checkIfDestinationAlreadySet();
         sendInternal((SQSQueueDestination)queue, message);
+    }
+
+    public void sendAsync(Queue queue, Message message, CompletionListener completionListener) throws JMSException {
+        if (!(queue instanceof SQSQueueDestination)) {
+            throw new InvalidDestinationException(
+                    "Incompatible implementation of Queue. Please use SQSQueueDestination implementation.");
+        }
+        checkIfDestinationAlreadySet();
+        sendInternalAsync((SQSQueueDestination)queue, message, completionListener);
     }
 
     /**
@@ -314,7 +376,12 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             throws JMSException {
         send(queue, message);
     }
-    
+
+    public void sendAsync(Queue queue, Message message, int deliveryMode, int priority, long timeToLive, CompletionListener completionListener)
+            throws JMSException {
+        sendAsync(queue, message, completionListener);
+    }
+
     /**
      * Gets the destination associated with this MessageProducer.
      * 
@@ -358,19 +425,27 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         }
         sendInternal(sqsDestination, message);
     }
-  
+
+    public void sendAsync(Message message, CompletionListener completionListener) throws JMSException {
+        if (sqsDestination == null) {
+            throw new UnsupportedOperationException(
+                    "MessageProducer has to specify a destination at creation time.");
+        }
+        sendInternalAsync(sqsDestination, message, completionListener);
+    }
+
     /**
      * Sends a message to a destination created during the creation time of this
      * message producer.
      * <P>
      * Send does not support deliveryMode, priority, and timeToLive. It will
      * ignore anything in deliveryMode, priority, and timeToLive.
-     * 
+     *
      * @param message
      *            the message to send
      * @param deliveryMode
      * @param priority
-     * @param timeToLive           
+     * @param timeToLive
      * @throws MessageFormatException
      *             If an invalid message is specified.
      * @throws UnsupportedOperationException
@@ -383,7 +458,11 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     public void send(Message message, int deliveryMode, int priority, long timeToLive) throws JMSException {
         send(message);
     }
-    
+
+    public void sendAsync(Message message, int deliveryMode, int priority, long timeToLive, CompletionListener completionListener) throws JMSException {
+        sendAsync(message, completionListener);
+    }
+
     /**
      * Sends a message to a queue destination.
      * 
@@ -409,6 +488,17 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         }
         if (destination instanceof SQSQueueDestination) {
             send((Queue) destination, message);
+        } else {
+            throw new InvalidDestinationException("Incompatible implementation of Destination. Please use SQSQueueDestination implementation.");
+        }
+    }
+
+    public void sendAsync(Destination destination, Message message, CompletionListener completionListener) throws JMSException {
+        if (destination == null) {
+            throw new InvalidDestinationException("Destination cannot be null");
+        }
+        if (destination instanceof SQSQueueDestination) {
+            sendAsync((Queue) destination, message, completionListener);
         } else {
             throw new InvalidDestinationException("Incompatible implementation of Destination. Please use SQSQueueDestination implementation.");
         }
@@ -441,6 +531,10 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     @Override
     public void send(Destination destination, Message message, int deliveryMode, int priority, long timeToLive) throws JMSException {
         send(destination, message);
+    }
+
+    public void sendAsync(Destination destination, Message message, int deliveryMode, int priority, long timeToLive, CompletionListener completionListener) throws JMSException {
+        sendAsync(destination, message, completionListener);
     }
 
     /** This method is not supported. */
