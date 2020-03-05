@@ -1919,6 +1919,22 @@ public class SQSMessageConsumerPrefetchTest {
         consumerPrefetch.run();
     }
 
+    /**
+     * Test SetMessageListener before starting prefetch
+     * Setting MessageListener before starting prefetch would not mark
+     * the message listener as ready. Therefore start() method should
+     * do this work in order to get pre-fetch going even when
+     * number of messages to pre-fetch is set to 0.
+     */
+    @Test
+    public void testSetMessageListenerBeforeStart() {
+
+        MessageListener msgListener = mock(MessageListener.class);
+        consumerPrefetch.setMessageListener(msgListener);
+        consumerPrefetch.start();
+        assertEquals(1, consumerPrefetch.messagesRequested);
+    }
+
     /*
      * Utility functions
      */
