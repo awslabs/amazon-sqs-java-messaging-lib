@@ -552,7 +552,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         }
         synchronized (stateLock) {
             running = true;
-            notifyStateChange();
+            messageListenerReady();
         }
     }
 
