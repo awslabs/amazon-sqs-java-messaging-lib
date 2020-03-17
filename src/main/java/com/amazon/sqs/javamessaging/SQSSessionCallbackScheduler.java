@@ -26,8 +26,8 @@ import javax.jms.JMSException;
 import javax.jms.MessageListener;
 import javax.jms.Session;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.SQSSession.CallbackEntry;
@@ -42,7 +42,7 @@ import com.amazon.sqs.javamessaging.message.SQSMessage;
  * consumer message listeners.
  */
 public class SQSSessionCallbackScheduler implements Runnable {
-    private static final Log LOG = LogFactory.getLog(SQSSessionCallbackScheduler.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSSessionCallbackScheduler.class);
     
     protected ArrayDeque<CallbackEntry> callbackQueue;
 

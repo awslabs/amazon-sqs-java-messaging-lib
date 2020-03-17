@@ -24,10 +24,13 @@ import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
-import com.amazonaws.services.sqs.model.SendMessageRequest;
-import com.amazonaws.services.sqs.model.SendMessageResult;
-import com.amazonaws.util.Base64;
+
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
+import software.amazon.awssdk.utils.BinaryUtils;
 
 import javax.jms.JMSException;
 
@@ -147,43 +150,52 @@ public class SQSMessageProducerFifoTest {
         sqsText.setFloatProperty(floatProperty, (float)5.0);
         sqsText.setDoubleProperty(doubleProperty, 6.0);
         sqsText.setStringProperty(stringProperty, "seven");
-        sqsText.setObjectProperty(objectProperty, new Integer(8));
+        sqsText.setObjectProperty(objectProperty, Integer.valueOf(8));
 
-        MessageAttributeValue messageAttributeValueBoolean = new MessageAttributeValue();
-        messageAttributeValueBoolean.setDataType("Number.Boolean");
-        messageAttributeValueBoolean.setStringValue("1");
+        MessageAttributeValue messageAttributeValueBoolean = MessageAttributeValue.builder()
+        		.dataType("Number.Boolean")
+        		.stringValue("1")
+        		.build();
 
-        MessageAttributeValue messageAttributeValueByte = new MessageAttributeValue();
-        messageAttributeValueByte.setDataType("Number.byte");
-        messageAttributeValueByte.setStringValue("1");
+        MessageAttributeValue messageAttributeValueByte = MessageAttributeValue.builder()
+        		.dataType("Number.byte")
+        		.stringValue("1")
+        		.build();
 
-        MessageAttributeValue messageAttributeValueShort = new MessageAttributeValue();
-        messageAttributeValueShort.setDataType("Number.short");
-        messageAttributeValueShort.setStringValue("2");
+        MessageAttributeValue messageAttributeValueShort = MessageAttributeValue.builder()
+        		.dataType("Number.short")
+        		.stringValue("2")
+        		.build();
+        
+        MessageAttributeValue messageAttributeValueInt = MessageAttributeValue.builder()
+        		.dataType("Number.int")
+        		.stringValue("3")
+        		.build();
+        
+        MessageAttributeValue messageAttributeValueLong = MessageAttributeValue.builder()
+        		.dataType("Number.long")
+        		.stringValue("4")
+        		.build();
+        
+        MessageAttributeValue messageAttributeValueFloat = MessageAttributeValue.builder()
+        		.dataType("Number.float")
+        		.stringValue("5.0")
+        		.build();
 
-        MessageAttributeValue messageAttributeValueInt = new MessageAttributeValue();
-        messageAttributeValueInt.setDataType("Number.int");
-        messageAttributeValueInt.setStringValue("3");
+        MessageAttributeValue messageAttributeValueDouble = MessageAttributeValue.builder()
+        		.dataType("Number.double")
+        		.stringValue("6.0")
+        		.build();
+        
+        MessageAttributeValue messageAttributeValueString = MessageAttributeValue.builder()
+        		.dataType("String")
+        		.stringValue("seven")
+        		.build();
 
-        MessageAttributeValue messageAttributeValueLong = new MessageAttributeValue();
-        messageAttributeValueLong.setDataType("Number.long");
-        messageAttributeValueLong.setStringValue("4");
-
-        MessageAttributeValue messageAttributeValueFloat = new MessageAttributeValue();
-        messageAttributeValueFloat.setDataType("Number.float");
-        messageAttributeValueFloat.setStringValue("5.0");
-
-        MessageAttributeValue messageAttributeValueDouble = new MessageAttributeValue();
-        messageAttributeValueDouble.setDataType("Number.double");
-        messageAttributeValueDouble.setStringValue("6.0");
-
-        MessageAttributeValue messageAttributeValueString = new MessageAttributeValue();
-        messageAttributeValueString.setDataType("String");
-        messageAttributeValueString.setStringValue("seven");
-
-        MessageAttributeValue messageAttributeValueObject = new MessageAttributeValue();
-        messageAttributeValueObject.setDataType("Number.int");
-        messageAttributeValueObject.setStringValue("8");
+        MessageAttributeValue messageAttributeValueObject = MessageAttributeValue.builder()
+        		.dataType("Number.int")
+        		.stringValue("8")
+        		.build();
 
         /*
          * Convert property to sqs message attribute
@@ -217,7 +229,7 @@ public class SQSMessageProducerFifoTest {
         msg.setStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID, DEDUP_ID);
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER));
+                .thenReturn(SendMessageResponse.builder().messageId(MESSAGE_ID).sequenceNumber(SEQ_NUMBER).build());
 
         producer.sendInternal(destination, msg);
 
@@ -238,27 +250,29 @@ public class SQSMessageProducerFifoTest {
          * Set up non JMS sqs message
          */
         Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<String, MessageAttributeValue>();
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-        messageAttributeValue.setStringValue(SQSMessage.TEXT_MESSAGE_TYPE);
-        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
+        MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+	        .stringValue(SQSMessage.TEXT_MESSAGE_TYPE)
+	        .dataType(SQSMessagingClientConstants.STRING)
+	        .build();
+	        
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
-        Map<String, String> mapAttributes = new HashMap<String, String>();
-        mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
+        Map<MessageSystemAttributeName, String> mapAttributes = new HashMap<>();
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID), GROUP_ID);
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), DEDUP_ID);
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER), SEQ_NUMBER);
 
-        com.amazonaws.services.sqs.model.Message message =
-                new com.amazonaws.services.sqs.model.Message()
-                            .withMessageAttributes(mapMessageAttributes)
-                            .withAttributes(mapAttributes)
-                            .withBody("MessageBody");
+        Message message = Message.builder()
+                            .messageAttributes(mapMessageAttributes)
+                            .attributes(mapAttributes)
+                            .body("MessageBody")
+                            .build();
 
         SQSTextMessage msg = spy(new SQSTextMessage(acknowledger, QUEUE_URL, message));
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER_2));
+                .thenReturn(SendMessageResponse.builder().messageId(MESSAGE_ID).sequenceNumber(SEQ_NUMBER_2).build());
 
         producer.sendInternal(destination, msg);
 
@@ -284,7 +298,7 @@ public class SQSMessageProducerFifoTest {
         String msgBody = msg.getMessageBody();
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER));
+                .thenReturn(SendMessageResponse.builder().messageId(MESSAGE_ID).sequenceNumber(SEQ_NUMBER).build());
 
         producer.sendInternal(destination, msg);
 
@@ -306,35 +320,36 @@ public class SQSMessageProducerFifoTest {
          */
         Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<String, MessageAttributeValue>();
 
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-        messageAttributeValue.setStringValue(SQSMessage.OBJECT_MESSAGE_TYPE);
-        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
+        MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+	        .stringValue(SQSMessage.OBJECT_MESSAGE_TYPE)
+	       	.dataType(SQSMessagingClientConstants.STRING)
+	       	.build();
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
-        Map<String, String> mapAttributes = new HashMap<String, String>();
-        mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
+        Map<MessageSystemAttributeName, String> mapAttributes = new HashMap<>();
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID), GROUP_ID);
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), DEDUP_ID);
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER), SEQ_NUMBER);
 
         // Encode an object to byte array
-        Integer integer = new Integer("10");
+        Integer integer = Integer.valueOf("10");
         ByteArrayOutputStream array = new ByteArrayOutputStream(10);
         ObjectOutputStream oStream = new ObjectOutputStream(array);
         oStream.writeObject(integer);
         oStream.close();
 
-        String messageBody = Base64.encodeAsString(array.toByteArray());
-        com.amazonaws.services.sqs.model.Message message =
-                new com.amazonaws.services.sqs.model.Message()
-                        .withMessageAttributes(mapMessageAttributes)
-                        .withAttributes(mapAttributes)
-                        .withBody(messageBody);
+        String messageBody = BinaryUtils.toBase64(array.toByteArray());
+        Message message = Message.builder()
+	                        .messageAttributes(mapMessageAttributes)
+	                        .attributes(mapAttributes)
+	                        .body(messageBody)
+	                        .build();
 
         SQSObjectMessage msg = spy(new SQSObjectMessage(acknowledger, QUEUE_URL, message));
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER_2));
+                .thenReturn(SendMessageResponse.builder().messageId(MESSAGE_ID).sequenceNumber(SEQ_NUMBER_2).build());
 
         producer.sendInternal(destination, msg);
 
@@ -358,7 +373,7 @@ public class SQSMessageProducerFifoTest {
         msg.reset();
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER));
+                .thenReturn(SendMessageResponse.builder().messageId(MESSAGE_ID).sequenceNumber(SEQ_NUMBER).build());
 
         producer.sendInternal(destination, msg);
 
@@ -381,29 +396,30 @@ public class SQSMessageProducerFifoTest {
          * Set up non JMS sqs message
          */
         Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<String, MessageAttributeValue>();
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-        messageAttributeValue.setStringValue(SQSMessage.BYTE_MESSAGE_TYPE);
-        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
+        MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+	        .stringValue(SQSMessage.BYTE_MESSAGE_TYPE)
+	        .dataType(SQSMessagingClientConstants.STRING)
+	        .build();
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
-        Map<String, String> mapAttributes = new HashMap<String, String>();
-        mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
+        Map<MessageSystemAttributeName, String> mapAttributes = new HashMap<>();
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID), GROUP_ID);
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), DEDUP_ID);
+        mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER), SEQ_NUMBER);
 
         byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
-        String messageBody = Base64.encodeAsString(byteArray);
-        com.amazonaws.services.sqs.model.Message message =
-                new com.amazonaws.services.sqs.model.Message()
-                        .withMessageAttributes(mapMessageAttributes)
-                        .withAttributes(mapAttributes)
-                        .withBody(messageBody);
+        String messageBody = BinaryUtils.toBase64(byteArray);
+        Message message = Message.builder()
+	                        .messageAttributes(mapMessageAttributes)
+	                        .attributes(mapAttributes)
+	                        .body(messageBody)
+	                        .build();
 
         SQSBytesMessage msg = spy(new SQSBytesMessage(acknowledger, QUEUE_URL, message));
 
         when(amazonSQSClient.sendMessage(any(SendMessageRequest.class)))
-                .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID).withSequenceNumber(SEQ_NUMBER_2));
+                .thenReturn(SendMessageResponse.builder().messageId(MESSAGE_ID).sequenceNumber(SEQ_NUMBER_2).build());
 
         producer.sendInternal(destination, msg);
 
@@ -438,12 +454,12 @@ public class SQSMessageProducerFifoTest {
             }
 
             SendMessageRequest request = (SendMessageRequest)argument;
-            assertEquals(queueUrl, request.getQueueUrl());
-            assertEquals(messagesBody, request.getMessageBody());
-            String messageType = request.getMessageAttributes().get(SQSMessage.JMS_SQS_MESSAGE_TYPE).getStringValue();
+            assertEquals(queueUrl, request.queueUrl());
+            assertEquals(messagesBody, request.messageBody());
+            String messageType = request.messageAttributes().get(SQSMessage.JMS_SQS_MESSAGE_TYPE).stringValue();
             assertEquals(this.messageType, messageType);
-            assertEquals(this.groupId, request.getMessageGroupId());
-            assertEquals(this.deduplicationId, request.getMessageDeduplicationId());
+            assertEquals(this.groupId, request.messageGroupId());
+            assertEquals(this.deduplicationId, request.messageDeduplicationId());
             return true;
         }
     }

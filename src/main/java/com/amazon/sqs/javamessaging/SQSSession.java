@@ -47,10 +47,11 @@ import javax.jms.TemporaryTopic;
 import javax.jms.TextMessage;
 import javax.jms.Topic;
 import javax.jms.TopicSubscriber;
-import javax.jms.IllegalStateException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.jms.IllegalStateException;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
@@ -87,7 +88,7 @@ import com.amazon.sqs.javamessaging.util.SQSMessagingClientThreadFactory;
  * </ul>
  */
 public class SQSSession implements Session, QueueSession {
-    private static final Log LOG = LogFactory.getLog(SQSSession.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSSession.class);
     
     private static final int SESSION_EXECUTOR_GRACEFUL_SHUTDOWN_TIME = 10;
     
@@ -633,7 +634,7 @@ public class SQSSession implements Session, QueueSession {
     @Override
     public Queue createQueue(String queueName) throws JMSException {
         checkClosed();
-        return new SQSQueueDestination(queueName, amazonSQSClient.getQueueUrl(queueName).getQueueUrl());
+        return new SQSQueueDestination(queueName, amazonSQSClient.getQueueUrl(queueName).queueUrl());
     }
     
     /**
@@ -651,7 +652,7 @@ public class SQSSession implements Session, QueueSession {
     public Queue createQueue(String queueName, String ownerAccountId) throws JMSException {
         checkClosed();
         return new SQSQueueDestination(
-                queueName, amazonSQSClient.getQueueUrl(queueName, ownerAccountId).getQueueUrl());
+                queueName, amazonSQSClient.getQueueUrl(queueName, ownerAccountId).queueUrl());
     }
 
     /**

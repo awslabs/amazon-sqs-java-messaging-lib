@@ -14,24 +14,30 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.PrefetchManager;
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageConsumer;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSMessageProducer;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
-import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
-import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
-import com.amazonaws.services.sqs.model.GetQueueUrlResult;
-import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
-import com.amazonaws.services.sqs.model.ReceiveMessageResult;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.jms.Destination;
 import javax.jms.IllegalStateException;
@@ -44,37 +50,21 @@ import javax.jms.ObjectMessage;
 import javax.jms.Queue;
 import javax.jms.TextMessage;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
+import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
+import com.amazon.sqs.javamessaging.message.SQSTextMessage;
+
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 /**
  * Test the SQSSessionTest class
@@ -773,7 +763,7 @@ public class SQSSessionTest  {
     @Test
     public void testCreateQueue() throws JMSException {
 
-        GetQueueUrlResult result = new GetQueueUrlResult().withQueueUrl(QUEUE_URL);
+    	GetQueueUrlResponse result = GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build();
         when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME))
                 .thenReturn(result);
 
@@ -796,7 +786,7 @@ public class SQSSessionTest  {
     @Test
     public void testCreateQueueWithOwnerAccountId() throws JMSException {
 
-        GetQueueUrlResult result = new GetQueueUrlResult().withQueueUrl(QUEUE_URL);
+        GetQueueUrlResponse result = GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build();
         when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME, OWNER_ACCOUNT_ID))
                 .thenReturn(result);
 
@@ -1060,26 +1050,26 @@ public class SQSSessionTest  {
         when(parentSQSConnection.getNumberOfMessagesToPrefetch()).thenReturn(4);
 
         when(sqsClientJMSWrapper.getQueueUrl("queue1"))
-            .thenReturn(new GetQueueUrlResult().withQueueUrl("queueUrl1"));
+            .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl1").build());
         when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl1"))))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message1", "queue1-group1-message1")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message2", "queue1-group2-message2")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message3", "queue1-group3-message3")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message4", "queue1-group1-message4")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message5", "queue1-group2-message5")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message6", "queue1-group3-message6")))
-            .thenReturn(new ReceiveMessageResult());
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue1-group1-message1")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message2", "queue1-group2-message2")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message3", "queue1-group3-message3")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message4", "queue1-group1-message4")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message5", "queue1-group2-message5")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue1-group3-message6")).build())
+            .thenReturn(ReceiveMessageResponse.builder().build());
         
         when(sqsClientJMSWrapper.getQueueUrl("queue2"))
-            .thenReturn(new GetQueueUrlResult().withQueueUrl("queueUrl2"));
+            .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl2").build());
         when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl2"))))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message1", "queue2-group1-message1")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message2", "queue2-group2-message2")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message3", "queue2-group3-message3")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group1", "message4", "queue2-group1-message4")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group2", "message5", "queue2-group2-message5")))
-            .thenReturn(new ReceiveMessageResult().withMessages(createFifoMessage("group3", "message6", "queue2-group3-message6")))
-            .thenReturn(new ReceiveMessageResult());
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue2-group1-message1")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message2", "queue2-group2-message2")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message3", "queue2-group3-message3")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message4", "queue2-group1-message4")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message5", "queue2-group2-message5")).build())
+            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue2-group3-message6")).build())
+            .thenReturn(ReceiveMessageResponse.builder().build());
     
         MessageConsumer consumer1 = sqsSession.createConsumer(sqsSession.createQueue("queue1"));
         MessageConsumer consumer2 = sqsSession.createConsumer(sqsSession.createQueue("queue2"));
@@ -1133,8 +1123,8 @@ public class SQSSessionTest  {
         
         Set<String> handles = new HashSet<String>();
         for (ChangeMessageVisibilityBatchRequest request : changeVisibilityRequests) {
-            for (ChangeMessageVisibilityBatchRequestEntry entry : request.getEntries()) {
-                handles.add(entry.getReceiptHandle());
+            for (ChangeMessageVisibilityBatchRequestEntry entry : request.entries()) {
+                handles.add(entry.receiptHandle());
             }
         }
         
@@ -1160,7 +1150,7 @@ public class SQSSessionTest  {
         public boolean matches(Object argument) {
             if (argument instanceof ReceiveMessageRequest) {
                 ReceiveMessageRequest request = (ReceiveMessageRequest)argument;
-                return queueUrl.equals(request.getQueueUrl());
+                return queueUrl.equals(request.queueUrl());
             } else {
                 return false;
             }
@@ -1168,18 +1158,18 @@ public class SQSSessionTest  {
         
     }
 
-    private com.amazonaws.services.sqs.model.Message createFifoMessage(String groupId, String messageId, String receiptHandle) throws JMSException {
-        com.amazonaws.services.sqs.model.Message message = new com.amazonaws.services.sqs.model.Message();
-        message.setBody("body");
-        message.setMessageId(messageId);
-        message.setReceiptHandle(receiptHandle);
-        Map<String, String> attributes = new HashMap<String, String>();
-        attributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "728374687246872364");
-        attributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, messageId);
-        attributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
-        attributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "0");
-        message.setAttributes(attributes);
-        return message;
+    private software.amazon.awssdk.services.sqs.model.Message createFifoMessage(String groupId, String messageId, String receiptHandle) throws JMSException {
+    	Map<MessageSystemAttributeName, String> attributes = new HashMap<>();
+    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER), "728374687246872364");
+    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), messageId);
+    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID), groupId);
+    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "0");
+    	
+    	return software.amazon.awssdk.services.sqs.model.Message.builder()
+        .body("body")
+        .messageId(messageId)
+        .receiptHandle(receiptHandle)
+        .attributes(attributes).build();
     }
 
     /**
