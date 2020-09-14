@@ -21,7 +21,7 @@ import com.amazon.sqs.javamessaging.SQSConnectionFactory;
  */
 public class ConnectionsManager {
 	private final SQSConnectionFactory connectionFactory;
-	private final HashSet<Callable<Boolean>> closeableConnections = new HashSet<Callable<Boolean>>();
+	private final HashSet<Callable<Boolean>> closeableConnections = new HashSet<>();
 	private SQSConnection defaultConnection;
 	
     private final Object stateLock = new Object(); // Used for interactions with connection state.

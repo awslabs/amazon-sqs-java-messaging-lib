@@ -19,7 +19,7 @@ public class CredentialsProvider extends AWSStaticCredentialsProvider {
 		getCredentials(); // Initialize
 	}
 	
-	private static Boolean assertNotEmpty(String accessKey, String secretKey) {
+	private static boolean assertNotEmpty(String accessKey, String secretKey) {
 		try { if(accessKey.trim().isEmpty() || secretKey.trim().isEmpty()) return false; }
 		catch(NullPointerException npe) { return false; }
 		
