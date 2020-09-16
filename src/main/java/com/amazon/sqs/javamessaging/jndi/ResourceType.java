@@ -37,11 +37,20 @@ public enum ResourceType {
 	SD(true,DUPS_OK_ACKNOWLEDGE),
 	SU(true,UNORDERED_ACKNOWLEDGE);
 	
-	public final boolean isSessionPolling;
+	/**
+	 * Reports whether the type is a session pooling.<br>
+	 * Externally visible information.
+	 */
+	public final boolean isSessionPooling;
+	
+	/**
+	 * Reports the acknowledgment mode.<br>
+	 * Externally visible information.
+	 */
 	public final int acknowledgeMode;
 	
-	private ResourceType(boolean isSessionPolling,int acknowledgeMode) {
-		this.isSessionPolling = isSessionPolling;
+	private ResourceType(boolean isSessionPooling,int acknowledgeMode) {
+		this.isSessionPooling = isSessionPooling;
 		this.acknowledgeMode = acknowledgeMode;
 	}
 }

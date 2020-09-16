@@ -11,19 +11,19 @@ import com.amazon.sqs.javamessaging.SQSSession;
 public class ResourceTypeTest {
 	
 	@Test
-	public void testIsConnectionPolling() {
-		assertFalse(CA.isSessionPolling);
-		assertFalse(CC.isSessionPolling);
-		assertFalse(CD.isSessionPolling);
-		assertFalse(CU.isSessionPolling);
+	public void testIsConnectionPooling() {
+		assertFalse(CA.isSessionPooling);
+		assertFalse(CC.isSessionPooling);
+		assertFalse(CD.isSessionPooling);
+		assertFalse(CU.isSessionPooling);
 	}
 	
 	@Test
 	public void testIsSessionPolling() {
-		assertTrue(SA.isSessionPolling);
-		assertTrue(SC.isSessionPolling);
-		assertTrue(SD.isSessionPolling);
-		assertTrue(SU.isSessionPolling);
+		assertTrue(SA.isSessionPooling);
+		assertTrue(SC.isSessionPooling);
+		assertTrue(SD.isSessionPooling);
+		assertTrue(SU.isSessionPooling);
 	}
 
 	@Test

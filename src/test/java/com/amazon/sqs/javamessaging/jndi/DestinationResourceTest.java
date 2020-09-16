@@ -26,7 +26,7 @@ public class DestinationResourceTest {
 		for(ResourceType it : ResourceType.values()) {
 			sessions[it.ordinal()] = mock(Session.class);
 			
-			if(it.isSessionPolling)
+			if(it.isSessionPooling)
 				when(defaultConnection.createSession(false,it.acknowledgeMode)).thenReturn(sessions[it.ordinal()]);
 			else
 				when(newConnection.createSession(false,it.acknowledgeMode)).thenReturn(sessions[it.ordinal()]); 

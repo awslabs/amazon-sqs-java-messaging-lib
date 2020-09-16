@@ -15,6 +15,7 @@ import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.OperationNotSupportedException;
 import javax.naming.ServiceUnavailableException;
+import javax.naming.directory.InvalidAttributeValueException;
 
 import com.amazon.sqs.javamessaging.SQSConnectionFactory;
 
@@ -35,7 +36,6 @@ import com.amazon.sqs.javamessaging.SQSConnectionFactory;
  * @see DestinationResource
  */
 public class SQSContext implements Context {
-	private final SQSConnectionFactory connectionFactory;
 	private final ConnectionsManager connectionsManager;
 	private final ConcurrentHashMap<String,Object> bindings = new ConcurrentHashMap<>();
 	
@@ -43,11 +43,12 @@ public class SQSContext implements Context {
 	 * Public constructor of a naming context that requires {@link SQSConnectionFactory} parameter.
 	 * 
 	 * @param connectionFactory - set of connection configuration parameters.
-	 * @throws NamingException
+	 * @throws InvalidAttributeValueException
 	 */
-	public SQSContext(final SQSConnectionFactory connectionFactory) throws NamingException {
-		this.connectionFactory = connectionFactory;
-		this.connectionsManager = new ConnectionsManager(this.connectionFactory);
+	public SQSContext(final ConnectionsManager connectionsManager) throws InvalidAttributeValueException {
+		if(connectionsManager == null ) throw new InvalidAttributeValueException("SQSContext Requires ConnectionsManager.");
+		
+		this.connectionsManager = connectionsManager;
 	}
 	
 	private synchronized Object getDestination(String name) throws NamingException {
@@ -77,7 +78,7 @@ public class SQSContext implements Context {
 	 */
 	@Override
 	public Object lookup(String name) throws NamingException {
-		if(SQSConnectionFactory.class.getName().equals(name)) return connectionFactory;
+		if(SQSConnectionFactory.class.getName().equals(name)) return connectionsManager.connectionFactory;
 		
 		Object destination = bindings.get(name);
 		

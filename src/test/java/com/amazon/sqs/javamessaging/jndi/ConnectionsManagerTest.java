@@ -48,6 +48,7 @@ public class ConnectionsManagerTest {
 		ConnectionsManager connectionsManager = new ConnectionsManager(connectionFactory);
 		
 		assertNotNull(connectionsManager.createConnection());
+		assertEquals(connectionFactory,connectionsManager.connectionFactory);
 	}
 	
 	@Test
@@ -93,6 +94,8 @@ public class ConnectionsManagerTest {
 		assertEquals(1,connections.size());
 		
 		connectionsManager.close();
+		
+		for(SQSConnection it : connections) verify(it).close();
 		
 		connections.add(connectionsManager.getLazyDefaultConnection());
 		assertEquals(2,connections.size());

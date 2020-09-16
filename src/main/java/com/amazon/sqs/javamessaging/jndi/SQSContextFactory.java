@@ -12,7 +12,7 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 /**
  * A factory of Amazon Simple Queue Service (SQS) initial context that provides a method for creating instances of
- * {@link SQSContext} that contain a {@link SQSConnectionFactory} instance.
+ * {@link SQSContext} that contain a {@link ConnectionsManager} instance.
  * <p>
  * It uses {@link Context#PROVIDER_URL PROVIDER_URL} in the {@link ProviderEndpointConfiguration},
  * as well as {@link Context#SECURITY_PRINCIPAL SECURITY_PRINCIPAL} and
@@ -42,6 +42,6 @@ public class SQSContextFactory implements InitialContextFactory {
 	 */
 	@Override
 	public SQSContext getInitialContext(Hashtable<?,?> environment) throws NamingException {
-		return new SQSContext(createConnectionFactory(environment));
+		return new SQSContext(new ConnectionsManager(createConnectionFactory(environment)));
 	}
 }

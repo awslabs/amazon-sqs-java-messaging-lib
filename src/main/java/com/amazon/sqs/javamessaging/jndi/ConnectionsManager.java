@@ -14,13 +14,19 @@ import com.amazon.sqs.javamessaging.SQSConnection;
 import com.amazon.sqs.javamessaging.SQSConnectionFactory;
 
 /**
- * Manage the use of {@link SQSConnection connections} and their closings.
+ * Manage the use of {@link SQSConnection connections} and their closings
+ * through an {@link SQSConnectionFactory} instance.
  * 
  * @author krloss
  * @since 1.1.0
  */
 public class ConnectionsManager {
-	private final SQSConnectionFactory connectionFactory;
+	/**
+	 * Set of connection configuration parameters.<br>
+	 * Externally visible information.
+	 */
+	protected final SQSConnectionFactory connectionFactory;
+	
 	private final HashSet<Callable<Boolean>> closeableConnections = new HashSet<>();
 	private SQSConnection defaultConnection;
 	
@@ -79,8 +85,8 @@ public class ConnectionsManager {
 	private void close(ExecutorService executor) throws InterruptedException {
 		synchronized(stateLock) {
 			defaultConnection = null;
-			closeableConnections.clear();
 			executor.invokeAll(closeableConnections);
+			closeableConnections.clear();
 		}
 	}
 	

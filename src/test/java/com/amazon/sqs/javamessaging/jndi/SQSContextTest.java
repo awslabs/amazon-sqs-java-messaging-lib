@@ -3,13 +3,22 @@ package com.amazon.sqs.javamessaging.jndi;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import javax.jms.JMSException;
 import javax.jms.Queue;
 import javax.jms.Session;
 import javax.naming.CompositeName;
+import javax.naming.InterruptedNamingException;
 import javax.naming.NamingException;
 import javax.naming.OperationNotSupportedException;
+import javax.naming.ServiceUnavailableException;
 import javax.naming.directory.InvalidAttributeValueException;
 
 import org.junit.Before;
@@ -24,16 +33,12 @@ public class SQSContextTest {
 	private static CompositeName lookupName;
 	
 	private SQSContext contextForOperationNotSupported;
-	private SQSConnectionFactory connectionFactory;
+	private ConnectionsManager connectionsManager;
 	
 	@Before
 	public void setUp() throws Exception {
 		lookupString = "lookupString";
 		lookupName = new CompositeName("lookupName");
-		
-		contextForOperationNotSupported = new SQSContext(mock(SQSConnectionFactory.class));
-		
-		connectionFactory = mock(SQSConnectionFactory.class);
 		
 		Queue[] queues = new Queue[LENGTH_QUEUES];
 		Session[] sessions = new Session[LENGTH_QUEUES];
@@ -48,52 +53,100 @@ public class SQSContextTest {
 				when(sessions[i].createQueue(j.toString())).thenReturn(queues[i]);
 			
 			for(ResourceType it : ResourceType.values()) {
-				if(it.isSessionPolling)
+				if(it.isSessionPooling)
 					when(connections[i].createSession(false,it.acknowledgeMode)).thenReturn(sessions[i]);
 			}
 		}
 		
+		SQSConnectionFactory connectionFactory = mock(SQSConnectionFactory.class);
+		
 		when(connectionFactory.createConnection()).thenReturn(connections[0],connections[1]);
+		
+		contextForOperationNotSupported = new SQSContext(mock(ConnectionsManager.class));
+		connectionsManager = new ConnectionsManager(connectionFactory);
 	}
 	
 	@Test(expected = InvalidAttributeValueException.class)
-	public void testSQSContextWithoutConnectionFactory() throws NamingException {	
+	public void testSQSContextWithoutConnectionsManager() throws NamingException {	
 		new SQSContext(null);
 	}
 	@Test
 	public void testSQSContext() throws NamingException {
-		assertNotNull(new SQSContext(connectionFactory));
+		assertNotNull(new SQSContext(connectionsManager));
 	}
 	
 	@Test(expected = InvalidAttributeValueException.class)
 	public void testLookupIncorrectString() throws NamingException {
-		SQSContext context = new SQSContext(connectionFactory);
+		SQSContext context = new SQSContext(connectionsManager);
 		
-		assertEquals(connectionFactory,context.lookup(""));
+		assertEquals(connectionsManager,context.lookup(""));
+	}
+	
+	@Test(expected = ServiceUnavailableException.class)
+	public void testLookupWithJMSException() throws Exception {
+		ConnectionsManager connectionsManager = mock(ConnectionsManager.class);
+		SQSContext context = new SQSContext(connectionsManager);
+		
+		when(connectionsManager.getLazyDefaultConnection()).thenThrow(JMSException.class);
+		
+		context.lookup(String.format("%s:%s",ResourceType.SA.name(),lookupString));
 	}
 	
 	@Test
 	public void testLookupString() throws NamingException {
-		SQSContext context = new SQSContext(connectionFactory);
+		SQSContext context = new SQSContext(connectionsManager);
 		
-		assertEquals(connectionFactory,context.lookup(SQSConnectionFactory.class.getName()));
+		assertEquals(connectionsManager.connectionFactory,
+			context.lookup(SQSConnectionFactory.class.getName()));
 	}
 	
 	@Test
 	public void testLookupName() throws NamingException {
-		SQSContext context = new SQSContext(connectionFactory);
+		SQSContext context = new SQSContext(connectionsManager);
 		
-		assertEquals(connectionFactory,context.lookup(new CompositeName(SQSConnectionFactory.class.getName())));
+		assertEquals(connectionsManager.connectionFactory,
+			context.lookup(new CompositeName(SQSConnectionFactory.class.getName())));
+	}
+	
+	
+	@Test
+	public void testLookupConcurrent() throws Exception {
+		HashSet<Queue> queues = new HashSet<Queue>();
+		final ResourceType resourceType = ResourceType.CA;
+		final SQSContext context = new SQSContext(connectionsManager);
+		
+		ExecutorService executor = Executors.newFixedThreadPool(LENGTH_QUEUES);
+		
+		List<Future<Object>> futures = executor.invokeAll(Collections.nCopies(LENGTH_QUEUES,new Callable<Object>() {
+			@Override
+			public Queue call() throws Exception {
+				return (Queue) context.lookup(String.format("%s:%d",resourceType.name(),resourceType.ordinal()));
+			}
+		}));
+		
+		for(Future<Object> it: futures) queues.add((Queue)it.get());
+		
+		assertEquals(1,queues.size());
+	}
+	
+	@Test(expected = InterruptedNamingException.class)
+	public void testCloseWithJMSException() throws Exception {
+		ConnectionsManager connectionsManager = mock(ConnectionsManager.class);
+		SQSContext context = new SQSContext(connectionsManager);
+		
+		doThrow(JMSException.class).when(connectionsManager).close();
+		
+		context.close();
 	}
 	
 	@Test
 	public void testClose() throws NamingException {
-		SQSContext context = new SQSContext(connectionFactory);
+		SQSContext context = new SQSContext(connectionsManager);
 		HashSet<Queue> queues = new HashSet<Queue>();
 		
 		for(Integer i = 0; i < LENGTH_QUEUES; i++) {
 			for(ResourceType it : ResourceType.values()) {
-				if(it.isSessionPolling) {
+				if(it.isSessionPooling) {
 					Object queue = context.lookup(String.format("%s:%d",it.name(),i));
 					
 					assertNotNull(queue);
@@ -108,7 +161,7 @@ public class SQSContextTest {
 		
 		for(Integer i = 0; i < LENGTH_QUEUES; i++) {
 			for(ResourceType it : ResourceType.values()) {
-				if(it.isSessionPolling) {
+				if(it.isSessionPooling) {
 					Object queue = context.lookup(String.format("%s:%d",it.name(),i));
 					
 					assertNotNull(queue);
@@ -122,7 +175,7 @@ public class SQSContextTest {
 
 	@Test
 	public void testBindStringObject() throws NamingException {
-		SQSContext context = new SQSContext(connectionFactory);
+		SQSContext context = new SQSContext(connectionsManager);
 		
 		context.bind(lookupString,lookupName);
 		assertEquals(lookupName,context.lookup(lookupString));
@@ -130,7 +183,7 @@ public class SQSContextTest {
 
 	@Test
 	public void testBindNameObject() throws NamingException {
-		SQSContext context = new SQSContext(connectionFactory);
+		SQSContext context = new SQSContext(connectionsManager);
 		
 		context.bind(lookupName,lookupString);
 		assertEquals(lookupString,context.lookup(lookupName));

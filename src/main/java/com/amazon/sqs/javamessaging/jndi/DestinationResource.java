@@ -59,7 +59,7 @@ public class DestinationResource {
 	 * creates <b>session</b> according to the <i>acknowledgment mode</i>.
 	 */
 	private Session createSession(final ConnectionsManager connectionsManager) throws JMSException {
-		SQSConnection connection = type.isSessionPolling ?
+		SQSConnection connection = type.isSessionPooling ?
 			connectionsManager.getLazyDefaultConnection() : connectionsManager.createConnection();
 		
 		return connection.createSession(false,type.acknowledgeMode);
