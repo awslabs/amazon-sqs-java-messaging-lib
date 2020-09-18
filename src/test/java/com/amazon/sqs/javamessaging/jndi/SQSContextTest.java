@@ -23,6 +23,8 @@ import javax.naming.directory.InvalidAttributeValueException;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.amazon.sqs.javamessaging.SQSConnection;
 import com.amazon.sqs.javamessaging.SQSConnectionFactory;
@@ -34,6 +36,16 @@ public class SQSContextTest {
 	
 	private SQSContext contextForOperationNotSupported;
 	private ConnectionsManager connectionsManager;
+	
+	private static final Answer<Queue> createAnswerQueue(final Queue queue) {
+		return new Answer<Queue>() {
+			@Override
+			public Queue answer(InvocationOnMock invocation) throws Throwable {
+				Thread.sleep(100);
+				return queue;
+			}
+		};
+	}
 	
 	@Before
 	public void setUp() throws Exception {
@@ -50,7 +62,7 @@ public class SQSContextTest {
 			connections[i] = mock(SQSConnection.class);
 			
 			for(Integer j = 0; j < LENGTH_QUEUES; j++)
-				when(sessions[i].createQueue(j.toString())).thenReturn(queues[i]);
+				when(sessions[i].createQueue(j.toString())).thenAnswer(createAnswerQueue(queues[i]));
 			
 			for(ResourceType it : ResourceType.values()) {
 				if(it.isSessionPooling)

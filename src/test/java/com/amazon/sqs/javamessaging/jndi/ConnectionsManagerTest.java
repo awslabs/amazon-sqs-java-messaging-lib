@@ -12,10 +12,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import javax.jms.IllegalStateException;
 import javax.naming.directory.InvalidAttributeValueException;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.amazon.sqs.javamessaging.SQSConnection;
 import com.amazon.sqs.javamessaging.SQSConnectionFactory;
@@ -24,13 +27,21 @@ public class ConnectionsManagerTest {
 	private static final int POOLING_LENGTH = 2 * 5;
 	private SQSConnectionFactory connectionFactory;
 	
+	private static final Answer<SQSConnection> createAnswerConnection() {
+		return new Answer<SQSConnection>() {
+			@Override
+			public SQSConnection answer(InvocationOnMock invocation) throws Throwable {
+				Thread.sleep(100);
+				return mock(SQSConnection.class);
+			}
+		};
+	}
+	
 	@Before
 	public void setUp() throws Exception {
 		connectionFactory = mock(SQSConnectionFactory.class);
 		
-		when(connectionFactory.createConnection()).thenReturn(mock(SQSConnection.class),mock(SQSConnection.class),
-			mock(SQSConnection.class),mock(SQSConnection.class),mock(SQSConnection.class),mock(SQSConnection.class),
-			mock(SQSConnection.class),mock(SQSConnection.class),mock(SQSConnection.class),mock(SQSConnection.class));
+		when(connectionFactory.createConnection()).thenAnswer(createAnswerConnection());
 	}
 	
 	@Test(expected = InvalidAttributeValueException.class)
@@ -85,6 +96,29 @@ public class ConnectionsManagerTest {
 		connectionsManager.close();
 	}
 	
+	
+	@Test(expected = IllegalStateException.class)
+	public void testCloseWithInterruptedException() throws Exception {
+		SQSConnection connection = mock(SQSConnection.class);
+		SQSConnectionFactory connectionFactory = mock(SQSConnectionFactory.class);
+		
+		doAnswer(new Answer<Boolean>() {
+			@Override
+			public Boolean answer(InvocationOnMock invocation) throws Throwable {
+				for(Thread it : Thread.getAllStackTraces().keySet()) it.interrupt();
+				
+				return true;
+			}
+		}).when(connection).close();
+		
+		when(connectionFactory.createConnection()).thenReturn(connection);
+		
+		ConnectionsManager connectionsManager = new ConnectionsManager(connectionFactory);
+		
+		assertEquals(connection,connectionsManager.createConnection());
+		connectionsManager.close();
+	}
+	
 	@Test
 	public void testClose() throws Exception {
 		HashSet<SQSConnection> connections = new HashSet<SQSConnection>();
@@ -119,9 +153,8 @@ public class ConnectionsManagerTest {
 	public void testConcurrentBetweenCloseAndCreateConnection() throws Exception {
 		ArrayList<Callable<CallableReturn>> callables =  new ArrayList<Callable<CallableReturn>>();
 		final ConnectionsManager connectionsManager = new ConnectionsManager(connectionFactory);
-		final int poolingLength = POOLING_LENGTH / 2;
 		
-		callables.addAll(Collections.nCopies(poolingLength,new Callable<CallableReturn>() {
+		callables.addAll(Collections.nCopies(POOLING_LENGTH,new Callable<CallableReturn>() {
 			@Override
 			public CallableReturn call() throws Exception {
 				connectionsManager.close();
@@ -129,14 +162,14 @@ public class ConnectionsManagerTest {
 			}
 		}));
 		
-		callables.addAll(Collections.nCopies(2 * poolingLength,new Callable<CallableReturn>() {
+		callables.addAll(Collections.nCopies(2 * POOLING_LENGTH,new Callable<CallableReturn>() {
 			@Override
 			public CallableReturn call() throws Exception {
 				return new CallableReturn(connectionsManager.getLazyDefaultConnection());
 			}
 		}));
 		
-		assertEquals(3 * poolingLength,callables.size());
+		assertEquals(3 * POOLING_LENGTH,callables.size());
 		Collections.shuffle(callables);
 		
 		ArrayList<Boolean> closedCallables = new ArrayList<Boolean>();
@@ -153,7 +186,7 @@ public class ConnectionsManagerTest {
 		
 		executor.shutdown();
 		
-		assertEquals(poolingLength,closedCallables.size());
-		assertTrue(1 + poolingLength >= connections.size());
+		assertEquals(POOLING_LENGTH,closedCallables.size());
+		assertTrue(1 + POOLING_LENGTH >= connections.size());
 	}
 }
