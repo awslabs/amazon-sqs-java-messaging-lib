@@ -36,6 +36,7 @@ import com.amazon.sqs.javamessaging.SQSConnectionFactory;
  * @see DestinationResource
  */
 public class SQSContext implements Context {
+	private final Hashtable<?,?> environment;
 	private final ConnectionsManager connectionsManager;
 	private final ConcurrentHashMap<String,Object> bindings = new ConcurrentHashMap<>();
 	
@@ -43,12 +44,14 @@ public class SQSContext implements Context {
 	 * Public constructor of a naming context that requires {@link SQSConnectionFactory} parameter.
 	 * 
 	 * @param connectionFactory - set of connection configuration parameters.
+	 * @param environment - set of configuration informations.
 	 * @throws InvalidAttributeValueException
 	 */
-	public SQSContext(final ConnectionsManager connectionsManager) throws InvalidAttributeValueException {
+	public SQSContext(final ConnectionsManager connectionsManager, final Hashtable<?,?> environment) throws InvalidAttributeValueException {
 		if(connectionsManager == null ) throw new InvalidAttributeValueException("SQSContext Requires ConnectionsManager.");
 		
 		this.connectionsManager = connectionsManager;
+		this.environment = environment;
 	}
 	
 	private synchronized Object getDestination(String name) throws NamingException {
@@ -137,11 +140,18 @@ public class SQSContext implements Context {
 	public void bind(Name name, Object destination) throws NamingException {
 		bind(name.toString(),destination);
 	}
-	
+
+	/**
+	 * Get the set of configuration informations.
+	 * 
+	 * @return {@link Hashtable}
+	 * @throws NamingException
+	 */
 	@Override
 	public Hashtable<?, ?> getEnvironment() throws NamingException {
-		throw new OperationNotSupportedException();
+		return environment;
 	}
+	
 	@Override
 	public NamingEnumeration<NameClassPair> list(String name) throws NamingException {
 		throw new OperationNotSupportedException();

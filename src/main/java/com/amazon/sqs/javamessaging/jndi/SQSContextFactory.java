@@ -42,6 +42,6 @@ public class SQSContextFactory implements InitialContextFactory {
 	 */
 	@Override
 	public SQSContext getInitialContext(Hashtable<?,?> environment) throws NamingException {
-		return new SQSContext(new ConnectionsManager(createConnectionFactory(environment)));
+		return new SQSContext(new ConnectionsManager(createConnectionFactory(environment)),environment);
 	}
 }
