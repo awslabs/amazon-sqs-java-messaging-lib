@@ -18,7 +18,8 @@ import javax.jms.JMSException;
 import javax.jms.TextMessage;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-import com.amazonaws.services.sqs.model.Message;
+
+import software.amazon.awssdk.services.sqs.model.Message;
 
 /**
  * A TextMessage object is used to send a message body containing a
@@ -42,7 +43,7 @@ public class SQSTextMessage extends SQSMessage implements TextMessage {
      */
     public SQSTextMessage(Acknowledger acknowledger, String queueUrl, Message sqsMessage) throws JMSException{
         super(acknowledger, queueUrl, sqsMessage);
-        this.text = sqsMessage.getBody();
+        this.text = sqsMessage.body();
     }
     
     /**

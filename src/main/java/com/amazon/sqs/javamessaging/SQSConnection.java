@@ -33,11 +33,12 @@ import javax.jms.ServerSessionPool;
 import javax.jms.Session;
 import javax.jms.Topic;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazonaws.services.sqs.AmazonSQS;
+
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 /**
  * This is a logical connection entity, which encapsulates the logic to create
@@ -75,7 +76,7 @@ import com.amazonaws.services.sqs.AmazonSQS;
  * Exception listener on connection is not supported.
  */
 public class SQSConnection implements Connection, QueueConnection {
-    private static final Log LOG = LogFactory.getLog(SQSConnection.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSConnection.class);
     
     /** For now this doesn't do anything. */
     private ExceptionListener exceptionListener;
@@ -118,9 +119,9 @@ public class SQSConnection implements Connection, QueueConnection {
      * Get the AmazonSQSClient used by this connection. This can be used to do administrative operations
      * that aren't included in the JMS specification, e.g. creating new queues.
      * 
-     * @return the AmazonSQSClient used by this connection
+     * @return the SqsClient used by this connection
      */
-    public AmazonSQS getAmazonSQSClient() {
+    public SqsClient getAmazonSQSClient() {
         return amazonSQSClient.getAmazonSQSClient();
     }
 

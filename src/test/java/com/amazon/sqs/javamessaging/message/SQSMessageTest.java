@@ -27,7 +27,6 @@ import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,6 +35,8 @@ import javax.jms.MessageFormatException;
 import javax.jms.MessageNotWriteableException;
 
 import junit.framework.Assert;
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
 import java.util.*;
 
@@ -286,60 +287,72 @@ public class SQSMessageTest {
 
         Acknowledger ack = mock(Acknowledger.class);
 
-        Map<String,String> systemAttributes = new HashMap<String, String>();
-        systemAttributes.put(APPROXIMATE_RECEIVE_COUNT, "100");
+        Map<MessageSystemAttributeName, String> systemAttributes = new HashMap<>();
+        systemAttributes.put(MessageSystemAttributeName.fromValue(APPROXIMATE_RECEIVE_COUNT), "100");
 
         Map<String, MessageAttributeValue> messageAttributes = new HashMap<String, MessageAttributeValue>();
 
-        messageAttributes.put(myTrueBoolean, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.BOOLEAN)
-                                                    .withStringValue("1"));
+        messageAttributes.put(myTrueBoolean, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.BOOLEAN)
+                                                    .stringValue("1")
+                                                    .build());
 
-        messageAttributes.put(myFalseBoolean, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.BOOLEAN)
-                                                    .withStringValue("0"));
+        messageAttributes.put(myFalseBoolean, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.BOOLEAN)
+                                                    .stringValue("0")
+                                                    .build());
 
-        messageAttributes.put(myInteger, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.INT)
-                                                    .withStringValue("100"));
+        messageAttributes.put(myInteger, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.INT)
+                                                    .stringValue("100")
+                                                    .build());
 
-        messageAttributes.put(myDouble, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.DOUBLE)
-                                                    .withStringValue("2.1768"));
+        messageAttributes.put(myDouble, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.DOUBLE)
+                                                    .stringValue("2.1768")
+                                                    .build());
 
-        messageAttributes.put(myFloat, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.FLOAT)
-                                                    .withStringValue("3.1457"));
+        messageAttributes.put(myFloat, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.FLOAT)
+                                                    .stringValue("3.1457")
+                                                    .build());
 
-        messageAttributes.put(myLong, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.LONG)
-                                                    .withStringValue("1290772974281"));
+        messageAttributes.put(myLong, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.LONG)
+                                                    .stringValue("1290772974281")
+                                                    .build());
 
-        messageAttributes.put(myShort, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.SHORT)
-                                                    .withStringValue("123"));
+        messageAttributes.put(myShort, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.SHORT)
+                                                    .stringValue("123")
+                                                    .build());
 
-        messageAttributes.put(myByte, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.BYTE)
-                                                    .withStringValue("1"));
+        messageAttributes.put(myByte, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.BYTE)
+                                                    .stringValue("1")
+                                                    .build());
 
-        messageAttributes.put(myString, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.STRING)
-                                                    .withStringValue("StringValue"));
+        messageAttributes.put(myString, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.STRING)
+                                                    .stringValue("StringValue")
+                                                    .build());
 
-        messageAttributes.put(myCustomString, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.NUMBER + ".custom")
-                                                    .withStringValue("['one', 'two']"));
+        messageAttributes.put(myCustomString, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.NUMBER + ".custom")
+                                                    .stringValue("['one', 'two']")
+                                                    .build());
 
-        messageAttributes.put(myNumber, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.NUMBER)
-                                                    .withStringValue("500"));
+        messageAttributes.put(myNumber, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.NUMBER)
+                                                    .stringValue("500")
+                                                    .build());
 
-        com.amazonaws.services.sqs.model.Message sqsMessage = new com.amazonaws.services.sqs.model.Message()
-                .withMessageAttributes(messageAttributes)
-                .withAttributes(systemAttributes)
-                .withMessageId("messageId")
-                .withReceiptHandle("ReceiptHandle");
+        software.amazon.awssdk.services.sqs.model.Message sqsMessage = software.amazon.awssdk.services.sqs.model.Message.builder()
+                .messageAttributes(messageAttributes)
+                .attributes(systemAttributes)
+                .messageId("messageId")
+                .receiptHandle("ReceiptHandle")
+                .build();
 
         SQSMessage message = new SQSMessage(ack, "QueueUrl", sqsMessage);
 

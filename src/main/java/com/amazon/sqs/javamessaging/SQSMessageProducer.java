@@ -30,18 +30,20 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.QueueSender;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage.JMSMessagePropertyValue;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
-import com.amazonaws.services.sqs.model.SendMessageRequest;
-import com.amazonaws.services.sqs.model.SendMessageResult;
-import com.amazonaws.util.Base64;
+
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest.Builder;
+import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
+import software.amazon.awssdk.utils.BinaryUtils;
 
 /**
  * A client uses a MessageProducer object to send messages to a queue
@@ -54,7 +56,7 @@ import com.amazonaws.util.Base64;
  * <P>
  */
 public class SQSMessageProducer implements MessageProducer, QueueSender {
-    private static final Log LOG = LogFactory.getLog(SQSMessageProducer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSMessageProducer.class);
 
     private long MAXIMUM_DELIVERY_DELAY_MILLISECONDS = TimeUnit.MILLISECONDS.convert(15, TimeUnit.MINUTES);
     
@@ -100,7 +102,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         SQSMessage message = (SQSMessage)rawMessage;
         message.setJMSDestination(queue);
         if (message instanceof SQSBytesMessage) {
-            sqsMessageBody = Base64.encodeAsString(((SQSBytesMessage) message).getBodyAsBytes());
+            sqsMessageBody = BinaryUtils.toBase64(((SQSBytesMessage) message).getBodyAsBytes());
             messageType = SQSMessage.BYTE_MESSAGE_TYPE;
         } else if (message instanceof SQSObjectMessage) {
             sqsMessageBody = ((SQSObjectMessage) message).getMessageBody();
@@ -124,11 +126,13 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         addReplyToQueueReservedAttributes(messageAttributes, message);
         addCorrelationIDToQueueReservedAttributes(messageAttributes, message);
 
-        SendMessageRequest sendMessageRequest = new SendMessageRequest(queue.getQueueUrl(), sqsMessageBody);
-        sendMessageRequest.setMessageAttributes(messageAttributes);
+        Builder sendMessageRequest = SendMessageRequest.builder()
+        		.queueUrl(queue.getQueueUrl())
+        		.messageBody(sqsMessageBody)
+        		.messageAttributes(messageAttributes);
 
         if (deliveryDelaySeconds != 0) {
-            sendMessageRequest.setDelaySeconds(deliveryDelaySeconds);
+            sendMessageRequest.delaySeconds(deliveryDelaySeconds);
         }
 
         //for FIFO queues, we have to specify both MessageGroupId, which we obtain from standard property JMSX_GROUP_ID
@@ -136,12 +140,12 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         //notice that this code does not validate if the values are actually set by the JMS user
         //this means that failure to provide the required values will fail server side and throw a JMSException
         if (queue.isFifo()) {
-            sendMessageRequest.setMessageGroupId(message.getSQSMessageGroupId());
-            sendMessageRequest.setMessageDeduplicationId(message.getSQSMessageDeduplicationId());
+            sendMessageRequest.messageGroupId(message.getSQSMessageGroupId());
+            sendMessageRequest.messageDeduplicationId(message.getSQSMessageDeduplicationId());
         }
 
-        SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
-        String messageId = sendMessageResult.getMessageId();
+        SendMessageResponse sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest.build());
+        String messageId = sendMessageResult.messageId();
         LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
         /** TODO: Do not support disableMessageID for now. */
         message.setSQSMessageId(messageId);
@@ -149,8 +153,8 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         // if the message was sent to FIFO queue, the sequence number will be
         // set in the response
         // pass it to JMS user through provider specific JMS property
-        if (sendMessageResult.getSequenceNumber() != null) {
-            message.setSequenceNumber(sendMessageResult.getSequenceNumber());
+        if (sendMessageResult.sequenceNumber() != null) {
+            message.setSequenceNumber(sendMessageResult.sequenceNumber());
         }
     }
 
@@ -219,25 +223,14 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             // and SQS FIFO has a different understanding of message groups
 
             JMSMessagePropertyValue propertyObject = message.getJMSMessagePropertyValue(propertyName);
-            MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-
-            messageAttributeValue.setDataType(propertyObject.getType());
-            messageAttributeValue.setStringValue(propertyObject.getStringMessageAttributeValue());
+            MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+            		.dataType(propertyObject.getType())
+            		.stringValue(propertyObject.getStringMessageAttributeValue())
+            		.build();
 
             messageAttributes.put(propertyName, messageAttributeValue);
         }
         return messageAttributes;
-    }
-
-    /**
-     * Adds the message type attribute during send as part of the send message
-     * request.
-     */
-    private void addMessageTypeReservedAttribute(Map<String, MessageAttributeValue> messageAttributes,
-                                                 SQSMessage message, String value) throws JMSException {
-
-
-        addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_MESSAGE_TYPE, value);
     }
 
     /**
@@ -279,9 +272,10 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      */
     private void addStringAttribute(Map<String, MessageAttributeValue> messageAttributes,
                                     String key, String value) {
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
-        messageAttributeValue.setStringValue(value);
+        MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+        		.dataType(SQSMessagingClientConstants.STRING)
+        		.stringValue(value)
+        		.build();
         messageAttributes.put(key, messageAttributeValue);
     }
     

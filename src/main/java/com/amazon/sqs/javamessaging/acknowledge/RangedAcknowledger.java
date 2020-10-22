@@ -21,14 +21,15 @@ import java.util.Queue;
 
 import javax.jms.JMSException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
-import com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry;
+
+import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequest;
+import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequestEntry;
 
 /**
  * Used to acknowledge group of messages. Acknowledging a consumed message
@@ -41,7 +42,7 @@ import com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry;
  * This class is not safe for concurrent use.
  */
 public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger {
-    private static final Log LOG = LogFactory.getLog(RangedAcknowledger.class);
+    private static final Logger LOG = LoggerFactory.getLogger(RangedAcknowledger.class);
     
     private final AmazonSQSMessagingClientWrapper amazonSQSClient;
 
@@ -140,14 +141,19 @@ public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger
             // Remove the message from queue of unAckMessages
             unAckMessages.poll();
             
-            DeleteMessageBatchRequestEntry entry = new DeleteMessageBatchRequestEntry(
-                    Integer.toString(batchId), receiptHandle);
+            DeleteMessageBatchRequestEntry entry = DeleteMessageBatchRequestEntry.builder()
+            		.id( Integer.toString(batchId))
+            		.receiptHandle(receiptHandle)
+            		.build();
             deleteMessageBatchRequestEntries.add(entry);
             batchId++;
         }
         
-        DeleteMessageBatchRequest deleteMessageBatchRequest = new DeleteMessageBatchRequest(
-                queueUrl, deleteMessageBatchRequestEntries);
+        DeleteMessageBatchRequest deleteMessageBatchRequest = DeleteMessageBatchRequest
+        		.builder()
+        		.queueUrl(queueUrl)
+        		.entries(deleteMessageBatchRequestEntries)
+        		.build();
         /**
          * TODO: If one of the batch calls fail, then the remaining messages on
          * the batch will not be deleted, and will be visible and delivered as
