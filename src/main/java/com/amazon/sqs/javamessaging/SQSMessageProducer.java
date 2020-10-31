@@ -113,7 +113,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         if (sqsMessageBody == null || sqsMessageBody.isEmpty()) {
             throw new JMSException("Message body cannot be null or empty");
         }
-        Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute((SQSMessage) message);
+        Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute(message);
 
         /**
          * These will override existing attributes if they exist. Everything that
@@ -127,9 +127,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         SendMessageRequest sendMessageRequest = new SendMessageRequest(queue.getQueueUrl(), sqsMessageBody);
         sendMessageRequest.setMessageAttributes(messageAttributes);
 
-        if (deliveryDelaySeconds != 0) {
-            sendMessageRequest.setDelaySeconds(deliveryDelaySeconds);
-        }
+        sendMessageRequest.setDelaySeconds(calculateDelaySeconds(message));
 
         //for FIFO queues, we have to specify both MessageGroupId, which we obtain from standard property JMSX_GROUP_ID
         //and MessageDeduplicationId, which we obtain from a custom provider specific property JMS_SQS_DEDUPLICATION_ID
@@ -151,6 +149,19 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         // pass it to JMS user through provider specific JMS property
         if (sendMessageResult.getSequenceNumber() != null) {
             message.setSequenceNumber(sendMessageResult.getSequenceNumber());
+        }
+    }
+
+    private int calculateDelaySeconds(SQSMessage message) throws JMSException {
+        try {
+            long scheduledDelay = message.getLongProperty(SQSMessage.SQS_SCHEDULED_DELAY);
+            return convertDeliveryDelayToSeconds(scheduledDelay);
+        } catch (NumberFormatException nfe) {
+            // Message does not have the delay property, use the producer's delay
+            return deliveryDelaySeconds;
+        } catch (IllegalArgumentException ide) {
+            // Message's delay property is invalid, throw exception
+            throw new JMSException(ide.getMessage());
         }
     }
 
@@ -511,13 +522,17 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      * in seconds.
      */
     public void setDeliveryDelay(long deliveryDelay) {
+        this.deliveryDelaySeconds = convertDeliveryDelayToSeconds(deliveryDelay);
+    }
+
+    private int convertDeliveryDelayToSeconds(long deliveryDelay) {
         if (deliveryDelay < 0 || deliveryDelay > MAXIMUM_DELIVERY_DELAY_MILLISECONDS) {
             throw new IllegalArgumentException("Delivery delay must be non-negative and at most 15 minutes: " + deliveryDelay);
         }
         if (deliveryDelay % 1000 != 0) {
             throw new IllegalArgumentException("Delivery delay must be a multiple of 1000: " + deliveryDelay);
         }
-        this.deliveryDelaySeconds = (int)(deliveryDelay / 1000);
+        return (int)(deliveryDelay / 1000);
     }
 
     /**

@@ -15,17 +15,11 @@
 package com.amazon.sqs.javamessaging;
 
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageProducer;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
@@ -740,6 +734,60 @@ public class SQSMessageProducerTest {
             producer.setDeliveryDelay(20);
             fail();
         } catch (IllegalArgumentException ide) {
+            // expected
+        }
+    }
+
+    @Test
+    public void testSetDeliveryDelayWithMessageProperty() throws JMSException {
+        assertEquals(0, producer.getDeliveryDelay());
+
+        ArgumentCaptor<SendMessageRequest> requestCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
+        when(amazonSQSClient.sendMessage(requestCaptor.capture()))
+                        .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1));
+
+        SQSTextMessage msg = new SQSTextMessage("Sorry I'm late!");
+        msg.setLongProperty(SQSMessage.SQS_SCHEDULED_DELAY, 2000L);
+        producer.send(msg);
+
+        assertEquals(2, requestCaptor.getValue().getDelaySeconds().intValue());
+    }
+
+
+    @Test
+    public void testSetDeliveryDelayWithMessagePropertyHasPriorityOverProducerDelay() throws JMSException {
+        assertEquals(0, producer.getDeliveryDelay());
+
+        producer.setDeliveryDelay(1000);
+
+        assertEquals(1000, producer.getDeliveryDelay());
+
+        ArgumentCaptor<SendMessageRequest> requestCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
+        when(amazonSQSClient.sendMessage(requestCaptor.capture()))
+                        .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1));
+
+        SQSTextMessage msg = new SQSTextMessage("Sorry I'm late!");
+        msg.setLongProperty(SQSMessage.SQS_SCHEDULED_DELAY, 2000L);
+        producer.send(msg);
+
+        assertEquals(2, requestCaptor.getValue().getDelaySeconds().intValue());
+    }
+
+
+    @Test
+    public void testSetDeliveryDelayWithMessagePropertyAndInvalidDelays() throws JMSException {
+        assertEquals(0, producer.getDeliveryDelay());
+
+        ArgumentCaptor<SendMessageRequest> requestCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
+        when(amazonSQSClient.sendMessage(requestCaptor.capture()))
+                        .thenReturn(new SendMessageResult().withMessageId(MESSAGE_ID_1));
+
+        SQSTextMessage msg = new SQSTextMessage("Sorry I'm late!");
+        msg.setLongProperty(SQSMessage.SQS_SCHEDULED_DELAY, 123L);
+        try {
+            producer.send(msg);
+            fail();
+        } catch (JMSException e) {
             // expected
         }
     }
