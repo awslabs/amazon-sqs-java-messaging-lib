@@ -117,9 +117,10 @@ public class SQSMessage implements Message {
         receiptHandle = sqsMessage.getReceiptHandle();
         this.setSQSMessageId(sqsMessage.getMessageId());
         Map<String,String> systemAttributes = sqsMessage.getAttributes();
-        int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
+        String receiveCountAttrib = systemAttributes.get(APPROXIMATE_RECEIVE_COUNT);
+        int receiveCount = receiveCountAttrib == null ? 0 : Integer.parseInt(receiveCountAttrib);
         
-        /**
+        /*
          * JMSXDeliveryCount is set based on SQS ApproximateReceiveCount
          * attribute.
          */
