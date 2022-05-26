@@ -70,6 +70,8 @@ public class SQSMessagingClientConstants {
 
     public static final String APPROXIMATE_RECEIVE_COUNT = "ApproximateReceiveCount";
 
+    public static final String SENT_TIMESTAMP = "SentTimestamp";
+
     public static final String MESSAGE_DEDUPLICATION_ID = "MessageDeduplicationId";
 
     public static final String MESSAGE_GROUP_ID = "MessageGroupId";
