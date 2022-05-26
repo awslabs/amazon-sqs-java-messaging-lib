@@ -56,6 +56,7 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.jms.ObjectMessage;
 
+import org.joda.time.DateTime;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -1066,6 +1067,9 @@ public class SQSMessageConsumerPrefetchTest {
 
         Map<String, String> mapAttributes = new HashMap<String, String>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        Long now = DateTime.now().getMillis();
+        mapAttributes.put(SQSMessagingClientConstants.SENT_TIMESTAMP, now.toString());
+
 
         com.amazonaws.services.sqs.model.Message message = mock(com.amazonaws.services.sqs.model.Message.class);
         // Return message attributes with message type 'TEXT'
@@ -1083,6 +1087,7 @@ public class SQSMessageConsumerPrefetchTest {
          */
         assertTrue(jsmMessage instanceof SQSTextMessage);
         assertEquals(message.getBody(), "MessageBody");
+        assertEquals(jsmMessage.getJMSTimestamp(), now.longValue());
     }
 
     /**
