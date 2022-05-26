@@ -55,6 +55,7 @@ import javax.jms.JMSException;
 import javax.jms.MessageListener;
 import javax.jms.ObjectMessage;
 
+import org.joda.time.DateTime;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -1069,8 +1070,16 @@ public class SQSMessageConsumerPrefetchTest {
         		.build();
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
+<<<<<<< HEAD
         Map<MessageSystemAttributeName, String> mapAttributes = new HashMap<>();
         mapAttributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
+=======
+        Map<String, String> mapAttributes = new HashMap<String, String>();
+        mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        Long now = DateTime.now().getMillis();
+        mapAttributes.put(SQSMessagingClientConstants.SENT_TIMESTAMP, now.toString());
+
+>>>>>>> 84f6b36 (JMSTimestamp could be set to SentTimestamp)
 
         // Return message attributes with message type 'TEXT'
         Message message = Message.builder()
@@ -1088,7 +1097,12 @@ public class SQSMessageConsumerPrefetchTest {
          * Verify results
          */
         assertTrue(jsmMessage instanceof SQSTextMessage);
+<<<<<<< HEAD
         assertEquals(message.body(), "MessageBody");
+=======
+        assertEquals(message.getBody(), "MessageBody");
+        assertEquals(jsmMessage.getJMSTimestamp(), now.longValue());
+>>>>>>> 84f6b36 (JMSTimestamp could be set to SentTimestamp)
     }
 
     /**
