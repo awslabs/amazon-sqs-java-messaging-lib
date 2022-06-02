@@ -6,7 +6,7 @@
 
   <groupId>com.amazonaws</groupId>
   <artifactId>amazon-sqs-java-messaging-lib</artifactId>
-  <version>1.0.9</version>
+  <version>1.1.0</version>
   <packaging>jar</packaging>
   <name>Amazon SQS Java Messaging Library</name>
   <description>The Amazon SQS Java Messaging Library holds the Java Message Service compatible classes, that are used
@@ -166,7 +166,8 @@
             <configuration>
               <keyname>${gpg.sqs.keyname}</keyname>
               <passphraseServerId>gpg.sqs.passphrase</passphraseServerId>
-            </configuration>
+              <skip>true</skip>
+      	    </configuration>
           </execution>
         </executions>
       </plugin>
