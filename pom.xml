@@ -1,23 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <groupId>com.amazonaws</groupId>
   <artifactId>amazon-sqs-java-messaging-lib</artifactId>
   <version>1.1.0</version>
-  <packaging>jar</packaging>
   <name>Amazon SQS Java Messaging Library</name>
   <description>The Amazon SQS Java Messaging Library holds the Java Message Service compatible classes, that are used
     for communicating with Amazon Simple Queue Service.
   </description>
-  <url>https://github.com/awslabs/amazon-sqs-java-messaging-lib/</url>
-
+  <url>https://github.com/awslabs/amazon-sqs-java-messaging-lib</url>
   <scm>
     <url>https://github.com/awslabs/amazon-sqs-java-messaging-lib.git</url>
   </scm>
-
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -25,7 +18,6 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-
   <developers>
     <developer>
       <id>amazonwebservices</id>
@@ -36,9 +28,9 @@
       </roles>
     </developer>
   </developers>
-
   <properties>
     <aws-java-sdk.version>1.11.106</aws-java-sdk.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <dependencies>
@@ -52,7 +44,12 @@
       <artifactId>geronimo-jms_1.1_spec</artifactId>
       <version>1.1.1</version>
     </dependency>
-
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>5.7.0-M1</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -80,6 +77,19 @@
             <encoding>UTF-8</encoding>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>3.0.0-M1</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>integration-test</goal>
+                <goal>verify</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -106,10 +116,10 @@
             <goals>
               <goal>jar</goal>
             </goals>
-            <configuration> 
-              <!-- 
+            <configuration>
+              <!--
               TODO-RS: Java 8 is more strict about some javadoc tags.
-              We'll need to update quite a few to remove this workaround.  
+              We'll need to update quite a few to remove this workaround.
               -->
               <additionalparam>-Xdoclint:none</additionalparam>
             </configuration>
@@ -122,40 +132,53 @@
         <version>1.6.7</version>
         <extensions>true</extensions>
         <configuration>
-           <serverId>ossrh</serverId>
-           <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-           <autoReleaseAfterClose>true</autoReleaseAfterClose>
+          <serverId>ossrh</serverId>
+          <nexusUrl>https://aws.oss.sonatype.org</nexusUrl>
+          <autoReleaseAfterClose>true</autoReleaseAfterClose>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>sign-artifacts</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>sign</goal>
-            </goals>
-            <configuration>
-              <keyname>${gpg.sqs.keyname}</keyname>
-              <passphraseServerId>gpg.sqs.passphrase</passphraseServerId>
-              <skip>true</skip>
-      	    </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
-  
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-    </repository>
-  </distributionManagement>
+
+  <profiles>
+    <profile>
+      <id>publishing</id>
+
+      <distributionManagement>
+        <snapshotRepository>
+          <id>ossrh</id>
+          <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+          <id>ossrh</id>
+          <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+      </distributionManagement>
+
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <gpgArguments>
+                    <gpgArgument>--pinentry-mode</gpgArgument>
+                    <gpgArgument>loopback</gpgArgument>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
