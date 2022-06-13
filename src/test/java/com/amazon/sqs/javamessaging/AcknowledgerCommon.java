@@ -14,8 +14,7 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -72,6 +71,6 @@ public class AcknowledgerCommon {
             populatedMessages.add(message);
             acknowledger.notifyMessageReceived(message);
         }
-        org.junit.Assert.assertEquals(populateMessageSize, acknowledger.getUnAckMessages().size());
+        assertEquals(populateMessageSize, acknowledger.getUnAckMessages().size());
     }
 }

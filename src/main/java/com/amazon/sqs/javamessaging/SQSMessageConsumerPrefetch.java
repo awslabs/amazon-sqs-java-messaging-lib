@@ -56,7 +56,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
  * <P>
  * Uses SQS <code>receiveMessage</code> with long-poll wait time of 20 seconds.
  * <P>
- * Add re-tries on top of <code>AmazonSQSClient</code> re-tries on SQS calls.
+ * Add re-tries on top of <code>SqsClient</code> re-tries on SQS calls.
  */
 public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 

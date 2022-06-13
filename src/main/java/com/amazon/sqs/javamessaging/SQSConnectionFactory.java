@@ -30,7 +30,7 @@ import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 
 /**
  * A ConnectionFactory object encapsulates a set of connection configuration
- * parameters for <code>AmazonSQSClient</code> as well as setting
+ * parameters for <code>SqsClient</code> as well as setting
  * <code>numberOfMessagesToPrefetch</code>.
  * <P>
  * The <code>numberOfMessagesToPrefetch</code> parameter is used to size of the
@@ -40,7 +40,7 @@ import software.amazon.awssdk.services.sqs.SqsClientBuilder;
  * <P>
  * If more physical connections than the default maximum value (that is 50 as of
  * today) are needed on the connection pool,
- * {@link com.amazonaws.ClientConfiguration} needs to be configured.
+ * {@link software.amazon.awssdk.core.client.config.ClientOverrideConfiguration} needs to be configured.
  * <P>
  * None of the <code>createConnection</code> methods set-up the physical
  * connection to SQS, so validity of credentials are not checked with those
@@ -54,16 +54,16 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     /*
 
     /*
-     * Creates a SQSConnectionFactory that uses AmazonSQSClientBuilder.standard() for creating AmazonSQS client connections.
-     * Every SQSConnection will have its own copy of AmazonSQS client.
+     * Creates a SQSConnectionFactory that uses SqsClientBuilder.standard() for creating SqsClient connections.
+     * Every SQSConnection will have its own copy of SqsClient.
      */
     public SQSConnectionFactory(ProviderConfiguration providerConfiguration) {
         this(providerConfiguration, SqsClient.create());
     }
     
     /*
-     * Creates a SQSConnectionFactory that uses the provided AmazonSQS client connection.
-     * Every SQSConnection will use the same provided AmazonSQS client.
+     * Creates a SQSConnectionFactory that uses the provided SqsClient connection.
+     * Every SQSConnection will use the same provided SqsClient.
      */
     public SQSConnectionFactory(ProviderConfiguration providerConfiguration, final SqsClient client) {
         if (providerConfiguration == null) {
@@ -82,7 +82,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     }
     
     /*
-     * Creates a SQSConnectionFactory that uses the provided AmazonSQSClientBuilder for creating AmazonSQS client connections.
+     * Creates a SQSConnectionFactory that uses the provided SqsClientBuilder for creating AmazonSQS client connections.
      * Every SQSConnection will have its own copy of AmazonSQS client created through the provided builder.
      */
     public SQSConnectionFactory(ProviderConfiguration providerConfiguration, final SqsClientBuilder clientBuilder) {

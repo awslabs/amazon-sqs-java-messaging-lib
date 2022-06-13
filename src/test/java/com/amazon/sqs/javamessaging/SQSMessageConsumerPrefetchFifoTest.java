@@ -195,10 +195,27 @@ public class SQSMessageConsumerPrefetchFifoTest {
         for (SQSMessageConsumerPrefetch.MessageManager messageManager : consumerPrefetch.messageQueue) {
             Message mockedMessage = messages.get(index);
             SQSMessage sqsMessage = (SQSMessage)messageManager.getMessage();
-            assertEquals("Receipt handle is the same", mockedMessage.receiptHandle(), sqsMessage.getReceiptHandle());
-            assertEquals("Group id is the same", mockedMessage.attributes().get(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID)), sqsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
-            assertEquals("Sequence number is the same", mockedMessage.attributes().get(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER)), sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
-            assertEquals("Deduplication id is the same", mockedMessage.attributes().get(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID)), sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
+            assertEquals(
+                    "Receipt handle is the same",
+                    mockedMessage.receiptHandle(), sqsMessage.getReceiptHandle());
+            assertEquals(
+                    "Group id is the same",
+                    mockedMessage
+                            .attributes()
+                            .get(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID)),
+                    sqsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
+            assertEquals(
+                    "Sequence number is the same",
+                    mockedMessage
+                            .attributes()
+                            .get(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER)),
+                    sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
+            assertEquals(
+                    "Deduplication id is the same",
+                    mockedMessage
+                            .attributes()
+                            .get(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID)),
+                    sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
             
             index++;
         }

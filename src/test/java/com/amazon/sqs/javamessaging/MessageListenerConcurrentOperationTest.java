@@ -288,8 +288,6 @@ public class MessageListenerConcurrentOperationTest {
 
     public void testConcurrentExecution(final MessageListener msgListener, final ConcurrentOperation operation) throws JMSException, InterruptedException {
 
-        //long start = System.currentTimeMillis();
-
         // Start the session
         operation.setup();
 
