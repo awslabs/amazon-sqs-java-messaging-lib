@@ -70,7 +70,8 @@ public class SQSMessage implements Message {
     public static final String JMS_SQS_REPLY_TO_QUEUE_NAME = "JMS_SQSReplyToQueueName";
     public static final String JMS_SQS_REPLY_TO_QUEUE_URL = "JMS_SQSReplyToQueueURL";
     public static final String JMS_SQS_CORRELATION_ID = "JMS_SQSCorrelationID";
-    
+    public static final String SQS_SCHEDULED_DELAY = "SQSScheduledDelay";
+
     // Default JMS Message properties
     private int deliveryMode = Message.DEFAULT_DELIVERY_MODE;
     private int priority = Message.DEFAULT_PRIORITY;
