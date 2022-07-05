@@ -18,7 +18,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -28,7 +27,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,10 +45,10 @@ import org.junit.Test;
 
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
-import com.amazonaws.util.Base64;
 
-import com.amazonaws.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+import software.amazon.awssdk.utils.BinaryUtils;
 
 /**
  * Test the SQSBytesMessageTest class
@@ -59,10 +57,10 @@ public class SQSBytesMessageTest {
     
     private SQSSession mockSQSSession;
     
-    private final static Map<String, String> MESSAGE_SYSTEM_ATTRIBUTES;
+    private final static Map<MessageSystemAttributeName, String> MESSAGE_SYSTEM_ATTRIBUTES;
     static {
-        MESSAGE_SYSTEM_ATTRIBUTES = new HashMap<String,String>();
-        MESSAGE_SYSTEM_ATTRIBUTES.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
+        MESSAGE_SYSTEM_ATTRIBUTES = new HashMap<>();
+        MESSAGE_SYSTEM_ATTRIBUTES.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
     }
 
     @Before 
@@ -103,10 +101,11 @@ public class SQSBytesMessageTest {
             fail("failed to readByte");
         }
 
-        Message message = new Message();
-        message.setBody(Base64.encodeAsString(body));
+        Message message = Message.builder()
+        		.body(BinaryUtils.toBase64(body))
+        		.attributes(MESSAGE_SYSTEM_ATTRIBUTES)
+        		.build();
         
-        message.setAttributes(MESSAGE_SYSTEM_ATTRIBUTES);
         SQSBytesMessage receivedByteMsg = new SQSBytesMessage(null, "", message);
         byte[] byteArray1 = new byte[4];
         receivedByteMsg.readBytes(byteArray1);
@@ -425,10 +424,10 @@ public class SQSBytesMessageTest {
             fail("failed to readByte");
         }
 
-        Message message = new Message();
-        message.setBody(Base64.encodeAsString(body));
-
-        message.setAttributes(MESSAGE_SYSTEM_ATTRIBUTES);
+        Message message = Message.builder()
+        		.attributes(MESSAGE_SYSTEM_ATTRIBUTES)
+        		.body(BinaryUtils.toBase64(body))
+        		.build();
         SQSBytesMessage receivedByteMsg = new SQSBytesMessage(null, "", message);
         byte[] byteArray1 = new byte[4];
         receivedByteMsg.readBytes(byteArray1);

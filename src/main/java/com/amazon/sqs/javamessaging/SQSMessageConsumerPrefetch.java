@@ -27,8 +27,8 @@ import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
@@ -38,10 +38,12 @@ import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 import com.amazon.sqs.javamessaging.util.ExponentialBackoffStrategy;
-import com.amazonaws.services.sqs.model.Message;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
-import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
-import com.amazonaws.services.sqs.model.ReceiveMessageResult;
+
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest.Builder;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 /**
  * Used internally to prefetch messages to internal buffer on a background
@@ -54,11 +56,11 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
  * <P>
  * Uses SQS <code>receiveMessage</code> with long-poll wait time of 20 seconds.
  * <P>
- * Add re-tries on top of <code>AmazonSQSClient</code> re-tries on SQS calls.
+ * Add re-tries on top of <code>SqsClient</code> re-tries on SQS calls.
  */
 public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
-    private static final Log LOG = LogFactory.getLog(SQSMessageConsumerPrefetch.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSMessageConsumerPrefetch.class);
 
     protected static final int WAIT_TIME_SECONDS = 20;
 
@@ -247,18 +249,20 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
         assert batchSize > 0;
 
-        ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(queueUrl)
-                                                              .withMaxNumberOfMessages(batchSize)
-                                                              .withAttributeNames(ALL)
-                                                              .withMessageAttributeNames(ALL)
-                                                              .withWaitTimeSeconds(waitTimeSeconds);
+        Builder receiveMessageRequestBuilder = ReceiveMessageRequest.builder()
+        													.queueUrl(queueUrl)
+                                                            .maxNumberOfMessages(batchSize)
+                                                            .attributeNamesWithStrings(ALL)
+                                                            .messageAttributeNames(ALL)
+                                                            .waitTimeSeconds(waitTimeSeconds);
+                                                           
         //if the receive request is for FIFO queue, provide a unique receive request attempt it, so that
         //failed calls retried by SDK will claim the same messages
         if (sqsDestination.isFifo()) {
-            receiveMessageRequest.withReceiveRequestAttemptId(UUID.randomUUID().toString());
+        	receiveMessageRequestBuilder.receiveRequestAttemptId(UUID.randomUUID().toString());
         }
-        ReceiveMessageResult receivedMessageResult = amazonSQSClient.receiveMessage(receiveMessageRequest);
-        return receivedMessageResult.getMessages();
+        ReceiveMessageResponse receivedMessageResult = amazonSQSClient.receiveMessage(receiveMessageRequestBuilder.build());
+        return receivedMessageResult.messages();
     }
 
     /**
@@ -276,7 +280,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 messageManagers.add(new MessageManager(this, jmsMessage));
             } catch (JMSException e) {
                 LOG.warn("Caught exception while converting received messages", e);
-                nackMessages.add(message.getReceiptHandle());
+                nackMessages.add(message.receiptHandle());
             }
         }
 
@@ -337,18 +341,18 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * @throws JMSException
      */
     protected javax.jms.Message convertToJMSMessage(Message message) throws JMSException {
-        MessageAttributeValue messageTypeAttribute = message.getMessageAttributes().get(
+        MessageAttributeValue messageTypeAttribute = message.messageAttributes().get(
                 SQSMessage.JMS_SQS_MESSAGE_TYPE);
         javax.jms.Message jmsMessage = null;
         if (messageTypeAttribute == null) {
             jmsMessage = new SQSTextMessage(acknowledger, queueUrl, message);
         } else {
-            String messageType = messageTypeAttribute.getStringValue();
+            String messageType = messageTypeAttribute.stringValue();
             if (SQSMessage.BYTE_MESSAGE_TYPE.equals(messageType)) {
                 try {
                     jmsMessage = new SQSBytesMessage(acknowledger, queueUrl, message);
                 } catch (JMSException e) {
-                    LOG.warn("MessageReceiptHandle - " + message.getReceiptHandle() +
+                    LOG.warn("MessageReceiptHandle - " + message.receiptHandle() +
                              "cannot be serialized to BytesMessage", e);
                     throw e;
                 }
@@ -363,21 +367,22 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
         jmsMessage.setJMSDestination(sqsDestination);
 
-        MessageAttributeValue replyToQueueNameAttribute = message.getMessageAttributes().get(
+        MessageAttributeValue replyToQueueNameAttribute = message.messageAttributes().get(
                 SQSMessage.JMS_SQS_REPLY_TO_QUEUE_NAME);
-        MessageAttributeValue replyToQueueUrlAttribute = message.getMessageAttributes().get(
+
+        MessageAttributeValue replyToQueueUrlAttribute = message.messageAttributes().get(
                 SQSMessage.JMS_SQS_REPLY_TO_QUEUE_URL);
         if (replyToQueueNameAttribute != null && replyToQueueUrlAttribute != null) {
-            String replyToQueueUrl = replyToQueueUrlAttribute.getStringValue();
-            String replyToQueueName = replyToQueueNameAttribute.getStringValue();
+            String replyToQueueUrl = replyToQueueUrlAttribute.stringValue();
+            String replyToQueueName = replyToQueueNameAttribute.stringValue();
             Destination replyToQueue = new SQSQueueDestination(replyToQueueName, replyToQueueUrl);
             jmsMessage.setJMSReplyTo(replyToQueue);
         }
 
-        MessageAttributeValue correlationIdAttribute = message.getMessageAttributes().get(
+        MessageAttributeValue correlationIdAttribute = message.messageAttributes().get(
                 SQSMessage.JMS_SQS_CORRELATION_ID);
         if (correlationIdAttribute != null) {
-                jmsMessage.setJMSCorrelationID(correlationIdAttribute.getStringValue());
+                jmsMessage.setJMSCorrelationID(correlationIdAttribute.stringValue());
         }
 
         jmsMessage.setJMSTimestamp(getJMSTimestamp(message));
@@ -385,7 +390,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     }
 
     private long getJMSTimestamp(Message message) {
-        Map<String, String> systemAttributes = message.getAttributes();
+        Map<String, String> systemAttributes = message.attributesAsStrings();
         String timestamp = systemAttributes.get(SQSMessagingClientConstants.SENT_TIMESTAMP);
         if (timestamp != null) {
             return Long.parseLong(timestamp);

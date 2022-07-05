@@ -28,7 +28,8 @@ import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazonaws.services.sqs.model.Message;
+
+import software.amazon.awssdk.services.sqs.model.Message;
 
 import javax.jms.JMSException;
 import javax.jms.MessageListener;
@@ -661,16 +662,17 @@ public class SQSSessionCallbackSchedulerTest {
     }
 
     private SQSMessageConsumerPrefetch.MessageManager createFifoMessageManager(String queueUrl, String groupId, String messageId, String receiptHandle) throws JMSException {
-        Message message = new Message();
-        message.setBody("body");
-        message.setMessageId(messageId);
-        message.setReceiptHandle(receiptHandle);
-        Map<String, String> attributes = new HashMap<String, String>();
-        attributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "728374687246872364");
-        attributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, messageId);
-        attributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
-        attributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "0");
-        message.setAttributes(attributes);
+    	Map<String, String> attributes = new HashMap<String, String>();
+    	attributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "728374687246872364");
+    	attributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, messageId);
+    	attributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
+    	attributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "0");
+        Message message = Message.builder()
+        		.body("body")
+        		.messageId(messageId)
+        		.receiptHandle(receiptHandle)
+        		.attributesWithStrings(attributes)
+        		.build();
         SQSMessage sqsMessage = new SQSTextMessage(acknowledger, queueUrl, message);
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
         when(prefetchManager.getMessageConsumer())
