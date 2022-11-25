@@ -54,7 +54,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
  * This runs until the message consumer is closed and in-progress SQS
  * <code>receiveMessage</code> call returns.
  * <P>
- * Uses SQS <code>receiveMessage</code> with long-poll wait time of 20 seconds.
+ * Uses SQS <code>receiveMessage</code> with long-poll wait time of WAIT_TIME_SECONDS (default to 20) seconds.
  * <P>
  * Add re-tries on top of <code>SqsClient</code> re-tries on SQS calls.
  */
@@ -62,7 +62,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     private static final Logger LOG = LoggerFactory.getLogger(SQSMessageConsumerPrefetch.class);
 
-    protected static final int WAIT_TIME_SECONDS = 20;
+    protected static int WAIT_TIME_SECONDS = 20;
 
     protected static final String ALL = "All";
 
