@@ -60,7 +60,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
 
     private static final Log LOG = LogFactory.getLog(SQSMessageConsumerPrefetch.class);
 
-    protected static final int WAIT_TIME_SECONDS = 20;
+    protected static int WAIT_TIME_SECONDS = 20;
 
     protected static final String ALL = "All";
 
