@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -29,8 +29,8 @@ import javax.jms.MessageListener;
 import javax.jms.Queue;
 import javax.jms.QueueReceiver;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
@@ -51,7 +51,7 @@ import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
  * improve the <code>receive</code> turn-around times.
  */
 public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
-    private static final Log LOG = LogFactory.getLog(SQSMessageConsumer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSMessageConsumer.class);
     public static final int PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME = 30;
 
     protected volatile boolean closed = false;
@@ -140,12 +140,13 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      * paused.
      * 
      * @return the next message produced for this message consumer, or null if
-     *         this message consumer is closed
+     *         this message consumer is closed during the receive call
      * @throws JMSException
      *             On internal error
      */
     @Override
     public Message receive() throws JMSException {
+        checkClosed();
         return sqsMessageConsumerPrefetch.receive();
     }
 
@@ -157,12 +158,13 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      * @param timeout
      *            the timeout value (in milliseconds)
      * @return the next message produced for this message consumer, or null if
-     *         the timeout expires or this message consumer is closed
+     *         the timeout expires or this message consumer is closed during the receive call
      * @throws JMSException
      *             On internal error
      */
     @Override
     public Message receive(long timeout) throws JMSException {
+        checkClosed();
         return sqsMessageConsumerPrefetch.receive(timeout);
     }
 
@@ -176,6 +178,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      */
     @Override
     public Message receiveNoWait() throws JMSException {
+        checkClosed();
         return sqsMessageConsumerPrefetch.receiveNoWait();
     }
     

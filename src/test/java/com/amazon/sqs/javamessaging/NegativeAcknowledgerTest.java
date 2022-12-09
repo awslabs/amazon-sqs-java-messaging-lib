@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -14,24 +14,6 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.PrefetchManager;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequest;
-import com.amazonaws.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
-
-import javax.jms.JMSException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyList;
@@ -42,6 +24,23 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import javax.jms.JMSException;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+
+import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
+
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
 
 /**
  * Test the NegativeAcknowledger class
@@ -127,12 +126,12 @@ public class NegativeAcknowledgerTest extends AcknowledgerCommon {
 
         assertEquals(1, argumentCaptor.getAllValues().size());
 
-        assertEquals(QUEUE_URL, argumentCaptor.getAllValues().get(0).getQueueUrl());
-        List<ChangeMessageVisibilityBatchRequestEntry> captureList =  argumentCaptor.getAllValues().get(0).getEntries();
+        assertEquals(QUEUE_URL, argumentCaptor.getAllValues().get(0).queueUrl());
+        List<ChangeMessageVisibilityBatchRequestEntry> captureList =  argumentCaptor.getAllValues().get(0).entries();
         assertEquals(receiptHandles.size(), captureList.size());
 
         for (ChangeMessageVisibilityBatchRequestEntry item : captureList) {
-            receiptHandles.contains(item.getReceiptHandle());
+            receiptHandles.contains(item.receiptHandle());
         }
     }
 
@@ -144,7 +143,7 @@ public class NegativeAcknowledgerTest extends AcknowledgerCommon {
 
         negativeAcknowledger.action(QUEUE_URL, null);
 
-        negativeAcknowledger.action(QUEUE_URL, Collections.EMPTY_LIST);
+        negativeAcknowledger.action(QUEUE_URL, Collections.emptyList());
 
         verify(amazonSQSClient, never()).changeMessageVisibilityBatch(any(ChangeMessageVisibilityBatchRequest.class));
     }

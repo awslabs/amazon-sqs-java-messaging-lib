@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package com.amazon.sqs.javamessaging;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.jms.Destination;
@@ -29,18 +30,20 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.QueueSender;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
+import com.amazon.sqs.javamessaging.message.SQSMessage.JMSMessagePropertyValue;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-import com.amazon.sqs.javamessaging.message.SQSMessage.JMSMessagePropertyValue;
-import com.amazonaws.util.Base64;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
-import com.amazonaws.services.sqs.model.SendMessageRequest;
-import com.amazonaws.services.sqs.model.SendMessageResult;
+
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest.Builder;
+import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
+import software.amazon.awssdk.utils.BinaryUtils;
 
 /**
  * A client uses a MessageProducer object to send messages to a queue
@@ -53,7 +56,11 @@ import com.amazonaws.services.sqs.model.SendMessageResult;
  * <P>
  */
 public class SQSMessageProducer implements MessageProducer, QueueSender {
-    private static final Log LOG = LogFactory.getLog(SQSMessageProducer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSMessageProducer.class);
+
+    private long MAXIMUM_DELIVERY_DELAY_MILLISECONDS = TimeUnit.MILLISECONDS.convert(15, TimeUnit.MINUTES);
+    
+    private int deliveryDelaySeconds = 0;
 
     /** This field is not actually used. */
     private long timeToLive;
@@ -95,7 +102,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         SQSMessage message = (SQSMessage)rawMessage;
         message.setJMSDestination(queue);
         if (message instanceof SQSBytesMessage) {
-            sqsMessageBody = Base64.encodeAsString(((SQSBytesMessage) message).getBodyAsBytes());
+            sqsMessageBody = BinaryUtils.toBase64(((SQSBytesMessage) message).getBodyAsBytes());
             messageType = SQSMessage.BYTE_MESSAGE_TYPE;
         } else if (message instanceof SQSObjectMessage) {
             sqsMessageBody = ((SQSObjectMessage) message).getMessageBody();
@@ -109,21 +116,36 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             throw new JMSException("Message body cannot be null or empty");
         }
         Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute((SQSMessage) message);
-        addMessageTypeReservedAttribute(messageAttributes, (SQSMessage) message, messageType);
-        SendMessageRequest sendMessageRequest = new SendMessageRequest(queue.getQueueUrl(), sqsMessageBody);
-        sendMessageRequest.setMessageAttributes(messageAttributes);
+
+        /**
+         * These will override existing attributes if they exist. Everything that
+         * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
+         * attribute, it will be overwritten.
+         */
+        addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_MESSAGE_TYPE, messageType);
+        addReplyToQueueReservedAttributes(messageAttributes, message);
+        addCorrelationIDToQueueReservedAttributes(messageAttributes, message);
+
+        Builder sendMessageRequest = SendMessageRequest.builder()
+        		.queueUrl(queue.getQueueUrl())
+        		.messageBody(sqsMessageBody)
+        		.messageAttributes(messageAttributes);
+
+        if (deliveryDelaySeconds != 0) {
+            sendMessageRequest.delaySeconds(deliveryDelaySeconds);
+        }
 
         //for FIFO queues, we have to specify both MessageGroupId, which we obtain from standard property JMSX_GROUP_ID
         //and MessageDeduplicationId, which we obtain from a custom provider specific property JMS_SQS_DEDUPLICATION_ID
         //notice that this code does not validate if the values are actually set by the JMS user
         //this means that failure to provide the required values will fail server side and throw a JMSException
         if (queue.isFifo()) {
-            sendMessageRequest.setMessageGroupId(message.getSQSMessageGroupId());
-            sendMessageRequest.setMessageDeduplicationId(message.getSQSMessageDeduplicationId());
+            sendMessageRequest.messageGroupId(message.getSQSMessageGroupId());
+            sendMessageRequest.messageDeduplicationId(message.getSQSMessageDeduplicationId());
         }
 
-        SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
-        String messageId = sendMessageResult.getMessageId();
+        SendMessageResponse sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest.build());
+        String messageId = sendMessageResult.messageId();
         LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
         /** TODO: Do not support disableMessageID for now. */
         message.setSQSMessageId(messageId);
@@ -131,8 +153,8 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         // if the message was sent to FIFO queue, the sequence number will be
         // set in the response
         // pass it to JMS user through provider specific JMS property
-        if (sendMessageResult.getSequenceNumber() != null) {
-            message.setSequenceNumber(sendMessageResult.getSequenceNumber());
+        if (sendMessageResult.sequenceNumber() != null) {
+            message.setSequenceNumber(sendMessageResult.sequenceNumber());
         }
     }
 
@@ -201,10 +223,10 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
             // and SQS FIFO has a different understanding of message groups
 
             JMSMessagePropertyValue propertyObject = message.getJMSMessagePropertyValue(propertyName);
-            MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-
-            messageAttributeValue.setDataType(propertyObject.getType());
-            messageAttributeValue.setStringValue(propertyObject.getStringMessageAttributeValue());
+            MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+            		.dataType(propertyObject.getType())
+            		.stringValue(propertyObject.getStringMessageAttributeValue())
+            		.build();
 
             messageAttributes.put(propertyName, messageAttributeValue);
         }
@@ -212,25 +234,51 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     }
 
     /**
-     * Adds the message type attribute during send as part of the send message
-     * request.
+     * Adds the reply-to queue name and url attributes during send as part of the send message
+     * request, if necessary
      */
-    private void addMessageTypeReservedAttribute(Map<String, MessageAttributeValue> messageAttributes,
-                                                 SQSMessage message, String value) throws JMSException {
+    private void addReplyToQueueReservedAttributes(Map<String, MessageAttributeValue> messageAttributes,
+                                                   SQSMessage message) throws JMSException {
 
-        MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
-
-        messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
-        messageAttributeValue.setStringValue(value);
-
-        /**
-         * This will override the existing attribute if exists. Everything that
-         * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
-         * attribute, it will be overwritten.
-         */
-        messageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
+        Destination replyTo = message.getJMSReplyTo();
+        if (replyTo instanceof SQSQueueDestination) {
+            SQSQueueDestination replyToQueue = (SQSQueueDestination)replyTo;
+    
+            /**
+             * This will override the existing attributes if exists. Everything that
+             * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
+             * attribute, it will be overwritten.
+             */
+            addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_REPLY_TO_QUEUE_NAME, replyToQueue.getQueueName());
+            addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_REPLY_TO_QUEUE_URL, replyToQueue.getQueueUrl());
+        }
     }
 
+    /**
+     * Adds the correlation ID attribute during send as part of the send message
+     * request, if necessary
+     */
+    private void addCorrelationIDToQueueReservedAttributes(Map<String, MessageAttributeValue> messageAttributes,
+                                                   SQSMessage message) throws JMSException {
+
+        String correlationID = message.getJMSCorrelationID();
+        if (correlationID != null) {
+            addStringAttribute(messageAttributes, SQSMessage.JMS_SQS_CORRELATION_ID, correlationID);
+        }
+    }
+
+    /**
+     * Convenience method for adding a single string attribute.
+     */
+    private void addStringAttribute(Map<String, MessageAttributeValue> messageAttributes,
+                                    String key, String value) {
+        MessageAttributeValue messageAttributeValue = MessageAttributeValue.builder()
+        		.dataType(SQSMessagingClientConstants.STRING)
+        		.stringValue(value)
+        		.build();
+        messageAttributes.put(key, messageAttributeValue);
+    }
+    
     /**
      * Sends a message to a queue.
      * <P>
@@ -448,7 +496,32 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     public long getTimeToLive() throws JMSException {
         return timeToLive;
     }
+    
+    /**
+     * Sets the minimum length of time in milliseconds that must elapse after a 
+     * message is sent before the JMS provider may deliver the message to a consumer.
+     * <p>
+     * This must be a multiple of 1000, since SQS only supports delivery delays
+     * in seconds.
+     */
+    public void setDeliveryDelay(long deliveryDelay) {
+        if (deliveryDelay < 0 || deliveryDelay > MAXIMUM_DELIVERY_DELAY_MILLISECONDS) {
+            throw new IllegalArgumentException("Delivery delay must be non-negative and at most 15 minutes: " + deliveryDelay);
+        }
+        if (deliveryDelay % 1000 != 0) {
+            throw new IllegalArgumentException("Delivery delay must be a multiple of 1000: " + deliveryDelay);
+        }
+        this.deliveryDelaySeconds = (int)(deliveryDelay / 1000);
+    }
 
+    /**
+     * Gets the minimum length of time in milliseconds that must elapse after a 
+     * message is sent before the JMS provider may deliver the message to a consumer.
+     */
+    public long getDeliveryDelay() {
+        return deliveryDelaySeconds * 1000;
+    }
+    
     void checkClosed() throws IllegalStateException {
         if (closed.get()) {
             throw new IllegalStateException("The producer is closed.");

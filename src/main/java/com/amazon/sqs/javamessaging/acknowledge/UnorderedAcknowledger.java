@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import javax.jms.JMSException;
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazonaws.services.sqs.model.DeleteMessageRequest;
+
+import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 
 /**
  * Used to acknowledge messages in any order one at a time.
@@ -53,8 +54,10 @@ public class UnorderedAcknowledger implements Acknowledger {
     @Override
     public void acknowledge(SQSMessage message) throws JMSException {
         session.checkClosed();
-        amazonSQSClient.deleteMessage(new DeleteMessageRequest(
-                message.getQueueUrl(), message.getReceiptHandle()));
+        amazonSQSClient.deleteMessage(DeleteMessageRequest.builder()
+        		.queueUrl(message.getQueueUrl())
+        		.receiptHandle(message.getReceiptHandle())
+        		.build());
         unAckMessages.remove(message.getReceiptHandle());
     }
     

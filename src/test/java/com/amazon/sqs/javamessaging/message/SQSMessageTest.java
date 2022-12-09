@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,6 +35,8 @@ import javax.jms.MessageFormatException;
 import javax.jms.MessageNotWriteableException;
 
 import junit.framework.Assert;
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
 import java.util.*;
 
@@ -53,6 +54,8 @@ public class SQSMessageTest {
     final String myShort = "myShort";
     final String myByte = "myByte";
     final String myString = "myString";
+    final String myCustomString = "myCustomString";
+    final String myNumber = "myNumber";
 
     @Before
     public void setup() {
@@ -76,6 +79,7 @@ public class SQSMessageTest {
         message.setShortProperty("myShort", (short) 123);
         message.setByteProperty("myByteProperty", (byte) 'a');
         message.setStringProperty("myString", "StringValue");
+        message.setStringProperty("myNumber", "500");
 
         Assert.assertTrue(message.propertyExists("myTrueBoolean"));
         Assert.assertEquals(message.getObjectProperty("myTrueBoolean"), true);
@@ -113,6 +117,15 @@ public class SQSMessageTest {
         Assert.assertEquals(message.getObjectProperty("myString"), "StringValue");
         Assert.assertEquals(message.getStringProperty("myString"), "StringValue");
 
+        Assert.assertTrue(message.propertyExists("myNumber"));
+        Assert.assertEquals(message.getObjectProperty("myNumber"), "500");
+        Assert.assertEquals(message.getStringProperty("myNumber"), "500");
+        Assert.assertEquals(message.getLongProperty("myNumber"), 500L);
+        Assert.assertEquals(message.getFloatProperty("myNumber"), 500f);
+        Assert.assertEquals(message.getShortProperty("myNumber"), (short) 500);
+        Assert.assertEquals(message.getDoubleProperty("myNumber"), 500d);
+        Assert.assertEquals(message.getIntProperty("myNumber"), 500);
+
         // Validate property names
         Set<String> propertyNamesSet = new HashSet<String>(Arrays.asList(
                 "myTrueBoolean",
@@ -123,6 +136,7 @@ public class SQSMessageTest {
                 "myLong",
                 "myShort",
                 "myByteProperty",
+                "myNumber",
                 "myString"));
 
         Enumeration<String > propertyNames = message.getPropertyNames();
@@ -142,6 +156,7 @@ public class SQSMessageTest {
         Assert.assertFalse(message.propertyExists("myShort"));
         Assert.assertFalse(message.propertyExists("myByteProperty"));
         Assert.assertFalse(message.propertyExists("myString"));
+        Assert.assertFalse(message.propertyExists("myNumber"));
 
         propertyNames = message.getPropertyNames();
         assertFalse(propertyNames.hasMoreElements());
@@ -272,52 +287,72 @@ public class SQSMessageTest {
 
         Acknowledger ack = mock(Acknowledger.class);
 
-        Map<String,String> systemAttributes = new HashMap<String, String>();
-        systemAttributes.put(APPROXIMATE_RECEIVE_COUNT, "100");
+        Map<MessageSystemAttributeName, String> systemAttributes = new HashMap<>();
+        systemAttributes.put(MessageSystemAttributeName.fromValue(APPROXIMATE_RECEIVE_COUNT), "100");
 
         Map<String, MessageAttributeValue> messageAttributes = new HashMap<String, MessageAttributeValue>();
 
-        messageAttributes.put(myTrueBoolean, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.BOOLEAN)
-                                                    .withStringValue("1"));
+        messageAttributes.put(myTrueBoolean, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.BOOLEAN)
+                                                    .stringValue("1")
+                                                    .build());
 
-        messageAttributes.put(myFalseBoolean, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.BOOLEAN)
-                                                    .withStringValue("0"));
+        messageAttributes.put(myFalseBoolean, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.BOOLEAN)
+                                                    .stringValue("0")
+                                                    .build());
 
-        messageAttributes.put(myInteger, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.INT)
-                                                    .withStringValue("100"));
+        messageAttributes.put(myInteger, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.INT)
+                                                    .stringValue("100")
+                                                    .build());
 
-        messageAttributes.put(myDouble, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.DOUBLE)
-                                                    .withStringValue("2.1768"));
+        messageAttributes.put(myDouble, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.DOUBLE)
+                                                    .stringValue("2.1768")
+                                                    .build());
 
-        messageAttributes.put(myFloat, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.FLOAT)
-                                                    .withStringValue("3.1457"));
+        messageAttributes.put(myFloat, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.FLOAT)
+                                                    .stringValue("3.1457")
+                                                    .build());
 
-        messageAttributes.put(myLong, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.LONG)
-                                                    .withStringValue("1290772974281"));
+        messageAttributes.put(myLong, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.LONG)
+                                                    .stringValue("1290772974281")
+                                                    .build());
 
-        messageAttributes.put(myShort, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.SHORT)
-                                                    .withStringValue("123"));
+        messageAttributes.put(myShort, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.SHORT)
+                                                    .stringValue("123")
+                                                    .build());
 
-        messageAttributes.put(myByte, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.BYTE)
-                                                    .withStringValue("1"));
+        messageAttributes.put(myByte, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.BYTE)
+                                                    .stringValue("1")
+                                                    .build());
 
-        messageAttributes.put(myString, new MessageAttributeValue()
-                                                    .withDataType(SQSMessagingClientConstants.STRING)
-                                                    .withStringValue("StringValue"));
+        messageAttributes.put(myString, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.STRING)
+                                                    .stringValue("StringValue")
+                                                    .build());
 
-        com.amazonaws.services.sqs.model.Message sqsMessage = new com.amazonaws.services.sqs.model.Message()
-                .withMessageAttributes(messageAttributes)
-                .withAttributes(systemAttributes)
-                .withMessageId("messageId")
-                .withReceiptHandle("ReceiptHandle");
+        messageAttributes.put(myCustomString, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.NUMBER + ".custom")
+                                                    .stringValue("['one', 'two']")
+                                                    .build());
+
+        messageAttributes.put(myNumber, MessageAttributeValue.builder()
+                                                    .dataType(SQSMessagingClientConstants.NUMBER)
+                                                    .stringValue("500")
+                                                    .build());
+
+        software.amazon.awssdk.services.sqs.model.Message sqsMessage = software.amazon.awssdk.services.sqs.model.Message.builder()
+                .messageAttributes(messageAttributes)
+                .attributes(systemAttributes)
+                .messageId("messageId")
+                .receiptHandle("ReceiptHandle")
+                .build();
 
         SQSMessage message = new SQSMessage(ack, "QueueUrl", sqsMessage);
 
@@ -357,6 +392,19 @@ public class SQSMessageTest {
         Assert.assertEquals(message.getObjectProperty(myString), "StringValue");
         Assert.assertEquals(message.getStringProperty(myString), "StringValue");
 
+        Assert.assertTrue(message.propertyExists(myCustomString));
+        Assert.assertEquals(message.getObjectProperty(myCustomString), "['one', 'two']");
+        Assert.assertEquals(message.getStringProperty(myCustomString), "['one', 'two']");
+
+        Assert.assertTrue(message.propertyExists(myNumber));
+        Assert.assertEquals(message.getObjectProperty(myNumber), "500");
+        Assert.assertEquals(message.getStringProperty(myNumber), "500");
+        Assert.assertEquals(message.getIntProperty(myNumber), 500);
+        Assert.assertEquals(message.getShortProperty(myNumber), (short) 500);
+        Assert.assertEquals(message.getLongProperty(myNumber), 500l);
+        Assert.assertEquals(message.getFloatProperty(myNumber), 500f);
+        Assert.assertEquals(message.getDoubleProperty(myNumber), 500d);
+
 
         // Validate property names
         Set<String> propertyNamesSet = new HashSet<String>(Arrays.asList(
@@ -369,6 +417,8 @@ public class SQSMessageTest {
                 myShort,
                 myByte,
                 myString,
+                myCustomString,
+                myNumber,
                 JMSX_DELIVERY_COUNT));
 
         Enumeration<String > propertyNames = message.getPropertyNames();
@@ -388,6 +438,7 @@ public class SQSMessageTest {
         Assert.assertFalse(message.propertyExists("myShort"));
         Assert.assertFalse(message.propertyExists("myByteProperty"));
         Assert.assertFalse(message.propertyExists("myString"));
+        Assert.assertFalse(message.propertyExists("myNumber"));
 
         propertyNames = message.getPropertyNames();
         assertFalse(propertyNames.hasMoreElements());

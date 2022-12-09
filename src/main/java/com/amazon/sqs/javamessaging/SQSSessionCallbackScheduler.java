@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import javax.jms.JMSException;
 import javax.jms.MessageListener;
 import javax.jms.Session;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.SQSSession.CallbackEntry;
@@ -42,7 +42,7 @@ import com.amazon.sqs.javamessaging.message.SQSMessage;
  * consumer message listeners.
  */
 public class SQSSessionCallbackScheduler implements Runnable {
-    private static final Log LOG = LogFactory.getLog(SQSSessionCallbackScheduler.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSSessionCallbackScheduler.class);
     
     protected ArrayDeque<CallbackEntry> callbackQueue;
 
@@ -182,6 +182,10 @@ public class SQSSessionCallbackScheduler implements Runnable {
                         }
                     } finally {
                         session.finishedCallback();
+                        
+                        // Let the prefetch manager know we're available to
+                        // process another message (if there is a still a listener attached).
+                        messageManager.getPrefetchManager().messageListenerReady();
                     }
                 } catch (Throwable ex) {
                     LOG.error("Unexpected exception thrown during the run of the scheduled callback", ex);
@@ -211,7 +215,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
             }
         }
     }
-            
+    
     void nackQueuedMessages() {
         synchronized (callbackQueue) {
             try {

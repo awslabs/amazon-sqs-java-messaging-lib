@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -14,12 +14,11 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.util.ExponentialBackoffStrategy;
+import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
-import org.junit.Before;
 
-import static org.junit.Assert.assertEquals;
+import com.amazon.sqs.javamessaging.util.ExponentialBackoffStrategy;
 
 /**
  * Test the ExponentialBackoffStrategy class

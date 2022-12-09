@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,12 +27,16 @@ public class SQSMessagingClientConstants {
     public static final int MAX_BATCH = 10;
     
     public static final int MIN_BATCH = 1;
+    
+    public static final int MIN_PREFETCH = 0;
 
     /**
      * JMSMessage available user property types, which are mapped to message
      * attribute data types
      */
     public static final String STRING = "String";
+
+    public static final String NUMBER = "Number";
 
     public static final String INT = "Number.int";
 
@@ -65,6 +69,8 @@ public class SQSMessagingClientConstants {
     public static final String JMS_SQS_SEQUENCE_NUMBER = "JMS_SQS_SequenceNumber";
 
     public static final String APPROXIMATE_RECEIVE_COUNT = "ApproximateReceiveCount";
+
+    public static final String SENT_TIMESTAMP = "SentTimestamp";
 
     public static final String MESSAGE_DEDUPLICATION_ID = "MessageDeduplicationId";
 

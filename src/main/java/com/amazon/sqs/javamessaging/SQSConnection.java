@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,11 +18,8 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 import javax.jms.IllegalStateException;
-
 import javax.jms.Connection;
-
 import javax.jms.ConnectionConsumer;
 import javax.jms.ConnectionMetaData;
 import javax.jms.Destination;
@@ -36,11 +33,12 @@ import javax.jms.ServerSessionPool;
 import javax.jms.Session;
 import javax.jms.Topic;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazonaws.services.sqs.AmazonSQS;
+
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 /**
  * This is a logical connection entity, which encapsulates the logic to create
@@ -78,7 +76,7 @@ import com.amazonaws.services.sqs.AmazonSQS;
  * Exception listener on connection is not supported.
  */
 public class SQSConnection implements Connection, QueueConnection {
-    private static final Log LOG = LogFactory.getLog(SQSConnection.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SQSConnection.class);
     
     /** For now this doesn't do anything. */
     private ExceptionListener exceptionListener;
@@ -93,7 +91,8 @@ public class SQSConnection implements Connection, QueueConnection {
 
     /**
      * Configures the amount of messages that can be prefetched by a consumer. A
-     * single consumer cannot prefetch more than 10 messages.
+     * single consumer cannot prefetch more than 10 messages in a single call to SQS,
+     * but it will make multiple calls as necessary.
      */
     private final int numberOfMessagesToPrefetch;
     private volatile boolean closed = false;
@@ -120,9 +119,9 @@ public class SQSConnection implements Connection, QueueConnection {
      * Get the AmazonSQSClient used by this connection. This can be used to do administrative operations
      * that aren't included in the JMS specification, e.g. creating new queues.
      * 
-     * @return the AmazonSQSClient used by this connection
+     * @return the SqsClient used by this connection
      */
-    public AmazonSQS getAmazonSQSClient() {
+    public SqsClient getAmazonSQSClient() {
         return amazonSQSClient.getAmazonSQSClient();
     }
 
@@ -198,7 +197,14 @@ public class SQSConnection implements Connection, QueueConnection {
             throw new JMSException("Unrecognized acknowledgeMode. Cannot create Session.");
         }
         synchronized (stateLock) { 
-            checkClosing();
+            if (closing) {
+                /**
+                 * SQSSession's constructor has already started a SQSSessionCallbackScheduler which should be closed
+                 * before leaving sqsSession object.
+                 */
+                sqsSession.close();
+                throw new IllegalStateException("Connection is closed or closing");
+            }
             sessions.add(sqsSession);
 
             /**

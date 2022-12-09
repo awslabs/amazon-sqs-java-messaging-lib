@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -14,33 +14,29 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageConsumer;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.SQSSessionCallbackScheduler;
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-
-import javax.jms.*;
-import javax.jms.IllegalStateException;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 
+import javax.jms.IllegalStateException;
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.MessageListener;
+import javax.jms.Session;
+
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
+import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
 
 /**
  * Test concurrent operation of message listener on session and connections
@@ -291,8 +287,6 @@ public class MessageListenerConcurrentOperationTest {
     }
 
     public void testConcurrentExecution(final MessageListener msgListener, final ConcurrentOperation operation) throws JMSException, InterruptedException {
-
-        long start = System.currentTimeMillis();
 
         // Start the session
         operation.setup();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -31,8 +31,11 @@ import javax.jms.MessageNotWriteableException;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
+import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
+
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.*;
 
@@ -66,6 +69,9 @@ public class SQSMessage implements Message {
     public static final String OBJECT_MESSAGE_TYPE = "object";
     public static final String TEXT_MESSAGE_TYPE = "text";
     public static final String JMS_SQS_MESSAGE_TYPE = "JMS_SQSMessageType";
+    public static final String JMS_SQS_REPLY_TO_QUEUE_NAME = "JMS_SQSReplyToQueueName";
+    public static final String JMS_SQS_REPLY_TO_QUEUE_URL = "JMS_SQSReplyToQueueURL";
+    public static final String JMS_SQS_CORRELATION_ID = "JMS_SQSCorrelationID";
     
     // Default JMS Message properties
     private int deliveryMode = Message.DEFAULT_DELIVERY_MODE;
@@ -76,7 +82,7 @@ public class SQSMessage implements Message {
     private long expiration = Message.DEFAULT_TIME_TO_LIVE;
     private String messageID;
     private String type;
-    private Destination replyTo;
+    private SQSQueueDestination replyTo;
     private Destination destination;
 
     private final Map<String, JMSMessagePropertyValue> properties = new HashMap<String, JMSMessagePropertyValue>();
@@ -107,13 +113,13 @@ public class SQSMessage implements Message {
      * This is called at the receiver side to create a
      * JMS message from the SQS message received.
      */
-    SQSMessage(Acknowledger acknowledger, String queueUrl, com.amazonaws.services.sqs.model.Message sqsMessage) throws JMSException{
+    SQSMessage(Acknowledger acknowledger, String queueUrl, software.amazon.awssdk.services.sqs.model.Message sqsMessage) throws JMSException{
         this.acknowledger = acknowledger;
         this.queueUrl = queueUrl;
-        receiptHandle = sqsMessage.getReceiptHandle();
-        this.setSQSMessageId(sqsMessage.getMessageId());
-        Map<String,String> systemAttributes = sqsMessage.getAttributes();
-        int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
+        receiptHandle = sqsMessage.receiptHandle();
+        this.setSQSMessageId(sqsMessage.messageId());
+        Map<MessageSystemAttributeName,String> systemAttributes = sqsMessage.attributes();
+        int receiveCount = Integer.parseInt(systemAttributes.get(MessageSystemAttributeName.fromValue(APPROXIMATE_RECEIVE_COUNT)));
         
         /**
          * JMSXDeliveryCount is set based on SQS ApproximateReceiveCount
@@ -124,7 +130,7 @@ public class SQSMessage implements Message {
         if (receiveCount > 1) {
             setJMSRedelivered(true);
         }
-        if (sqsMessage.getMessageAttributes() != null) {
+        if (sqsMessage.messageAttributes() != null) {
             addMessageAttributes(sqsMessage);
         }
 
@@ -137,8 +143,8 @@ public class SQSMessage implements Message {
         writePermissionsForProperties = false;
     }
     
-    private void mapSystemAttributeToJmsMessageProperty(Map<String,String> systemAttributes, String systemAttributeName, String jmsMessagePropertyName) throws JMSException {
-        String systemAttributeValue = systemAttributes.get(systemAttributeName);
+    private void mapSystemAttributeToJmsMessageProperty(Map<MessageSystemAttributeName,String> systemAttributes, String systemAttributeName, String jmsMessagePropertyName) throws JMSException {
+        String systemAttributeValue = systemAttributes.get(MessageSystemAttributeName.fromValue(systemAttributeName));
         if (systemAttributeValue != null) {
             properties.put(jmsMessagePropertyName, new JMSMessagePropertyValue(systemAttributeValue, STRING));
         }
@@ -154,10 +160,10 @@ public class SQSMessage implements Message {
         writePermissionsForProperties = true;
     }
 
-    private void addMessageAttributes(com.amazonaws.services.sqs.model.Message sqsMessage) throws JMSException {
-        for (Entry<String, MessageAttributeValue> entry : sqsMessage.getMessageAttributes().entrySet()) {
+    private void addMessageAttributes(software.amazon.awssdk.services.sqs.model.Message sqsMessage) throws JMSException {
+        for (Entry<String, MessageAttributeValue> entry : sqsMessage.messageAttributes().entrySet()) {
             properties.put(entry.getKey(), new JMSMessagePropertyValue(
-                    entry.getValue().getStringValue(), entry.getValue().getDataType()));
+                    entry.getValue().stringValue(), entry.getValue().dataType()));
         }
     }
 
@@ -320,7 +326,10 @@ public class SQSMessage implements Message {
 
     @Override
     public void setJMSReplyTo(Destination replyTo) throws JMSException {
-        this.replyTo = replyTo;
+        if (replyTo != null && !(replyTo instanceof SQSQueueDestination)) {
+            throw new IllegalArgumentException("The replyTo Destination must be a SQSQueueDestination");
+        }
+        this.replyTo = (SQSQueueDestination)replyTo;
     }
     
     /**
@@ -1185,9 +1194,7 @@ public class SQSMessage implements Message {
         }
 
         private static Object getObjectValue(String value, String type) throws JMSException {
-            if (STRING.equals(type)) {
-                return value;
-            } else if (INT.equals(type)) {
+            if (INT.equals(type)) {
                 return Integer.valueOf(value);
             } else if (LONG.equals(type)) {
                 return Long.valueOf(value);
@@ -1204,6 +1211,8 @@ public class SQSMessage implements Message {
                 return Float.valueOf(value);
             } else if (SHORT.equals(type)) {
                 return Short.valueOf(value);
+            } else if (type != null && (type.startsWith(STRING) || type.startsWith(NUMBER))) {
+                return value;
             } else {
                 throw new JMSException(type + " is not a supported JMS property type");
             }
