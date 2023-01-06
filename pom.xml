@@ -29,7 +29,7 @@
     </developer>
   </developers>
   <properties>
-    <aws-java-sdk.version>2.18.1</aws-java-sdk.version>
+    <aws-java-sdk.version>2.19.11</aws-java-sdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
