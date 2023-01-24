@@ -14,13 +14,9 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test the SQSDestinationTest class

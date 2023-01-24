@@ -14,8 +14,8 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import javax.jms.ConnectionMetaData;
-import javax.jms.JMSException;
+import jakarta.jms.ConnectionMetaData;
+import jakarta.jms.JMSException;
 
 
 public class SQSMessagingClientConstants {

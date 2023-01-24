@@ -14,56 +14,34 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-
-import javax.jms.JMSException;
-import javax.jms.MessageEOFException;
-import javax.jms.MessageFormatException;
-import javax.jms.MessageNotReadableException;
-import javax.jms.MessageNotWriteableException;
-
-import org.junit.Before;
-import org.junit.Test;
-
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.SQSSession;
-
+import jakarta.jms.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 import software.amazon.awssdk.utils.BinaryUtils;
+
+import java.io.*;
+import java.util.Map;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Test the SQSBytesMessageTest class
  */
 public class SQSBytesMessageTest {
-    
-    private SQSSession mockSQSSession;
-    
-    private final static Map<MessageSystemAttributeName, String> MESSAGE_SYSTEM_ATTRIBUTES;
-    static {
-        MESSAGE_SYSTEM_ATTRIBUTES = new HashMap<>();
-        MESSAGE_SYSTEM_ATTRIBUTES.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
-    }
 
-    @Before 
+    private SQSSession mockSQSSession;
+
+    private final static Map<MessageSystemAttributeName, String> MESSAGE_SYSTEM_ATTRIBUTES = Map.of(
+            MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "1");
+
+    @BeforeEach
     public void setUp() {
         mockSQSSession = mock(SQSSession.class);
     }
@@ -75,8 +53,8 @@ public class SQSBytesMessageTest {
     public void testReadWrite() throws JMSException {
         when(mockSQSSession.createBytesMessage()).thenReturn(new SQSBytesMessage());
         SQSBytesMessage msg = (SQSBytesMessage) mockSQSSession.createBytesMessage();
-        
-        byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
+
+        byte[] byteArray = new byte[]{1, 0, 'a', 65};
         byte byteData = 'a';
         short shortVal = 123;
 
@@ -91,7 +69,7 @@ public class SQSBytesMessageTest {
         msg.writeByte(byteData);
         msg.writeUTF("UTF-String");
         msg.writeObject("test");
-        
+
         msg.reset();
 
         int length = (int) msg.getBodyLength();
@@ -102,10 +80,10 @@ public class SQSBytesMessageTest {
         }
 
         Message message = Message.builder()
-        		.body(BinaryUtils.toBase64(body))
-        		.attributes(MESSAGE_SYSTEM_ATTRIBUTES)
-        		.build();
-        
+                .body(BinaryUtils.toBase64(body))
+                .attributes(MESSAGE_SYSTEM_ATTRIBUTES)
+                .build();
+
         SQSBytesMessage receivedByteMsg = new SQSBytesMessage(null, "", message);
         byte[] byteArray1 = new byte[4];
         receivedByteMsg.readBytes(byteArray1);
@@ -125,77 +103,21 @@ public class SQSBytesMessageTest {
         assertEquals("UTF-String", receivedByteMsg.readUTF());
         assertEquals("test", receivedByteMsg.readUTF());
 
-        /*
-         * Validate MessageEOFException is thrown when reaching end of file
-         */
-        try {
-            receivedByteMsg.readBoolean();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readUnsignedByte();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
+        assertThatThrownBy(receivedByteMsg::readBoolean).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readUnsignedByte).isInstanceOf(MessageEOFException.class);
 
         byte[] arr = new byte[10];
         assertEquals(-1, receivedByteMsg.readBytes(arr, 10));
 
-        try {
-            receivedByteMsg.readByte();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readShort();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readUnsignedShort();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readInt();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readLong();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readFloat();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readDouble();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readChar();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
-
-        try {
-            receivedByteMsg.readUTF();
-            fail();
-        } catch (MessageEOFException exception) {
-        }
+        assertThatThrownBy(receivedByteMsg::readByte).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readShort).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readUnsignedShort).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readInt).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readLong).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readFloat).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readDouble).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readChar).isInstanceOf(MessageEOFException.class);
+        assertThatThrownBy(receivedByteMsg::readUTF).isInstanceOf(MessageEOFException.class);
     }
 
     /**
@@ -203,7 +125,6 @@ public class SQSBytesMessageTest {
      */
     @Test
     public void testReadIOException() throws JMSException, IOException {
-
         /*
          * Set up mocks
          */
@@ -224,82 +145,17 @@ public class SQSBytesMessageTest {
 
         msg.setDataIn(dis);
 
-        try {
-            msg.readBoolean();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readByte();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readUnsignedByte();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readShort();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readUnsignedShort();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readInt();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readLong();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readFloat();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readDouble();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readChar();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
-
-        try {
-            msg.readUTF();
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(msg::readBoolean).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readByte).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readUnsignedByte).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readShort).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readUnsignedShort).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readInt).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readLong).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readFloat).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readDouble).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readChar).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
+        assertThatThrownBy(msg::readUTF).isInstanceOf(JMSException.class).cause().isEqualTo(ioException);
     }
 
     /**
@@ -307,7 +163,6 @@ public class SQSBytesMessageTest {
      */
     @Test
     public void testWriteIOException() throws JMSException, IOException {
-
         /*
          * Set up mocks
          */
@@ -315,8 +170,6 @@ public class SQSBytesMessageTest {
 
         OutputStream os = mock(OutputStream.class);
         DataOutputStream dos = new DataOutputStream(os);
-
-
 
         SQSBytesMessage msg = spy(new SQSBytesMessage());
         doNothing()
@@ -336,71 +189,47 @@ public class SQSBytesMessageTest {
             assertEquals(ioException, exception.getCause());
         }
 
-        try {
-            msg.writeByte((byte)1);
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeByte((byte) 1))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeShort((short)1);
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeShort((short) 1))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeInt(1);
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeInt(1))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeLong(1290772974281L);
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeLong(1290772974281L))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeFloat(3.1457f);
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeFloat(3.1457f))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeDouble(2.1768);
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeDouble(2.1768))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeChar('a');
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeChar('a'))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
 
-        try {
-            msg.writeUTF("test");
-            fail();
-        } catch (JMSException exception) {
-            assertEquals(ioException, exception.getCause());
-        }
+        assertThatThrownBy(() -> msg.writeUTF("test"))
+                .isInstanceOf(JMSException.class)
+                .cause().isEqualTo(ioException);
     }
 
     /**
      * Test write object function
      */
     @Test
-    public void testWriteObject() throws JMSException, IOException {
+    public void testWriteObject() throws JMSException {
         SQSBytesMessage msg = new SQSBytesMessage();
 
-        byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
+        byte[] byteArray = new byte[]{1, 0, 'a', 65};
         byte byteData = 'a';
         short shortVal = 123;
 
@@ -425,9 +254,9 @@ public class SQSBytesMessageTest {
         }
 
         Message message = Message.builder()
-        		.attributes(MESSAGE_SYSTEM_ATTRIBUTES)
-        		.body(BinaryUtils.toBase64(body))
-        		.build();
+                .attributes(MESSAGE_SYSTEM_ATTRIBUTES)
+                .body(BinaryUtils.toBase64(body))
+                .build();
         SQSBytesMessage receivedByteMsg = new SQSBytesMessage(null, "", message);
         byte[] byteArray1 = new byte[4];
         receivedByteMsg.readBytes(byteArray1);
@@ -449,33 +278,22 @@ public class SQSBytesMessageTest {
         /*
          * Check write object error cases
          */
-        try {
-            msg.writeObject(new HashSet<String>());
-            fail();
-        } catch(MessageFormatException exception) {
-            // expected
-        }
+        assertThatThrownBy(() -> msg.writeObject(Set.of())).isInstanceOf(MessageFormatException.class);
 
         /*
          * Check write object error cases
          */
-        try {
-            msg.writeObject(null);
-            fail();
-        } catch(NullPointerException exception) {
-            // expected
-        }
+        assertThatThrownBy(() -> msg.writeObject(null)).isInstanceOf(NullPointerException.class);
     }
 
     /**
      * Test clear body
      */
     @Test
-    public void testClearBody() throws JMSException, IOException {
-
+    public void testClearBody() throws JMSException {
         SQSBytesMessage msg = new SQSBytesMessage();
 
-        byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
+        byte[] byteArray = new byte[]{1, 0, 'a', 65};
         msg.writeBytes(byteArray);
 
         msg.clearBody();
@@ -485,11 +303,9 @@ public class SQSBytesMessageTest {
         /*
          * Verify message is in write-only mode
          */
-        try {
-            msg.readBytes(readByteArray);
-        } catch(MessageNotReadableException exception) {
-            assertEquals("Message is not readable", exception.getMessage());
-        }
+        assertThatThrownBy(() -> msg.readBytes(readByteArray))
+                .isInstanceOf(MessageNotReadableException.class)
+                .hasMessage("Message is not readable");
 
         msg.writeBytes(byteArray);
     }
@@ -497,28 +313,30 @@ public class SQSBytesMessageTest {
     /**
      * Test after reset the message is read only mode
      */
-    @Test(expected = MessageNotWriteableException.class)
+    @Test
     public void testNotWriteable() throws JMSException {
         SQSBytesMessage msg = new SQSBytesMessage();
 
-        byte[] byteArray = new byte[] { 'a', 0, 34, 65 };
+        byte[] byteArray = new byte[]{'a', 0, 34, 65};
         msg.writeBytes(byteArray);
         msg.reset();
         assertEquals('a', msg.readByte());
-        msg.writeInt(10);
+
+        assertThatThrownBy(() -> msg.writeInt(10))
+                .isInstanceOf(MessageNotWriteableException.class);
     }
 
     /**
      * Test before reset the message is not readable
      */
-    @Test(expected = MessageNotReadableException.class)
+    @Test
     public void testReadable() throws JMSException {
         when(mockSQSSession.createBytesMessage()).thenReturn(new SQSBytesMessage());
-        SQSBytesMessage msg = (SQSBytesMessage) mockSQSSession.createBytesMessage(); 
-        
-        byte[] byteArray = new byte[] { 'a', 0, 34, 65 };
+        SQSBytesMessage msg = (SQSBytesMessage) mockSQSSession.createBytesMessage();
+
+        byte[] byteArray = new byte[]{'a', 0, 34, 65};
         msg.writeBytes(byteArray);
-        
-        msg.readInt();
+
+        assertThatThrownBy(msg::readInt).isInstanceOf(MessageNotReadableException.class);
     }
 }

@@ -14,13 +14,11 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import javax.jms.JMSException;
-
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
 
 /**
- * <P>
+ * <p>
  * Specifies the different possible modes of acknowledgment:
  * <ul>
  * <li>In ACK_AUTO mode, every time the user receives a message, it is
@@ -37,22 +35,22 @@ public enum AcknowledgeMode {
     ACK_AUTO, ACK_UNORDERED, ACK_RANGE;
 
     private int originalAcknowledgeMode;
-    
+
     /**
-     * Sets the acknowledge mode.
+     * Sets the acknowledgment mode.
      */
     public AcknowledgeMode withOriginalAcknowledgeMode(int originalAcknowledgeMode) {
         this.originalAcknowledgeMode = originalAcknowledgeMode;
         return this;
     }
-    
+
     /**
-     * Returns the acknowledge mode.
+     * Returns the acknowledgment mode.
      */
     public int getOriginalAcknowledgeMode() {
         return originalAcknowledgeMode;
     }
-    
+
     /**
      * Creates the acknowledger associated with the session, which will be used
      * to acknowledge the delivered messages on consumers of the session.
@@ -61,19 +59,12 @@ public enum AcknowledgeMode {
      *            the SQS client to delete messages
      * @param parentSQSSession
      *            the associated session for the acknowledger
-     * @throws JMSException
-     *             If invalid acknowledge mode is used.
      */
-    public Acknowledger createAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession parentSQSSession) throws JMSException {
-        switch (this) {
-        case ACK_AUTO:
-            return new AutoAcknowledger(amazonSQSClient, parentSQSSession);
-        case ACK_RANGE:
-            return new RangedAcknowledger(amazonSQSClient, parentSQSSession);
-        case ACK_UNORDERED:
-            return new UnorderedAcknowledger(amazonSQSClient, parentSQSSession);
-        default:
-            throw new JMSException(this + " - AcknowledgeMode does not exist");
-        }
+    public Acknowledger createAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession parentSQSSession) {
+        return switch (this) {
+            case ACK_AUTO -> new AutoAcknowledger(amazonSQSClient, parentSQSSession);
+            case ACK_RANGE -> new RangedAcknowledger(amazonSQSClient, parentSQSSession);
+            case ACK_UNORDERED -> new UnorderedAcknowledger(amazonSQSClient, parentSQSSession);
+        };
     }
 }

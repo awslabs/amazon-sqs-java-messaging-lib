@@ -21,13 +21,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.IllegalStateException;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.Queue;
-import javax.jms.QueueReceiver;
+import jakarta.jms.IllegalStateException;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageConsumer;
+import jakarta.jms.MessageListener;
+import jakarta.jms.Queue;
+import jakarta.jms.QueueReceiver;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +67,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
     private final ExecutorService prefetchExecutor;
     
     /**
-     * Prefetch Runnable. This include keeping internal message buffer filled and call MessageListener if set.
+     * Prefetch Runnable. This includes keeping internal message buffer filled and call MessageListener if set.
      */
     private final SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch;
     
@@ -107,7 +107,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      */
     @Override
     public Queue getQueue() throws JMSException {
-        return (Queue) sqsDestination;
+        return sqsDestination;
     }
     
     /**
@@ -226,8 +226,8 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
 
         try {
             if (!prefetchExecutor.isShutdown()) {
-                LOG.info("Shutting down " + SQSSession.CONSUMER_PREFETCH_EXECUTER_NAME + " executor");
-                /** Shut down executor. */
+                LOG.info("Shutting down " + SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME + " executor");
+                // Shut down executor.
                 prefetchExecutor.shutdown();
             }
             
@@ -235,7 +235,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
 
             if (!prefetchExecutor.awaitTermination(PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME, TimeUnit.SECONDS)) {
 
-                LOG.warn("Can't terminate executor service " + SQSSession.CONSUMER_PREFETCH_EXECUTER_NAME +
+                LOG.warn("Can't terminate executor service " + SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME +
                          " after " + PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME +
                          " seconds, some running threads will be shutdown immediately");
                 prefetchExecutor.shutdownNow();

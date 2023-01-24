@@ -51,7 +51,7 @@ public final class SQSMessagingClientUtil {
             if (Character.isLetterOrDigit(ch) || HYPHEN == ch || DOT == ch) {
                 stringBuilder.append(ch);
             } else {
-                stringBuilder.append(UNDERSCORE + Integer.toString((int) ch) + UNDERSCORE);
+                stringBuilder.append(UNDERSCORE).append(Integer.toString(ch)).append(UNDERSCORE);
             }
         }
         return stringBuilder.toString();

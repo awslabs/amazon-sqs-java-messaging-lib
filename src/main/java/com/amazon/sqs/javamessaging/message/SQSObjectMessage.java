@@ -21,8 +21,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
-import javax.jms.JMSException;
-import javax.jms.ObjectMessage;
+import jakarta.jms.JMSException;
+import jakarta.jms.ObjectMessage;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,9 +80,9 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
      * 
      * @param payload
      *            The <code>Serializable</code> containing the message's body
-     * @throws MessageNotWriteableException
+     * @throws jakarta.jms.MessageNotWriteableException
      *             If the message is in read-only mode.
-     * @throws MessageFormatException
+     * @throws jakarta.jms.MessageFormatException
      *             If object serialization fails.
      */
     @Override
@@ -94,7 +94,7 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
     /**
      * Gets the <code>Serializable</code> containing this message's body
      * 
-     * @throws MessageFormatException
+     * @throws jakarta.jms.MessageFormatException
      *             If object deserialization fails.
      */
     @Override

@@ -14,11 +14,10 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.junit.Assert.assertEquals;
-
-import org.junit.Test;
-
 import com.amazon.sqs.javamessaging.util.ExponentialBackoffStrategy;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test the ExponentialBackoffStrategy class
@@ -26,27 +25,26 @@ import com.amazon.sqs.javamessaging.util.ExponentialBackoffStrategy;
 public class ExponentialBackoffStrategyTest {
 
     private static final int DELAY_INTERVAL = 10;
-    private static final int INITAL_DELAY = 20;
+    private static final int INITIAL_DELAY = 20;
     private static final int MAX_DELAY = 300;
 
     /**
      * test delay with illegal value of retry attempts
      */
     @Test
-    public void testDelayBeforeNextRetryNonPositiveRetryAttempt() throws Exception {
+    public void testDelayBeforeNextRetryNonPositiveRetryAttempt() {
+        ExponentialBackoffStrategy backoff = new ExponentialBackoffStrategy(DELAY_INTERVAL, INITIAL_DELAY, MAX_DELAY);
 
-        ExponentialBackoffStrategy backoff = new ExponentialBackoffStrategy(DELAY_INTERVAL, INITAL_DELAY, MAX_DELAY);
-
-        assertEquals(INITAL_DELAY, backoff.delayBeforeNextRetry(0));
-        assertEquals(INITAL_DELAY, backoff.delayBeforeNextRetry(-10));
+        assertEquals(INITIAL_DELAY, backoff.delayBeforeNextRetry(0));
+        assertEquals(INITIAL_DELAY, backoff.delayBeforeNextRetry(-10));
     }
 
     /**
      * test first delay result in delay initial value
      */
     @Test
-    public void testDelayBeforeNextRetryFirstAttempt() throws Exception {
-        ExponentialBackoffStrategy backoff = new ExponentialBackoffStrategy(DELAY_INTERVAL, INITAL_DELAY, MAX_DELAY);
+    public void testDelayBeforeNextRetryFirstAttempt() {
+        ExponentialBackoffStrategy backoff = new ExponentialBackoffStrategy(DELAY_INTERVAL, INITIAL_DELAY, MAX_DELAY);
 
         assertEquals(DELAY_INTERVAL, backoff.delayBeforeNextRetry(1));
     }
@@ -55,8 +53,8 @@ public class ExponentialBackoffStrategyTest {
      * test delay from 2 to 1000
      */
     @Test
-    public void testDelayBeforeNextRetry() throws Exception {
-        ExponentialBackoffStrategy backoff = new ExponentialBackoffStrategy(DELAY_INTERVAL, INITAL_DELAY, MAX_DELAY);
+    public void testDelayBeforeNextRetry() {
+        ExponentialBackoffStrategy backoff = new ExponentialBackoffStrategy(DELAY_INTERVAL, INITIAL_DELAY, MAX_DELAY);
 
         assertEquals(20, backoff.delayBeforeNextRetry(2));
         assertEquals(40, backoff.delayBeforeNextRetry(3));

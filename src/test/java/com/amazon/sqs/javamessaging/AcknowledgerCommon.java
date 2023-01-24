@@ -14,14 +14,12 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.junit.Assert.assertEquals;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
@@ -29,6 +27,8 @@ import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Parent class for the Acknowledger tests
@@ -38,7 +38,7 @@ public class AcknowledgerCommon {
     protected String baseQueueUrl = "queueUrl";
     protected Acknowledger acknowledger;
     protected AmazonSQSMessagingClientWrapper amazonSQSClient;
-    protected List<SQSMessage> populatedMessages = new ArrayList<SQSMessage>();
+    protected List<SQSMessage> populatedMessages = new ArrayList<>();
 
     /*
      * Generate and populate the list with sqs message from different queues
@@ -66,7 +66,7 @@ public class AcknowledgerCommon {
             		.attributes(mockAttributes)
             		.build();            		
             
-            SQSMessage message = (SQSMessage) new SQSTextMessage(acknowledger, queueUrl, sqsMessage);
+            SQSMessage message = new SQSTextMessage(acknowledger, queueUrl, sqsMessage);
             
             populatedMessages.add(message);
             acknowledger.notifyMessageReceived(message);

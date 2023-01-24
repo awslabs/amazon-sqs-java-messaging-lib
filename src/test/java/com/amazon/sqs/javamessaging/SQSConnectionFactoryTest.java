@@ -14,22 +14,22 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import javax.jms.JMSException;
-
-import org.junit.Test;
-
+import jakarta.jms.JMSException;
+import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 
-import static org.mockito.Mockito.*;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.mock;
 
 
 public class SQSConnectionFactoryTest {
     
     @Test
-    public void canCreateFactoryWithDefaultProviderSettings() throws JMSException {
+    public void canCreateFactoryWithDefaultProviderSettings() {
+        System.setProperty("aws.region", "eu-central-1");
         new SQSConnectionFactory(new ProviderConfiguration());
         //cannot actually attempt to create a connection because the default client builder depends on environment settings or instance configuration to be present
         //which we cannot guarantee on the builder fleet
