@@ -54,6 +54,14 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     /*
 
     /*
+     * Creates a default SQSConnectionFactory with a default providerConfiguration
+     */
+    
+    public SQSConnectionFactory() {
+        this(new ProviderConfiguration());
+    }
+    
+    /*
      * Creates a SQSConnectionFactory that uses SqsClientBuilder.standard() for creating SqsClient connections.
      * Every SQSConnection will have its own copy of SqsClient.
      */
