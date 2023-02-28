@@ -59,7 +59,6 @@ public class AmazonSQSMessagingClientWrapper {
      */
     private static final Set<String> SECURITY_EXCEPTION_ERROR_CODES = Set.of("MissingClientTokenId",
             "InvalidClientTokenId", "MissingAuthenticationToken", "AccessDenied");
-    ;
 
     private final SqsClient amazonSQSClient;
     private final AwsCredentialsProvider credentialsProvider;
