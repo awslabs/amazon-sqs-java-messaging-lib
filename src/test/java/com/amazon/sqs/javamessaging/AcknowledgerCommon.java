@@ -14,19 +14,17 @@
  */
 package com.amazon.sqs.javamessaging;
 
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
+import com.amazon.sqs.javamessaging.message.SQSTextMessage;
+import jakarta.jms.JMSException;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import jakarta.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

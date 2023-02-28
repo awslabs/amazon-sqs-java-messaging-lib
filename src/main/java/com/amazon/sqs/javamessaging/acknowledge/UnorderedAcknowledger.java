@@ -14,18 +14,16 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.SQSSession;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
+import jakarta.jms.JMSException;
+import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import jakarta.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-
-import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 
 /**
  * Used to acknowledge messages in any order one at a time.

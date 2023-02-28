@@ -14,6 +14,18 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
+import jakarta.jms.BytesMessage;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageEOFException;
+import jakarta.jms.MessageFormatException;
+import jakarta.jms.MessageNotReadableException;
+import jakarta.jms.MessageNotWriteableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.utils.BinaryUtils;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -21,21 +33,6 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
-
-import jakarta.jms.BytesMessage;
-import jakarta.jms.JMSException;
-import jakarta.jms.MessageEOFException;
-import jakarta.jms.MessageFormatException;
-import jakarta.jms.MessageNotReadableException;
-import jakarta.jms.MessageNotWriteableException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.utils.BinaryUtils;
 
 /**
  * This class borrows from <code>ActiveMQStreamMessage</code>, which is also

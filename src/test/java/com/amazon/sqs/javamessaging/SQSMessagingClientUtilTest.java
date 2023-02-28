@@ -15,7 +15,6 @@
 package com.amazon.sqs.javamessaging;
 
 import com.amazon.sqs.javamessaging.util.SQSMessagingClientUtil;
-
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

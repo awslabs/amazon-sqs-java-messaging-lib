@@ -14,19 +14,17 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
+import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
+import jakarta.jms.JMSException;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-
-import jakarta.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
 
 /**
  * Used to negative acknowledge of group of messages.

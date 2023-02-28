@@ -14,16 +14,13 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import java.util.Collections;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import jakarta.jms.IllegalStateException;
+import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import jakarta.jms.Connection;
 import jakarta.jms.ConnectionConsumer;
 import jakarta.jms.ConnectionMetaData;
 import jakarta.jms.Destination;
 import jakarta.jms.ExceptionListener;
+import jakarta.jms.IllegalStateException;
 import jakarta.jms.InvalidClientIDException;
 import jakarta.jms.JMSException;
 import jakarta.jms.Queue;
@@ -32,13 +29,13 @@ import jakarta.jms.QueueSession;
 import jakarta.jms.ServerSessionPool;
 import jakarta.jms.Session;
 import jakarta.jms.Topic;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-
 import software.amazon.awssdk.services.sqs.SqsClient;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This is a logical connection entity, which encapsulates the logic to create
@@ -167,7 +164,7 @@ public class SQSConnection implements Connection, QueueConnection {
      * 
      * @param transacted
      *            Only false is supported.
-     * @param sessionMode
+     * @param acknowledgeMode
      *            Legal values are <code>Session.AUTO_ACKNOWLEDGE</code>,
      *            <code>Session.CLIENT_ACKNOWLEDGE</code>,
      *            <code>Session.DUPS_OK_ACKNOWLEDGE</code>, and
@@ -179,19 +176,19 @@ public class SQSConnection implements Connection, QueueConnection {
      *             transaction and acknowledge mode.
      */
     @Override
-    public Session createSession(boolean transacted, int sessionMode) throws JMSException {
+    public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
         checkClosed();
         actionOnConnectionTaken = true;
-        if (transacted || sessionMode == Session.SESSION_TRANSACTED)
+        if (transacted || acknowledgeMode == Session.SESSION_TRANSACTED)
             throw new JMSException("SQSSession does not support transacted");
 
         SQSSession sqsSession;
-        if (sessionMode == Session.AUTO_ACKNOWLEDGE) {
-            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(sessionMode));
-        } else if (sessionMode == Session.CLIENT_ACKNOWLEDGE || sessionMode == Session.DUPS_OK_ACKNOWLEDGE) {
-            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_RANGE.withOriginalAcknowledgeMode(sessionMode));
-        } else if (sessionMode == SQSSession.UNORDERED_ACKNOWLEDGE) {
-            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_UNORDERED.withOriginalAcknowledgeMode(sessionMode));
+        if (acknowledgeMode == Session.AUTO_ACKNOWLEDGE) {
+            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(acknowledgeMode));
+        } else if (acknowledgeMode == Session.CLIENT_ACKNOWLEDGE || acknowledgeMode == Session.DUPS_OK_ACKNOWLEDGE) {
+            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_RANGE.withOriginalAcknowledgeMode(acknowledgeMode));
+        } else if (acknowledgeMode == SQSSession.UNORDERED_ACKNOWLEDGE) {
+            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_UNORDERED.withOriginalAcknowledgeMode(acknowledgeMode));
         } else {
             LOG.error("Unrecognized acknowledgeMode. Cannot create Session.");
             throw new JMSException("Unrecognized acknowledgeMode. Cannot create Session.");

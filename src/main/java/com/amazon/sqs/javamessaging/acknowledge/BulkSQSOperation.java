@@ -14,15 +14,14 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
+import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
+import jakarta.jms.JMSException;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import jakarta.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 
 /**
  * This is used by different acknowledgers that requires partitioning of the

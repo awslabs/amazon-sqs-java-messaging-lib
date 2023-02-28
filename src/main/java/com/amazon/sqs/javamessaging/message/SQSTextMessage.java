@@ -14,11 +14,9 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import jakarta.jms.JMSException;
 import jakarta.jms.TextMessage;
-
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-
 import software.amazon.awssdk.services.sqs.model.Message;
 
 /**

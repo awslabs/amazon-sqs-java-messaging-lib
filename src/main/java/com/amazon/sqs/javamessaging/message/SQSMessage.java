@@ -18,17 +18,42 @@ import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-import jakarta.jms.*;
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageFormatException;
+import jakarta.jms.MessageNotWriteableException;
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
-import java.lang.IllegalStateException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 
-import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.*;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.BOOLEAN;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.BYTE;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.DOUBLE;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.FLOAT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.INT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.INT_FALSE;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.INT_TRUE;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.JMSX_DELIVERY_COUNT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.JMSX_GROUP_ID;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.LONG;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.MESSAGE_GROUP_ID;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.NUMBER;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.SEQUENCE_NUMBER;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.SHORT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.STRING;
 
 /**
  * The SQSMessage is the root class of all SQS JMS messages and implements JMS

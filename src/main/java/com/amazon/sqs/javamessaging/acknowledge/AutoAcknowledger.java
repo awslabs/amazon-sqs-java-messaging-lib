@@ -21,7 +21,6 @@ import jakarta.jms.JMSException;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**

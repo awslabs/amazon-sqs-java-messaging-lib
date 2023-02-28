@@ -14,11 +14,10 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import java.util.List;
-
+import com.amazon.sqs.javamessaging.message.SQSMessage;
 import jakarta.jms.JMSException;
 
-import com.amazon.sqs.javamessaging.message.SQSMessage;
+import java.util.List;
 
 public interface Acknowledger {
 

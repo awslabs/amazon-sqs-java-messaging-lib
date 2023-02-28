@@ -14,14 +14,11 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import jakarta.jms.JMSException;
-
 import org.junit.jupiter.api.Test;
 
-import com.amazon.sqs.javamessaging.message.SQSTextMessage;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Test the SQSTextMessageTest class
