@@ -14,11 +14,6 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSessionCallbackScheduler;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
@@ -26,31 +21,30 @@ import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 import com.amazon.sqs.javamessaging.util.ExponentialBackoffStrategy;
+import com.amazonaws.services.sqs.model.MessageAttributeValue;
+import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
+import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.amazonaws.util.Base64;
-import com.amazonaws.services.sqs.model.*;
-
-import javax.jms.*;
+import jakarta.jms.JMSException;
+import jakarta.jms.ObjectMessage;
+import org.hamcrest.BaseMatcher;
+import org.hamcrest.Description;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
-import org.mockito.ArgumentMatcher;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.argThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -59,48 +53,26 @@ import static org.mockito.Mockito.when;
 /**
  * Test the SQSMessageConsumerPrefetchTest class
  */
-@RunWith(Parameterized.class)
 public class SQSMessageConsumerPrefetchFifoTest {
-
     private static final String NAMESPACE = "123456789012";
     private static final String QUEUE_NAME = "QueueName.fifo";
     private static final  String QUEUE_URL = NAMESPACE + "/" + QUEUE_NAME;
 
-    private Acknowledger acknowledger;
     private NegativeAcknowledger negativeAcknowledger;
-    private SQSSessionCallbackScheduler sqsSessionRunnable;
     private SQSMessageConsumerPrefetch consumerPrefetch;
-    private ExponentialBackoffStrategy backoffStrategy;
 
     private AmazonSQSMessagingClientWrapper amazonSQSClient;
 
-    @Parameters
-    public static List<Object[]> getParameters() {
-        return Arrays.asList(new Object[][] { {0}, {1}, {5}, {10}, {15} });
-    }
-   
-    private final int numberOfMessagesToPrefetch;
-    
-    public SQSMessageConsumerPrefetchFifoTest(int numberOfMessagesToPrefetch) {
-        this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
-    }
-    
-    @Before
-    public void setup() {
-
+    public void init(int numberOfMessagesToPrefetch) {
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
 
         SQSConnection parentSQSConnection = mock(SQSConnection.class);
         when(parentSQSConnection.getWrappedAmazonSQSClient()).thenReturn(amazonSQSClient);
 
-        sqsSessionRunnable = mock(SQSSessionCallbackScheduler.class);
-
-        acknowledger = mock(Acknowledger.class);
-
+        SQSSessionCallbackScheduler sqsSessionRunnable = mock(SQSSessionCallbackScheduler.class);
+        Acknowledger acknowledger = mock(Acknowledger.class);
         negativeAcknowledger = mock(NegativeAcknowledger.class);
-
-        backoffStrategy = mock(ExponentialBackoffStrategy.class);
-
+        ExponentialBackoffStrategy backoffStrategy = mock(ExponentialBackoffStrategy.class);
         SQSQueueDestination sqsDestination = new SQSQueueDestination(QUEUE_NAME, QUEUE_URL);
 
         consumerPrefetch =
@@ -113,15 +85,14 @@ public class SQSMessageConsumerPrefetchFifoTest {
     /**
      * Test one full prefetch operation works as expected
      */
-    @Test
-    public void testOneFullPrefetch() throws InterruptedException, JMSException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testOneFullPrefetch(int numberOfMessagesToPrefetch) throws InterruptedException, JMSException {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
-
+        // Set up consumer prefetch and mocks
         final int numMessages = numberOfMessagesToPrefetch > 0 ? numberOfMessagesToPrefetch : 1;
-        List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<com.amazonaws.services.sqs.model.Message>();
+        List<com.amazonaws.services.sqs.model.Message> messages = new ArrayList<>();
         for (int i = 0; i < numMessages; i++) {
             messages.add(createValidFifoMessage(i, "G" + i));
         }
@@ -131,22 +102,25 @@ public class SQSMessageConsumerPrefetchFifoTest {
 
         // Mock SQS call for receive message and return messages
         final int receiveMessageLimit = Math.min(10, numMessages);
-        when(amazonSQSClient.receiveMessage(argThat(new ArgumentMatcher<ReceiveMessageRequest>() {
-                    @Override
-                    public boolean matches(Object argument) {
-                        if (!(argument instanceof ReceiveMessageRequest))
-                            return false;
-                        ReceiveMessageRequest other = (ReceiveMessageRequest)argument;
-                        
-                        return other.getQueueUrl().equals(QUEUE_URL)
-                                && other.getMaxNumberOfMessages() == receiveMessageLimit
-                                && other.getMessageAttributeNames().size() == 1
-                                && other.getMessageAttributeNames().get(0).equals(SQSMessageConsumerPrefetch.ALL)
-                                && other.getWaitTimeSeconds() == SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS
-                                && other.getReceiveRequestAttemptId() != null
-                                && other.getReceiveRequestAttemptId().length() > 0;
-                    }            
-                })))
+        when(amazonSQSClient.receiveMessage(argThat(new BaseMatcher<>() {
+
+            @Override
+            public void describeTo(Description description) {
+
+            }
+            @Override
+            public boolean matches(Object argument) {
+                if (!(argument instanceof ReceiveMessageRequest other))
+                    return false;
+                return other.getQueueUrl().equals(QUEUE_URL)
+                        && other.getMaxNumberOfMessages() == receiveMessageLimit
+                        && other.getMessageAttributeNames().size() == 1
+                        && other.getMessageAttributeNames().get(0).equals(SQSMessageConsumerPrefetch.ALL)
+                        && other.getWaitTimeSeconds() == SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS
+                        && other.getReceiveRequestAttemptId() != null
+                        && other.getReceiveRequestAttemptId().length() > 0;
+            }
+        })))
                 .thenReturn(new ReceiveMessageResult().withMessages(messages));
 
         // Mock isClosed and exit after a single prefetch loop
@@ -156,19 +130,11 @@ public class SQSMessageConsumerPrefetchFifoTest {
                 .thenReturn(false)
                 .thenReturn(true);
 
-        /*
-         * Request a message (only relevant when prefetching is off).
-         */
+        // Request a message (only relevant when prefetching is off).
         consumerPrefetch.requestMessage();
-        
-        /*
-         * Run the prefetch
-         */
-        consumerPrefetch.run();
 
-        /*
-         * Verify the results
-         */
+        // Run the prefetch
+        consumerPrefetch.run();
 
         // Ensure Consumer was started
         verify(consumerPrefetch).waitForStart();
@@ -177,7 +143,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         verify(consumerPrefetch).waitForPrefetch();
 
         // Ensure no message was nack
-        verify(negativeAcknowledger).action(QUEUE_URL, new ArrayList<String>());
+        verify(negativeAcknowledger).action(QUEUE_URL, new ArrayList<>());
 
         // Ensure retries attempt was not increased
         assertEquals(0, consumerPrefetch.retriesAttempted);
@@ -187,11 +153,27 @@ public class SQSMessageConsumerPrefetchFifoTest {
         int index = 0;
         for (SQSMessageConsumerPrefetch.MessageManager messageManager : consumerPrefetch.messageQueue) {
             com.amazonaws.services.sqs.model.Message mockedMessage = messages.get(index);
-            SQSMessage sqsMessage = (SQSMessage)messageManager.getMessage();
-            assertEquals("Receipt handle is the same", mockedMessage.getReceiptHandle(), sqsMessage.getReceiptHandle());
-            assertEquals("Group id is the same", mockedMessage.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID), sqsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
-            assertEquals("Sequence number is the same", mockedMessage.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER), sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
-            assertEquals("Deduplication id is the same", mockedMessage.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
+            SQSMessage sqsMessage = (SQSMessage)messageManager.message();
+            assertEquals(
+                    mockedMessage.getReceiptHandle(),
+                    sqsMessage.getReceiptHandle(),
+                    "Receipt handle is the same"
+            );
+            assertEquals(
+                    mockedMessage.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID),
+                    sqsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID),
+                    "Group id is the same"
+            );
+            assertEquals(
+                    mockedMessage.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER),
+                    sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER),
+                    "Sequence number is the same"
+            );
+            assertEquals(
+                    mockedMessage.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID),
+                    sqsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID),
+                    "Deduplication id is the same"
+            );
             
             index++;
         }
@@ -200,42 +182,48 @@ public class SQSMessageConsumerPrefetchFifoTest {
     /**
      * Test ConvertToJMSMessage when message type is not set in the message attribute
      */
-    @Test
-    public void testConvertToJMSMessageNoTypeAttribute() throws JMSException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testConvertToJMSMessageNoTypeAttribute(int numberOfMessagesToPrefetch) throws JMSException {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
+        // Set up consumer prefetch and mocks
         com.amazonaws.services.sqs.model.Message message = createValidFifoMessage(1, "G");
+
         // Return message attribute with no message type attribute
         message.setBody("MessageBody");
 
-        /*
-         * Convert the SQS message to JMS Message
-         */
-        javax.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        // Convert the SQS message to JMS Message
+        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
-        /*
-         * Verify results
-         */
+        // Verify results
         assertTrue(jmsMessage instanceof SQSTextMessage);
         assertEquals(((SQSTextMessage) jmsMessage).getText(), "MessageBody");
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
+        assertEquals(
+                message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID)
+        );
+        assertEquals(
+                message.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER)
+        );
+        assertEquals(
+                message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID)
+        );
     }
 
     /**
      * Test ConvertToJMSMessage with byte message type
      */
-    @Test
-    public void testConvertToJMSMessageByteTypeAttribute() throws JMSException, IOException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testConvertToJMSMessageByteTypeAttribute(int numberOfMessagesToPrefetch) throws JMSException {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
-
+        // Set up consumer prefetch and mocks
         com.amazonaws.services.sqs.model.Message message = createValidFifoMessage(1, "G");
+
         // Return message attributes with message type 'BYTE'
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setStringValue(SQSMessage.BYTE_MESSAGE_TYPE);
@@ -245,34 +233,39 @@ public class SQSMessageConsumerPrefetchFifoTest {
         byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
         message.setBody(Base64.encodeAsString(byteArray));
 
-        /*
-         * Convert the SQS message to JMS Message
-         */
-        javax.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        //  Convert the SQS message to JMS Message
+        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
-        /*
-         * Verify results
-         */
+        // Verify results
         assertTrue(jmsMessage instanceof SQSBytesMessage);
         for (byte b : byteArray) {
             assertEquals(b, ((SQSBytesMessage)jmsMessage).readByte());
         }
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
+        assertEquals(
+                message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID)
+        );
+        assertEquals(
+                message.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER)
+        );
+        assertEquals(
+                message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID)
+        );
     }
 
     /**
      * Test ConvertToJMSMessage with byte message that contains illegal sqs message body
      */
-    @Test
-    public void testConvertToJMSMessageByteTypeIllegalBody() throws JMSException, IOException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testConvertToJMSMessageByteTypeIllegalBody(int numberOfMessagesToPrefetch) {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
-
+        // Set up consumer prefetch and mocks
         com.amazonaws.services.sqs.model.Message message = createValidFifoMessage(1, "G");
+
         // Return message attributes with message type 'BYTE'
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setStringValue(SQSMessage.BYTE_MESSAGE_TYPE);
@@ -281,27 +274,19 @@ public class SQSMessageConsumerPrefetchFifoTest {
         // Return illegal message body for byte message type
         message.setBody("Text Message");
 
-        /*
-         * Convert the SQS message to JMS Message
-         */
-        try {
-            consumerPrefetch.convertToJMSMessage(message);
-            fail("Expect JMSException");
-        } catch (JMSException jmse) {
-            // Expected JMS exception
-        }
+        // Convert the SQS message to JMS Message
+        assertThrows(JMSException.class, () -> consumerPrefetch.convertToJMSMessage(message));
     }
 
     /**
      * Test ConvertToJMSMessage with an object message
      */
-    @Test
-    public void testConvertToJMSMessageObjectTypeAttribute() throws JMSException, IOException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testConvertToJMSMessageObjectTypeAttribute(int numberOfMessagesToPrefetch) throws JMSException, IOException {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
-
+        // Set up consumer prefetch and mocks
         com.amazonaws.services.sqs.model.Message message = createValidFifoMessage(1, "G");
         // Return message attributes with message type 'OBJECT'
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
@@ -310,7 +295,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         message.getMessageAttributes().put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
         // Encode an object to byte array
-        Integer integer = new Integer("10");
+        Integer integer = 10;
         ByteArrayOutputStream array = new ByteArrayOutputStream(10);
         ObjectOutputStream oStream = new ObjectOutputStream(array);
         oStream.writeObject(integer);
@@ -318,14 +303,10 @@ public class SQSMessageConsumerPrefetchFifoTest {
         
         message.setBody(Base64.encodeAsString(array.toByteArray()));
 
-        /*
-         * Convert the SQS message to JMS Message
-         */
-        javax.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        // Convert the SQS message to JMS Message
+        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
-        /*
-         * Verify results
-         */
+        // Verify results
         assertTrue(jmsMessage instanceof SQSObjectMessage);
         assertEquals(integer, ((SQSObjectMessage) jmsMessage).getObject());
         assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
@@ -336,13 +317,12 @@ public class SQSMessageConsumerPrefetchFifoTest {
     /**
      * Test ConvertToJMSMessage with an object message that contains illegal sqs message body
      */
-    @Test
-    public void testConvertToJMSMessageObjectIllegalBody() throws JMSException, IOException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testConvertToJMSMessageObjectIllegalBody(int numberOfMessagesToPrefetch) throws JMSException {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
-
+        // Set up consumer prefetch and mocks
         com.amazonaws.services.sqs.model.Message message = createValidFifoMessage(1, "G");
         // Return message attributes with message type 'OBJECT'
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
@@ -351,69 +331,70 @@ public class SQSMessageConsumerPrefetchFifoTest {
         message.getMessageAttributes().put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
         message.setBody("Some text that does not represent an object");
 
-        /*
-         * Convert the SQS message to JMS Message
-         */
+        // Convert the SQS message to JMS Message
         ObjectMessage jmsMessage = (ObjectMessage) consumerPrefetch.convertToJMSMessage(message);
 
-        /*
-         * Verify results
-         */
-        try {
-            jmsMessage.getObject();
-            fail("Expect JMSException");
-        } catch (JMSException jmse) {
-            // Expected JMS exception
-        }
+        // Verify results
+        assertThrows(JMSException.class, jmsMessage::getObject);
     }
 
     /**
      * Test ConvertToJMSMessage with text message with text type attribute
      */
-    @Test
-    public void testConvertToJMSMessageTextTypeAttribute() throws JMSException, IOException {
+    @ParameterizedTest
+    @MethodSource("prefetchParameters")
+    public void testConvertToJMSMessageTextTypeAttribute(int numberOfMessagesToPrefetch) throws JMSException {
+        init(numberOfMessagesToPrefetch);
 
-        /*
-         * Set up consumer prefetch and mocks
-         */
-
+        // Set up consumer prefetch and mocks
         com.amazonaws.services.sqs.model.Message message = createValidFifoMessage(1, "G");
+
         // Return message attributes with message type 'TEXT'
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setStringValue(SQSMessage.TEXT_MESSAGE_TYPE);
         messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
         message.getMessageAttributes().put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
         message.setBody("MessageBody");
-        
-        /*
-         * Convert the SQS message to JMS Message
-         */
-        javax.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
-        /*
-         * Verify results
-         */
+        // Convert the SQS message to JMS Message
+        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+
+        // Verify results
         assertTrue(jmsMessage instanceof SQSTextMessage);
         assertEquals(message.getBody(), "MessageBody");
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
-        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID), jmsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
+        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID));
+        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.SEQUENCE_NUMBER),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER));
+        assertEquals(message.getAttributes().get(SQSMessagingClientConstants.MESSAGE_GROUP_ID),
+                jmsMessage.getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID));
     }
 
-    /*
+    /**
      * Utility functions
      */
-
     private com.amazonaws.services.sqs.model.Message createValidFifoMessage(int messageNumber, String groupId) {
-        Map<String,String> mapAttributes = new HashMap<String, String>();
-        mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
-        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "10000000000000000000" + messageNumber);
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, "d" + messageNumber);
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
+        Map<String,String> mapAttributes = Map.of(
+            SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1",
+            SQSMessagingClientConstants.SEQUENCE_NUMBER, "10000000000000000000" + messageNumber,
+            SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, "d" + messageNumber,
+            SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
         
         return new com.amazonaws.services.sqs.model.Message()
             .withReceiptHandle("r" + messageNumber)
             .withAttributes(mapAttributes);
     }
 
+    /**
+     * MethodSource
+     */
+    private static Stream<Arguments> prefetchParameters() {
+        return Stream.of(
+                Arguments.of(0),
+                Arguments.of(1),
+                Arguments.of(5),
+                Arguments.of(10),
+                Arguments.of(15)
+        );
+    }
 }

@@ -73,7 +73,7 @@ public class SQSMessagingClientThreadFactory implements ThreadFactory {
     /**
      * Checks if the thread is member of the thread group
      * 
-     * @param thread
+     * @param thread current thread
      * @return True If there is a thread group and the given thread is member of
      *         the group
      */

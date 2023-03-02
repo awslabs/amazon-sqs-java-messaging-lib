@@ -14,22 +14,21 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.acknowledge.AutoAcknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 
-import javax.jms.IllegalStateException;
+import jakarta.jms.IllegalStateException;
 import java.util.Collections;
-import org.junit.Test;
-import org.junit.Before;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -48,7 +47,7 @@ public class AutoAcknowledgerTest {
     private AmazonSQSMessagingClientWrapper amazonSQSClient;
     private SQSSession session;
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
         session = mock(SQSSession.class);
@@ -61,23 +60,17 @@ public class AutoAcknowledgerTest {
     @Test
     public void testAcknowledge() throws Exception {
 
-        /*
-         * Set up message mock
-         */
+        // Set up message mock
         SQSMessage message = mock(SQSMessage.class);
         when(message.getQueueUrl())
                 .thenReturn(QUEUE_URL);
         when(message.getReceiptHandle())
                 .thenReturn(RECEIPT_HANDLE);
 
-        /*
-         * Use the acknowledger to ack the message
-         */
+        // Use the acknowledger to ack the message
         acknowledger.acknowledge(message);
 
-        /*
-         * Verify results
-         */
+        // Verify results
         ArgumentCaptor<DeleteMessageRequest> argumentCaptor = ArgumentCaptor.forClass(DeleteMessageRequest.class);
         verify(amazonSQSClient).deleteMessage(argumentCaptor.capture());
         assertEquals(1, argumentCaptor.getAllValues().size());
@@ -93,9 +86,7 @@ public class AutoAcknowledgerTest {
     @Test
     public void testAcknowledgeWhenSessionClosed() throws Exception {
 
-        /*
-         * Set up mocks
-         */
+        // Set up mocks
         doThrow(new IllegalStateException("ise"))
                 .when(session).checkClosed();
 
@@ -105,15 +96,8 @@ public class AutoAcknowledgerTest {
         when(message.getReceiptHandle())
                 .thenReturn(RECEIPT_HANDLE);
 
-        /*
-         * Use the acknowledger to ack the message
-         */
-        try {
-            acknowledger.acknowledge(message);
-            fail();
-        } catch (IllegalStateException ise) {
-            // Expected exception
-        }
+        //Use the acknowledger to ack the message
+        assertThrows(IllegalStateException.class, () -> acknowledger.acknowledge(message));
     }
 
     /**
@@ -121,7 +105,6 @@ public class AutoAcknowledgerTest {
      */
     @Test
     public void testNotifyMessageReceived() throws Exception {
-
         SQSMessage message = mock(SQSMessage.class);
         acknowledger.notifyMessageReceived(message);
         verify(acknowledger).acknowledge(message);
@@ -132,7 +115,6 @@ public class AutoAcknowledgerTest {
      */
     @Test
     public void testGetUnAckMessages() throws Exception {
-
         assertEquals(Collections.<SQSMessageIdentifier>emptyList(), acknowledger.getUnAckMessages());
     }
 }

@@ -17,14 +17,14 @@ package com.amazon.sqs.javamessaging;
 import com.amazon.sqs.javamessaging.acknowledge.BulkSQSOperation;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.Test;
-import org.junit.Before; 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
@@ -39,13 +39,12 @@ public class BulkSQSOperationTest {
 
     private BulkSQSOperation bulkAction;
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
 
         bulkAction = spy(new BulkSQSOperation() {
             @Override
-            public void action(String queueUrl, List<String> receiptHandles) throws JMSException {
-                return;
+            public void action(String queueUrl, List<String> receiptHandles) {
             }
         });
     }
@@ -54,34 +53,18 @@ public class BulkSQSOperationTest {
      * Test illegal index value cases
      */
     @Test
-    public void testBulkActionIllegalIndexValue() throws Exception {
-
-        List<SQSMessageIdentifier> messageIdentifierList = new ArrayList<SQSMessageIdentifier>();
-        messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL, "receiptHandle1", "sqsMessageId1"));
-        messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL, "receiptHandle2", "sqsMessageId2"));
-        messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL, "receiptHandle3", "sqsMessageId3"));
-
+    public void testBulkActionIllegalIndexValue() {
+        List<SQSMessageIdentifier> messageIdentifierList = List.of(
+            new SQSMessageIdentifier(QUEUE_URL, "receiptHandle1", "sqsMessageId1"),
+            new SQSMessageIdentifier(QUEUE_URL, "receiptHandle2", "sqsMessageId2"),
+            new SQSMessageIdentifier(QUEUE_URL, "receiptHandle3", "sqsMessageId3")
+        );
         int negativeSize = -10;
-        try {
-            bulkAction.bulkAction(messageIdentifierList, negativeSize);
-            fail();
-        } catch(AssertionError ae) {
-            // expected exception
-        }
 
-        try {
-            bulkAction.bulkAction(messageIdentifierList, 0);
-            fail();
-        } catch(AssertionError ae) {
-            // expected exception
-        }
-
-        try {
-            bulkAction.bulkAction(messageIdentifierList, 3);
-            fail();
-        } catch(AssertionError ae) {
-            // expected exception
-        }
+        assertThrows(AssertionError.class, () -> bulkAction.bulkAction(messageIdentifierList, negativeSize));
+        assertThrows(AssertionError.class, () -> bulkAction.bulkAction(messageIdentifierList, 0));
+        assertThrows(AssertionError.class, () -> bulkAction.bulkAction(
+                messageIdentifierList, messageIdentifierList.size() + 1));
     }
 
     /**

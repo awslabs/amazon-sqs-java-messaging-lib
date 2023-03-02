@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 
@@ -46,7 +46,7 @@ public abstract class BulkSQSOperation {
         assert indexOfMessage > 0;
         assert indexOfMessage <= messageIdentifierList.size();
 
-        Map<String, List<String>> receiptHandleWithSameQueueUrl = new HashMap<String, List<String>>();
+        Map<String, List<String>> receiptHandleWithSameQueueUrl = new HashMap<>();
         
         // Add all messages up to and including requested message into Map.
         // Map contains key as queueUrl and value as list receiptHandles from
@@ -55,13 +55,9 @@ public abstract class BulkSQSOperation {
         for (int i = 0; i < indexOfMessage; i++) {
             SQSMessageIdentifier messageIdentifier = messageIdentifierList.get(i);
             String queueUrl = messageIdentifier.getQueueUrl();
-            List<String> receiptHandles = receiptHandleWithSameQueueUrl.get(queueUrl);
-            // if value of queueUrl is null create new list.
-            if (receiptHandles == null) {
-                receiptHandles = new ArrayList<String>();
-                receiptHandleWithSameQueueUrl.put(queueUrl, receiptHandles);
-            }
-            // add receiptHandle to the list.
+            // if value of queueUrl is null create new list
+            List<String> receiptHandles = receiptHandleWithSameQueueUrl.computeIfAbsent(queueUrl, k -> new ArrayList<>());
+            // add receiptHandle to the list
             receiptHandles.add(messageIdentifier.getReceiptHandle());
             // Once there are 10 messages in messageBatch, apply the batch action
             if (receiptHandles.size() == SQSMessagingClientConstants.MAX_BATCH) {
@@ -83,9 +79,8 @@ public abstract class BulkSQSOperation {
      * @param queueUrl
      *            queueUrl of the queue, which the receipt handles belong
      * @param receiptHandles
-     *            the list of handles, which is be used to (negative)acknowledge
+     *            the list of handles, which is being used to (negative)acknowledge
      *            the messages.
-     * @throws JMSException
      */
     public abstract void action(String queueUrl, List<String> receiptHandles) throws JMSException;
         

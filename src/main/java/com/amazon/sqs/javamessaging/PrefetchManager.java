@@ -25,13 +25,13 @@ public interface PrefetchManager {
      * messageQueue when user calls for receive or message listener onMessage is
      * called.
      */
-    public void messageDispatched();
+    void messageDispatched();
 
     /**
      * Notify the prefetchThread that the message listener has finished with any
      * previous message and is ready to accept another.
      */
-    public void messageListenerReady();
+    void messageListenerReady();
     
     /**
      * This is used to determine the state of the consumer, when the message
@@ -39,5 +39,5 @@ public interface PrefetchManager {
      * 
      * @return The message consumer, which owns the prefetchThread
      */
-    public SQSMessageConsumer getMessageConsumer();
+    SQSMessageConsumer getMessageConsumer();
 }

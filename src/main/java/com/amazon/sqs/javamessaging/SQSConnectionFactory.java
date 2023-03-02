@@ -14,10 +14,12 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import javax.jms.ConnectionFactory;
-import javax.jms.JMSException;
-import javax.jms.QueueConnection;
-import javax.jms.QueueConnectionFactory;
+import jakarta.jms.ConnectionFactory;
+import jakarta.jms.JMSContext;
+import jakarta.jms.JMSException;
+import jakarta.jms.JMSRuntimeException;
+import jakarta.jms.QueueConnection;
+import jakarta.jms.QueueConnectionFactory;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
@@ -81,12 +83,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
             throw new IllegalArgumentException("AmazonSQS client cannot be null");
         }
         this.providerConfiguration = providerConfiguration;
-        this.amazonSQSClientSupplier = new AmazonSQSClientSupplier() {
-            @Override
-            public AmazonSQS get() {
-                return client;
-            }
-        };
+        this.amazonSQSClientSupplier = () -> client;
     }
     
     /*
@@ -101,31 +98,23 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
             throw new IllegalArgumentException("AmazonSQS client builder cannot be null");
         }
         this.providerConfiguration = providerConfiguration;
-        this.amazonSQSClientSupplier = new AmazonSQSClientSupplier() {
-            @Override
-            public AmazonSQS get() {
-                return clientBuilder.build();
-            }
-        };
+        this.amazonSQSClientSupplier = clientBuilder::build;
     }
     
     private SQSConnectionFactory(final Builder builder) {
         this.providerConfiguration = builder.providerConfiguration;
-        this.amazonSQSClientSupplier = new AmazonSQSClientSupplier() {
-            @Override
-            public AmazonSQS get() {
-                AmazonSQSClient amazonSQSClient = new AmazonSQSClient(builder.awsCredentialsProvider, builder.clientConfiguration);
-                if (builder.region != null) {
-                    amazonSQSClient.setRegion(builder.region);
-                }
-                if (builder.endpoint != null) {
-                    amazonSQSClient.setEndpoint(builder.endpoint);
-                }
-                if (builder.signerRegionOverride != null) {
-                    amazonSQSClient.setSignerRegionOverride(builder.signerRegionOverride);
-                }
-                return amazonSQSClient;
+        this.amazonSQSClientSupplier = () -> {
+            AmazonSQSClient amazonSQSClient = new AmazonSQSClient(builder.awsCredentialsProvider, builder.clientConfiguration);
+            if (builder.region != null) {
+                amazonSQSClient.setRegion(builder.region);
             }
+            if (builder.endpoint != null) {
+                amazonSQSClient.setEndpoint(builder.endpoint);
+            }
+            if (builder.signerRegionOverride != null) {
+                amazonSQSClient.setSignerRegionOverride(builder.signerRegionOverride);
+            }
+            return amazonSQSClient;
         };
     }
 
@@ -163,20 +152,43 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQS, awsCredentialsProvider);
         return new SQSConnection(amazonSQSClientJMSWrapper, providerConfiguration.getNumberOfMessagesToPrefetch());
     }
+
+    /** This method is not supported. */
+    @Override
+    public JMSContext createContext() {
+        throw new JMSRuntimeException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public JMSContext createContext(String userName, String password) {
+        throw new JMSRuntimeException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public JMSContext createContext(String userName, String password, int sessionMode) {
+        throw new JMSRuntimeException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public JMSContext createContext(int sessionMode) {
+        throw new JMSRuntimeException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
     
     @Override
     public QueueConnection createQueueConnection() throws JMSException {
-        return (QueueConnection) createConnection();
+        return createConnection();
     }
 
     @Override
     public QueueConnection createQueueConnection(String userName, String password) throws JMSException {
-        return (QueueConnection) createConnection(userName, password);
+        return createConnection(userName, password);
     }
     
     /**
      * Deprecated. Use one of the constructors of this class instead and provide either AmazonSQS client or AmazonSQSClientBuilder.
-     * @return
      */
     @Deprecated
     public static Builder builder() {
@@ -185,7 +197,6 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
 
     /**
      * Deprecated. Use one of the constructors of SQSConnectionFactory instead.
-     * @return
      */
     @Deprecated
     public static class Builder {
@@ -194,7 +205,7 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
         private String signerRegionOverride;
         private ClientConfiguration clientConfiguration;
         private AWSCredentialsProvider awsCredentialsProvider = new DefaultAWSCredentialsProviderChain();
-        private ProviderConfiguration providerConfiguration;
+        private final ProviderConfiguration providerConfiguration;
         
         public Builder(Region region) {
             this();

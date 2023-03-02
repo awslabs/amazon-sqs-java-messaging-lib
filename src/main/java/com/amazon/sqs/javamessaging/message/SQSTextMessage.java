@@ -14,8 +14,9 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
-import javax.jms.JMSException;
-import javax.jms.TextMessage;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageNotWriteableException;
+import jakarta.jms.TextMessage;
 
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazonaws.services.sqs.model.Message;

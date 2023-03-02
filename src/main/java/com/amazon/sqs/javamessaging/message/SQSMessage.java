@@ -16,6 +16,7 @@ package com.amazon.sqs.javamessaging.message;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -23,11 +24,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageFormatException;
-import javax.jms.MessageNotWriteableException;
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageFormatException;
+import jakarta.jms.MessageNotWriteableException;
 
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
@@ -56,11 +57,11 @@ import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.*;
  * </P>
  * <P>
  * JMSXDeliveryCount reserved property is supported and set based on the
- * approximate receive count observed on the SQS side.
+ * approximate Receive Count observed on the SQS side.
  */
 public class SQSMessage implements Message {
         
-    private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
+    private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     
     // Define constant message types.
     public static final String BYTE_MESSAGE_TYPE = "byte";
@@ -78,12 +79,13 @@ public class SQSMessage implements Message {
     private boolean redelivered;
     private String correlationID;
     private long expiration = Message.DEFAULT_TIME_TO_LIVE;
+    private long deliveryTime = Message.DEFAULT_DELIVERY_DELAY;
     private String messageID;
     private String type;
     private SQSQueueDestination replyTo;
     private Destination destination;
 
-    private final Map<String, JMSMessagePropertyValue> properties = new HashMap<String, JMSMessagePropertyValue>();
+    private final Map<String, JMSMessagePropertyValue> properties = new HashMap<>();
 
     private boolean writePermissionsForProperties;
     private boolean writePermissionsForBody;
@@ -111,20 +113,16 @@ public class SQSMessage implements Message {
      * This is called at the receiver side to create a
      * JMS message from the SQS message received.
      */
-    SQSMessage(Acknowledger acknowledger, String queueUrl, com.amazonaws.services.sqs.model.Message sqsMessage) throws JMSException{
+    SQSMessage(Acknowledger acknowledger, String queueUrl, com.amazonaws.services.sqs.model.Message sqsMessage) throws JMSException {
         this.acknowledger = acknowledger;
         this.queueUrl = queueUrl;
         receiptHandle = sqsMessage.getReceiptHandle();
         this.setSQSMessageId(sqsMessage.getMessageId());
-        Map<String,String> systemAttributes = sqsMessage.getAttributes();
+        Map<String, String> systemAttributes = sqsMessage.getAttributes();
         int receiveCount = Integer.parseInt(systemAttributes.get(APPROXIMATE_RECEIVE_COUNT));
-        
-        /**
-         * JMSXDeliveryCount is set based on SQS ApproximateReceiveCount
-         * attribute.
-         */
-        properties.put(JMSX_DELIVERY_COUNT, new JMSMessagePropertyValue(
-                receiveCount, INT));
+
+        //JMSXDeliveryCount is set based on SQS ApproximateReceiveCount attribute
+        properties.put(JMSX_DELIVERY_COUNT, new JMSMessagePropertyValue(receiveCount, INT));
         if (receiveCount > 1) {
             setJMSRedelivered(true);
         }
@@ -141,7 +139,11 @@ public class SQSMessage implements Message {
         writePermissionsForProperties = false;
     }
     
-    private void mapSystemAttributeToJmsMessageProperty(Map<String,String> systemAttributes, String systemAttributeName, String jmsMessagePropertyName) throws JMSException {
+    private void mapSystemAttributeToJmsMessageProperty(
+            Map<String,String> systemAttributes,
+            String systemAttributeName,
+            String jmsMessagePropertyName
+    ) throws JMSException {
         String systemAttributeValue = systemAttributes.get(systemAttributeName);
         if (systemAttributeValue != null) {
             properties.put(jmsMessagePropertyName, new JMSMessagePropertyValue(systemAttributeValue, STRING));
@@ -195,15 +197,13 @@ public class SQSMessage implements Message {
     
     /**
      * Get SQS Message Group Id (applicable for FIFO queues, available also as JMS property 'JMSXGroupId')
-     * @throws JMSException 
      */
     public String getSQSMessageGroupId() throws JMSException {
         return getStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID);
     }
     
     /**
-     * Get SQS Message Deduplication Id (applicable for FIFO queues, available also as JMS property 'JMS_SQS_DeduplicationId')
-     * @throws JMSException 
+     * Get SQS Message Deduplication ID (applicable for FIFO queues, available also as JMS property 'JMS_SQS_DeduplicationId')
      */
     public String getSQSMessageDeduplicationId() throws JMSException {
         return getStringProperty(SQSMessagingClientConstants.JMS_SQS_DEDUPLICATION_ID);
@@ -211,7 +211,6 @@ public class SQSMessage implements Message {
     
     /**
      * Get SQS Message Sequence Number (applicable for FIFO queues, available also as JMS property 'JMS_SQS_SequenceNumber')
-     * @throws JMSException 
      */
     public String getSQSMessageSequenceNumber() throws JMSException {
         return getStringProperty(SQSMessagingClientConstants.JMS_SQS_SEQUENCE_NUMBER);
@@ -227,7 +226,7 @@ public class SQSMessage implements Message {
     }
     
     /**
-     * Set SQS Message Id, used on send.
+     * Set SQS Message ID, used on send.
      * 
      * @param sqsMessageID
      *            messageId assigned by SQS during send.
@@ -337,7 +336,7 @@ public class SQSMessage implements Message {
      * message is being sent.
      * <P>
      * When a message is sent, this field is ignored. After completion of the
-     * send or publish method, the field holds the destination specified by the
+     * Send or Publish method, the field holds the destination specified by the
      * method.
      * <P>
      * When a message is received, its JMSDestination value must be equivalent
@@ -405,6 +404,16 @@ public class SQSMessage implements Message {
     }
 
     @Override
+    public long getJMSDeliveryTime() throws JMSException {
+        return deliveryTime;
+    }
+
+    @Override
+    public void setJMSDeliveryTime(long deliveryTime) throws JMSException {
+        this.deliveryTime = deliveryTime;
+    }
+
+    @Override
     public int getJMSPriority() throws JMSException {
         return priority;
     }
@@ -415,7 +424,7 @@ public class SQSMessage implements Message {
     }
     
     /**
-     * Clears a message's properties and set the write permissions for
+     * Clears a message's properties and set the Write permissions for
      * properties. The message's header fields and body are not cleared.
      */
     @Override
@@ -686,22 +695,17 @@ public class SQSMessage implements Message {
         return properties.get(name);
     }
 
-    private static class PropertyEnum implements Enumeration<String> {
-        private final Iterator<String> propertyItr;
-
-        public PropertyEnum(Iterator<String> propertyItr) {
-            this.propertyItr = propertyItr;
-        }
+    private record PropertyEnum(Iterator<String> propertyItr) implements Enumeration<String> {
 
         @Override
         public boolean hasMoreElements() {
-            return propertyItr.hasNext();
-        }
+                return propertyItr.hasNext();
+            }
 
         @Override
         public String nextElement() {
-            return propertyItr.next();
-        }
+                return propertyItr.next();
+            }
     }
     
     /**
@@ -958,6 +962,16 @@ public class SQSMessage implements Message {
         throw new JMSException("SQSMessage does not have any body");
     }
 
+    @Override
+    public <T> T getBody(Class<T> c) throws JMSException {
+        throw new JMSException("Could not get SQSMessage body in " + c.getSimpleName());
+    }
+
+    @Override
+    public boolean isBodyAssignableTo(Class c) throws JMSException {
+        throw new JMSException("SQSMessage body is not assignable to " + c.getSimpleName());
+    }
+
     private boolean isValidPropertyValueType(Object value) {
         return value instanceof Boolean || value instanceof Byte || value instanceof Short ||
                value instanceof Integer || value instanceof Long || value instanceof Float ||
@@ -971,59 +985,35 @@ public class SQSMessage implements Message {
      */
     public static class TypeConversionSupport {
 
-        static class ConversionKey {
-            final Class<?> from;
-
-            final Class<?> to;
-
-            public ConversionKey(Class<?> from, Class<?> to) {
-                this.from = from;
-                this.to = to;
-            }
-            
-            @Override
-            public int hashCode() {
-                final int prime = 31;
-                int result = 1;
-                result = prime * result + ((from == null) ? 0 : from.hashCode());
-                result = prime * result + ((to == null) ? 0 : to.hashCode());
-                return result;
-            }
+        record ConversionKey(Class<?> from, Class<?> to) {
 
             @Override
-            public boolean equals(Object obj) {
-                if (this == obj)
-                    return true;
-                if (obj == null)
-                    return false;
-                if (getClass() != obj.getClass())
-                    return false;
-                ConversionKey other = (ConversionKey) obj;
-                if (from == null) {
-                    if (other.from != null)
-                        return false;
-                } else if (!from.equals(other.from))
-                    return false;
-                if (to == null) {
-                    if (other.to != null)
-                        return false;
-                } else if (!to.equals(other.to))
-                    return false;
-                return true;
-            }
-        }
+                    public boolean equals(Object obj) {
+                        if (this == obj)
+                            return true;
+                        if (obj == null)
+                            return false;
+                        if (getClass() != obj.getClass())
+                            return false;
+                        ConversionKey other = (ConversionKey) obj;
+                        if (from == null) {
+                            if (other.from != null)
+                                return false;
+                        } else if (!from.equals(other.from))
+                            return false;
+                        if (to == null) {
+                            return other.to == null;
+                        } else return to.equals(other.to);
+                    }
+                }
 
         interface Converter {
             Object convert(Object value);
         }
 
-        static final private Map<ConversionKey, Converter> CONVERSION_MAP = new HashMap<ConversionKey, Converter>();
+        static final private Map<ConversionKey, Converter> CONVERSION_MAP = new HashMap<>();
         static {
-            Converter toStringConverter = new Converter() {
-                public Object convert(Object value) {
-                    return value.toString();
-                }
-            };
+            Converter toStringConverter = Object::toString;
             CONVERSION_MAP.put(new ConversionKey(Boolean.class, String.class), toStringConverter);
             CONVERSION_MAP.put(new ConversionKey(Byte.class, String.class), toStringConverter);
             CONVERSION_MAP.put(new ConversionKey(Short.class, String.class), toStringConverter);
@@ -1031,80 +1021,31 @@ public class SQSMessage implements Message {
             CONVERSION_MAP.put(new ConversionKey(Long.class, String.class), toStringConverter);
             CONVERSION_MAP.put(new ConversionKey(Float.class, String.class), toStringConverter);
             CONVERSION_MAP.put(new ConversionKey(Double.class, String.class), toStringConverter);
+            CONVERSION_MAP.put(new ConversionKey(String.class, Boolean.class), value -> {
+                String stringValue = (String) value;
+                if (Boolean.parseBoolean(stringValue) || INT_TRUE.equals(value)) {
+                    return Boolean.TRUE;
+                }
+                return Boolean.FALSE;
+            });
+            CONVERSION_MAP.put(new ConversionKey(String.class, Byte.class), value -> Byte.valueOf((String) value));
+            CONVERSION_MAP.put(new ConversionKey(String.class, Short.class), value -> Short.valueOf((String) value));
+            CONVERSION_MAP.put(new ConversionKey(String.class, Integer.class), value -> Integer.valueOf((String) value));
+            CONVERSION_MAP.put(new ConversionKey(String.class, Long.class), value -> Long.valueOf((String) value));
+            CONVERSION_MAP.put(new ConversionKey(String.class, Float.class), value -> Float.valueOf((String) value));
+            CONVERSION_MAP.put(new ConversionKey(String.class, Double.class), value -> Double.valueOf((String) value));
 
-            CONVERSION_MAP.put(new ConversionKey(String.class, Boolean.class), new Converter() {
-                public Object convert(Object value) {
-                    String stringValue = (String) value;
-                    if (Boolean.valueOf(stringValue) || INT_TRUE.equals((String) value)) {
-                        return Boolean.TRUE;
-                    }
-                    return Boolean.FALSE;
-                }
-            });
-            CONVERSION_MAP.put(new ConversionKey(String.class, Byte.class), new Converter() {
-                public Object convert(Object value) {
-                    return Byte.valueOf((String) value);
-                }
-            });
-            CONVERSION_MAP.put(new ConversionKey(String.class, Short.class), new Converter() {
-                public Object convert(Object value) {
-                    return Short.valueOf((String) value);
-                }
-            });
-            CONVERSION_MAP.put(new ConversionKey(String.class, Integer.class), new Converter() {
-                public Object convert(Object value) {
-                    return Integer.valueOf((String) value);
-                }
-            });
-            CONVERSION_MAP.put(new ConversionKey(String.class, Long.class), new Converter() {
-                public Object convert(Object value) {
-                    return Long.valueOf((String) value);
-                }
-            });
-            CONVERSION_MAP.put(new ConversionKey(String.class, Float.class), new Converter() {
-                public Object convert(Object value) {
-                    return Float.valueOf((String) value);
-                }
-            });
-            CONVERSION_MAP.put(new ConversionKey(String.class, Double.class), new Converter() {
-                public Object convert(Object value) {
-                    return Double.valueOf((String) value);
-                }
-            });
-
-            Converter longConverter = new Converter() {
-                public Object convert(Object value) {
-                    return Long.valueOf(((Number) value).longValue());
-                }
-            };
+            Converter longConverter = value -> ((Number) value).longValue();
             CONVERSION_MAP.put(new ConversionKey(Byte.class, Long.class), longConverter);
             CONVERSION_MAP.put(new ConversionKey(Short.class, Long.class), longConverter);
             CONVERSION_MAP.put(new ConversionKey(Integer.class, Long.class), longConverter);
-            CONVERSION_MAP.put(new ConversionKey(Date.class, Long.class), new Converter() {
-                public Object convert(Object value) {
-                    return Long.valueOf(((Date) value).getTime());
-                }
-            });
+            CONVERSION_MAP.put(new ConversionKey(Date.class, Long.class), value -> ((Date) value).getTime());
 
-            Converter intConverter = new Converter() {
-                public Object convert(Object value) {
-                    return Integer.valueOf(((Number) value).intValue());
-                }
-            };
+            Converter intConverter = value -> ((Number) value).intValue();
             CONVERSION_MAP.put(new ConversionKey(Byte.class, Integer.class), intConverter);
             CONVERSION_MAP.put(new ConversionKey(Short.class, Integer.class), intConverter);
-
-            CONVERSION_MAP.put(new ConversionKey(Byte.class, Short.class), new Converter() {
-                public Object convert(Object value) {
-                    return Short.valueOf(((Number) value).shortValue());
-                }
-            });
-
-            CONVERSION_MAP.put(new ConversionKey(Float.class, Double.class), new Converter() {
-                public Object convert(Object value) {
-                    return Double.valueOf(((Number) value).doubleValue());
-                }
-            });
+            CONVERSION_MAP.put(new ConversionKey(Byte.class, Short.class), value -> ((Number) value).shortValue());
+            CONVERSION_MAP.put(new ConversionKey(Float.class, Double.class), value -> ((Number) value).doubleValue());
         }
 
         @SuppressWarnings("unchecked")
@@ -1115,7 +1056,7 @@ public class SQSMessage implements Message {
             if (value.getClass() == clazz)
                 return (T) value;
 
-            Converter c = (Converter) CONVERSION_MAP.get(new ConversionKey(value.getClass(), clazz));
+            Converter c = CONVERSION_MAP.get(new ConversionKey(value.getClass(), clazz));
             if (c == null)
                 return null;
             return (T) c.convert(value);
@@ -1232,11 +1173,10 @@ public class SQSMessage implements Message {
 
     /**
      * This method sets the JMS_SQS_SEQUENCE_NUMBER property on the message. It is exposed explicitly here, so that
-     * it can be invoked even on read-only message object obtained through receing a message. 
+     * it can be invoked even on read-only message object obtained through receiving a message.
      * This support the use case of send a received message by using the same JMSMessage object.
      * 
      * @param sequenceNumber Sequence number to set. If null or empty, the stored sequence number will be removed.
-     * @throws JMSException
      */
     public void setSequenceNumber(String sequenceNumber) throws JMSException {
         if (sequenceNumber == null || sequenceNumber.isEmpty()) {
@@ -1246,7 +1186,7 @@ public class SQSMessage implements Message {
         }
     }
 
-    /*
+    /**
      * Unit Test Utility Functions
      */
     void setWritePermissionsForProperties(boolean writePermissionsForProperties) {

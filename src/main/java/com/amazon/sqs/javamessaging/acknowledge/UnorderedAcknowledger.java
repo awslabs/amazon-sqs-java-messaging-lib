@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
@@ -44,7 +44,7 @@ public class UnorderedAcknowledger implements Acknowledger {
     public UnorderedAcknowledger (AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession session) {
         this.amazonSQSClient = amazonSQSClient;
         this.session = session;
-        this.unAckMessages  = new HashMap<String, SQSMessageIdentifier>();
+        this.unAckMessages  = new HashMap<>();
     }
     
     /**
@@ -73,7 +73,7 @@ public class UnorderedAcknowledger implements Acknowledger {
      */
     @Override
     public List<SQSMessageIdentifier> getUnAckMessages() {
-        return new ArrayList<SQSMessageIdentifier>(unAckMessages.values());
+        return new ArrayList<>(unAckMessages.values());
     }
     
     /**

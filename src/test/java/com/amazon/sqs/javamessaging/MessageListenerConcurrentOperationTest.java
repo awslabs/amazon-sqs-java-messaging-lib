@@ -14,31 +14,25 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageConsumer;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.SQSSessionCallbackScheduler;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
-
-import javax.jms.*;
-import javax.jms.IllegalStateException;
+import jakarta.jms.IllegalStateException;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageListener;
+import jakarta.jms.Session;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +53,7 @@ public class MessageListenerConcurrentOperationTest {
     /**
      * Message listener that creates a producer on the session
      */
-    private MessageListener msgListenerCreatesProducer = new MessageListener() {
+    private final MessageListener msgListenerCreatesProducer = new MessageListener() {
         @Override
         public void onMessage(Message message) {
             try {
@@ -73,7 +67,7 @@ public class MessageListenerConcurrentOperationTest {
     /**
      * Message listener that creates a consumer on the session
      */
-    private MessageListener msgListenerCreatesConsumer = new MessageListener() {
+    private final MessageListener msgListenerCreatesConsumer = new MessageListener() {
         @Override
         public void onMessage(Message message) {
             try {
@@ -84,7 +78,7 @@ public class MessageListenerConcurrentOperationTest {
         }
     };
 
-    @Before
+    @BeforeEach
     public void Setup() throws JMSException {
 
         Acknowledger acknowledger = mock(Acknowledger.class);
@@ -98,15 +92,15 @@ public class MessageListenerConcurrentOperationTest {
 
         SQSMessageConsumer consumer = mock(SQSMessageConsumer.class);
 
-        SQSMessageConsumerPrefetch preftecher = new SQSMessageConsumerPrefetch(sqsSessionRunnable, acknowledger, negativeAcknowledger, sqsDestination,
+        SQSMessageConsumerPrefetch prefetcher = new SQSMessageConsumerPrefetch(sqsSessionRunnable, acknowledger, negativeAcknowledger, sqsDestination,
                 amazonSQSClient, NUMBER_OF_MESSAGES_TO_PREFETCH);
-        preftecher.setMessageConsumer(consumer);
+        prefetcher.setMessageConsumer(consumer);
 
         msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager.getMessage())
+        when(msgManager.message())
                 .thenReturn(mock(SQSMessage.class));
-        when(msgManager.getPrefetchManager())
-                .thenReturn(preftecher);
+        when(msgManager.prefetchManager())
+                .thenReturn(prefetcher);
     }
 
     /**
@@ -290,8 +284,9 @@ public class MessageListenerConcurrentOperationTest {
         }
     }
 
-    public void testConcurrentExecution(final MessageListener msgListener, final ConcurrentOperation operation) throws JMSException, InterruptedException {
-
+    public void testConcurrentExecution(
+            final MessageListener msgListener,
+            final ConcurrentOperation operation) throws JMSException, InterruptedException {
         long start = System.currentTimeMillis();
 
         // Start the session
@@ -300,37 +295,24 @@ public class MessageListenerConcurrentOperationTest {
         final CyclicBarrier startBarrier = new CyclicBarrier(2);
         final CountDownLatch finishLatch = new CountDownLatch(1);
 
-        Thread t1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    startBarrier.await();
-                    operation.applyOperation();
-                } catch (JMSException e) {
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (BrokenBarrierException e) {
-                    e.printStackTrace();
-                }
-                finishLatch.countDown();
+        Thread t1 = new Thread(() -> {
+            try {
+                startBarrier.await();
+                operation.applyOperation();
+            } catch (JMSException | InterruptedException | BrokenBarrierException e) {
+                e.printStackTrace();
             }
+            finishLatch.countDown();
         });
 
         // Start the callback scheduler
-        Thread t2 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-
-                try {
-                    startBarrier.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (BrokenBarrierException e) {
-                    e.printStackTrace();
-                }
-                session.getSqsSessionRunnable().scheduleCallBacks(msgListener, Collections.singletonList(msgManager));
+        Thread t2 = new Thread(() -> {
+            try {
+                startBarrier.await();
+            } catch (InterruptedException | BrokenBarrierException e) {
+                e.printStackTrace();
             }
+            session.getSqsSessionRunnable().scheduleCallBacks(msgListener, Collections.singletonList(msgManager));
         });
 
         t1.start();
@@ -346,11 +328,11 @@ public class MessageListenerConcurrentOperationTest {
      */
     private interface ConcurrentOperation {
 
-        public abstract void setup() throws JMSException;
+        void setup() throws JMSException;
 
-        public abstract void applyOperation() throws JMSException;
+        void applyOperation() throws JMSException;
 
-        public abstract void verify();
+        void verify();
 
     }
 }

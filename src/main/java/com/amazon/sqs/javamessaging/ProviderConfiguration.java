@@ -28,7 +28,11 @@ public class ProviderConfiguration {
 
     public void setNumberOfMessagesToPrefetch(int numberOfMessagesToPrefetch) {
         if (numberOfMessagesToPrefetch < SQSMessagingClientConstants.MIN_PREFETCH) {
-            throw new IllegalArgumentException(String.format("Invalid prefetch size. Provided value '%1$s' cannot be smaller than '%2$s'", numberOfMessagesToPrefetch, SQSMessagingClientConstants.MIN_PREFETCH));
+            throw new IllegalArgumentException(String.format(
+                    "Invalid prefetch size. Provided value '%1$s' cannot be smaller than '%2$s'",
+                    numberOfMessagesToPrefetch,
+                    SQSMessagingClientConstants.MIN_PREFETCH
+            ));
         }
         this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
     }

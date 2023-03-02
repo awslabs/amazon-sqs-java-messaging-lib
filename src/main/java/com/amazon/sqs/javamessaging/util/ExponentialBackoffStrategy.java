@@ -20,9 +20,9 @@ package com.amazon.sqs.javamessaging.util;
  */
 public class ExponentialBackoffStrategy {
 
-    private long delayInterval;
-    private long initialDelay;
-    private long maxDelay;
+    private final long delayInterval;
+    private final long initialDelay;
+    private final long maxDelay;
 
     public ExponentialBackoffStrategy(long delayInterval, long initialDelay, long maxDelay) {
         this.delayInterval = delayInterval;
@@ -33,7 +33,7 @@ public class ExponentialBackoffStrategy {
     /**
      * Returns the delay before the next attempt.
      * 
-     * @param retriesAttempted
+     * @param retriesAttempted number of retries attempted
      * @return The delay before the next attempt.
      */
     public long delayBeforeNextRetry(int retriesAttempted) {

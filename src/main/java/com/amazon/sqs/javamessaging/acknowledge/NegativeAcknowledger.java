@@ -18,7 +18,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
@@ -58,9 +58,9 @@ public class NegativeAcknowledger extends BulkSQSOperation {
      *             If <code>action</code> throws.
      */
     public void bulkAction(ArrayDeque<MessageManager> messageQueue, String queueUrl) throws JMSException {
-        List<String> receiptHandles = new ArrayList<String>();
+        List<String> receiptHandles = new ArrayList<>();
         while (!messageQueue.isEmpty()) {
-            receiptHandles.add(((SQSMessage) (messageQueue.pollFirst().getMessage())).getReceiptHandle());
+            receiptHandles.add(((SQSMessage) (messageQueue.pollFirst().message())).getReceiptHandle());
 
             // If there is more than 10 stop can call action
             if (receiptHandles.size() == SQSMessagingClientConstants.MAX_BATCH) {
@@ -79,7 +79,7 @@ public class NegativeAcknowledger extends BulkSQSOperation {
      * @param queueUrl
      *            The queueUrl of the queue, which the receipt handles belong.
      * @param receiptHandles
-     *            The list of handles, which is be used to negative acknowledge
+     *            The list of handles, which is being used to negative acknowledge
      *            the messages via using
      *            <code>changeMessageVisibilityBatch</code>.
      * @throws JMSException
@@ -87,17 +87,17 @@ public class NegativeAcknowledger extends BulkSQSOperation {
      */
     @Override
     public void action(String queueUrl, List<String> receiptHandles) throws JMSException {
-
         if (receiptHandles == null || receiptHandles.isEmpty()) {
             return;
         }
 
-        List<ChangeMessageVisibilityBatchRequestEntry> nackEntries = new ArrayList<ChangeMessageVisibilityBatchRequestEntry>(
+        List<ChangeMessageVisibilityBatchRequestEntry> nackEntries = new ArrayList<>(
                 receiptHandles.size());
         int batchId = 0;
         for (String messageReceiptHandle : receiptHandles) {
-            ChangeMessageVisibilityBatchRequestEntry changeMessageVisibilityBatchRequestEntry = new ChangeMessageVisibilityBatchRequestEntry(
-                    Integer.toString(batchId), messageReceiptHandle).withVisibilityTimeout(NACK_TIMEOUT);
+            ChangeMessageVisibilityBatchRequestEntry changeMessageVisibilityBatchRequestEntry =
+                    new ChangeMessageVisibilityBatchRequestEntry(Integer.toString(batchId), messageReceiptHandle)
+                            .withVisibilityTimeout(NACK_TIMEOUT);
             nackEntries.add(changeMessageVisibilityBatchRequestEntry);
             batchId++;
         }

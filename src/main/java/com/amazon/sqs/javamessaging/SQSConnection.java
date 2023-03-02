@@ -18,20 +18,20 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.jms.IllegalStateException;
-import javax.jms.Connection;
-import javax.jms.ConnectionConsumer;
-import javax.jms.ConnectionMetaData;
-import javax.jms.Destination;
-import javax.jms.ExceptionListener;
-import javax.jms.InvalidClientIDException;
-import javax.jms.JMSException;
-import javax.jms.Queue;
-import javax.jms.QueueConnection;
-import javax.jms.QueueSession;
-import javax.jms.ServerSessionPool;
-import javax.jms.Session;
-import javax.jms.Topic;
+import jakarta.jms.IllegalStateException;
+import jakarta.jms.Connection;
+import jakarta.jms.ConnectionConsumer;
+import jakarta.jms.ConnectionMetaData;
+import jakarta.jms.Destination;
+import jakarta.jms.ExceptionListener;
+import jakarta.jms.InvalidClientIDException;
+import jakarta.jms.JMSException;
+import jakarta.jms.Queue;
+import jakarta.jms.QueueConnection;
+import jakarta.jms.QueueSession;
+import jakarta.jms.ServerSessionPool;
+import jakarta.jms.Session;
+import jakarta.jms.Topic;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -106,12 +106,11 @@ public class SQSConnection implements Connection, QueueConnection {
      */
     private volatile boolean actionOnConnectionTaken = false;
 
-    private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<Session, Boolean>());
+    private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     SQSConnection(AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper, int numberOfMessagesToPrefetch) {
         amazonSQSClient = amazonSQSClientJMSWrapper;
         this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
-
     }
     
     /**
@@ -197,7 +196,7 @@ public class SQSConnection implements Connection, QueueConnection {
         }
         synchronized (stateLock) { 
             if (closing) {
-                /**
+                /*
                  * SQSSession's constructor has already started a SQSSessionCallbackScheduler which should be closed
                  * before leaving sqsSession object.
                  */
@@ -206,7 +205,7 @@ public class SQSConnection implements Connection, QueueConnection {
             }
             sessions.add(sqsSession);
 
-            /**
+            /*
              * Any new sessions created on a started connection should be
              * started on creation
              */
@@ -214,8 +213,17 @@ public class SQSConnection implements Connection, QueueConnection {
                 sqsSession.start();
             }
         }
-               
         return sqsSession;
+    }
+
+    @Override
+    public Session createSession(int acknowledgeMode) throws JMSException {
+        return createSession(false, acknowledgeMode);
+    }
+
+    @Override
+    public Session createSession() throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
     @Override
@@ -302,7 +310,7 @@ public class SQSConnection implements Connection, QueueConnection {
      * This means that a client can rely on the fact that none of its message
      * listeners will be called and that all threads of control waiting for
      * receive calls to return will not return with a message until the
-     * connection is restarted. The receive timers for a stopped connection
+     * connection is restarted. The Receive timers for a stopped connection
      * continue to advance, so receives may time out while the connection is
      * stopped.
      * <P>
@@ -335,7 +343,7 @@ public class SQSConnection implements Connection, QueueConnection {
                 try {
                     for (Session session : sessions) {
                         SQSSession sqsSession = (SQSSession) session;
-                        /**
+                        /*
                          * Session stop call blocks until receives and/or
                          * message listeners in progress have completed.
                          */
@@ -379,7 +387,7 @@ public class SQSConnection implements Connection, QueueConnection {
             return;
         }
 
-        /**
+        /*
          * A message listener must not attempt to close its own connection as
          * this would lead to deadlock.
          */
@@ -410,7 +418,7 @@ public class SQSConnection implements Connection, QueueConnection {
 
                 }
             }
-        }/** Blocks until closing of the connection completes */
+        }// Blocks until closing of the connection completes
         else {
             synchronized (stateLock) {
                 while (!closed) {
@@ -431,7 +439,7 @@ public class SQSConnection implements Connection, QueueConnection {
      * from list of Sessions.
      */
     void removeSession(Session session) throws JMSException {
-        /**
+        /*
          * No need to synchronize on stateLock assuming this can be only called
          * by session.close(), on which point connection will not be worried
          * about missing closing this session.
@@ -513,8 +521,25 @@ public class SQSConnection implements Connection, QueueConnection {
 
     /** This method is not supported. */
     @Override
-    public ConnectionConsumer createConnectionConsumer(Queue queue, String messageSelector, ServerSessionPool sessionPool, int maxMessages)
-            throws JMSException {
+    public ConnectionConsumer createConnectionConsumer(
+            Queue queue, String messageSelector, ServerSessionPool sessionPool, int maxMessages
+    ) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public ConnectionConsumer createSharedConnectionConsumer(
+            Topic topic, String subscriptionName, String messageSelector, ServerSessionPool sessionPool, int maxMessages
+    ) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public ConnectionConsumer createSharedDurableConnectionConsumer(
+            Topic topic, String subscriptionName, String messageSelector, ServerSessionPool sessionPool, int maxMessages
+    ) throws JMSException {
         throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
@@ -529,8 +554,8 @@ public class SQSConnection implements Connection, QueueConnection {
         return closed;
     }
 
-    void setClosing(boolean closing) {
-        this.closing = closing;
+    void setClosing() {
+        this.closing = true;
     }
 
     void setRunning(boolean running) {

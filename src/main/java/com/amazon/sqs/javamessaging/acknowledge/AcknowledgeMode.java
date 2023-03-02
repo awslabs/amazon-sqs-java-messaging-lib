@@ -14,7 +14,7 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
@@ -64,16 +64,14 @@ public enum AcknowledgeMode {
      * @throws JMSException
      *             If invalid acknowledge mode is used.
      */
-    public Acknowledger createAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession parentSQSSession) throws JMSException {
-        switch (this) {
-        case ACK_AUTO:
-            return new AutoAcknowledger(amazonSQSClient, parentSQSSession);
-        case ACK_RANGE:
-            return new RangedAcknowledger(amazonSQSClient, parentSQSSession);
-        case ACK_UNORDERED:
-            return new UnorderedAcknowledger(amazonSQSClient, parentSQSSession);
-        default:
-            throw new JMSException(this + " - AcknowledgeMode does not exist");
-        }
+    public Acknowledger createAcknowledger(
+            AmazonSQSMessagingClientWrapper amazonSQSClient,
+            SQSSession parentSQSSession) throws JMSException {
+        return switch (this) {
+            case ACK_AUTO -> new AutoAcknowledger(amazonSQSClient, parentSQSSession);
+            case ACK_RANGE -> new RangedAcknowledger(amazonSQSClient, parentSQSSession);
+            case ACK_UNORDERED -> new UnorderedAcknowledger(amazonSQSClient, parentSQSSession);
+            default -> throw new JMSException(this + " - AcknowledgeMode does not exist");
+        };
     }
 }
