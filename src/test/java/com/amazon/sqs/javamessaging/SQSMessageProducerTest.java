@@ -47,9 +47,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doNothing;
@@ -130,7 +129,7 @@ public class SQSMessageProducerTest {
         SQSMessage sqsText = new SQSTextMessage();
         Map<String, MessageAttributeValue> messageAttributeText = producer.propertyToMessageAttribute(sqsText);
 
-        assertEquals(0, messageAttributeText.size());
+        assertThat(messageAttributeText).isEmpty();
 
         /*
          * Test Empty object message default attribute
@@ -138,16 +137,15 @@ public class SQSMessageProducerTest {
         SQSMessage sqsObject = new SQSObjectMessage();
         Map<String, MessageAttributeValue> messageAttributeObject = producer.propertyToMessageAttribute(sqsObject);
 
-        assertEquals(0, messageAttributeObject.size());
+        assertThat(messageAttributeObject).isEmpty();
 
         /*
          * Test Empty byte message default attribute
          */
         SQSMessage sqsByte = new SQSBytesMessage();
-        // TODO messageAttributeByte not verified
         Map<String, MessageAttributeValue> messageAttributeByte = producer.propertyToMessageAttribute(sqsByte);
 
-        assertEquals(0, messageAttributeObject.size());
+        assertThat(messageAttributeByte).isEmpty();
     }
 
     /**
@@ -241,15 +239,15 @@ public class SQSMessageProducerTest {
         /*
          * Verify results
          */
-        assertEquals(messageAttributeValueBoolean, messageAttribute.get(booleanProperty));
-        assertEquals(messageAttributeValueByte, messageAttribute.get(byteProperty));
-        assertEquals(messageAttributeValueShort, messageAttribute.get(shortProperty));
-        assertEquals(messageAttributeValueInt, messageAttribute.get(intProperty));
-        assertEquals(messageAttributeValueLong, messageAttribute.get(longProperty));
-        assertEquals(messageAttributeValueFloat, messageAttribute.get(floatProperty));
-        assertEquals(messageAttributeValueDouble, messageAttribute.get(doubleProperty));
-        assertEquals(messageAttributeValueString, messageAttribute.get(stringProperty));
-        assertEquals(messageAttributeValueObject, messageAttribute.get(objectProperty));
+        assertThat(messageAttributeValueBoolean).isEqualTo(messageAttribute.get(booleanProperty));
+        assertThat(messageAttributeValueByte).isEqualTo(messageAttribute.get(byteProperty));
+        assertThat(messageAttributeValueShort).isEqualTo(messageAttribute.get(shortProperty));
+        assertThat(messageAttributeValueInt).isEqualTo(messageAttribute.get(intProperty));
+        assertThat(messageAttributeValueLong).isEqualTo(messageAttribute.get(longProperty));
+        assertThat(messageAttributeValueFloat).isEqualTo(messageAttribute.get(floatProperty));
+        assertThat(messageAttributeValueDouble).isEqualTo(messageAttribute.get(doubleProperty));
+        assertThat(messageAttributeValueString).isEqualTo(messageAttribute.get(stringProperty));
+        assertThat(messageAttributeValueObject).isEqualTo(messageAttribute.get(objectProperty));
 
     }
 
@@ -382,8 +380,8 @@ public class SQSMessageProducerTest {
         ArgumentCaptor<SendMessageRequest> argumentCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
         verify(amazonSQSClient, times(2)).sendMessage(argumentCaptor.capture());
 
-        assertEquals(megBody1, argumentCaptor.getAllValues().get(0).messageBody());
-        assertEquals(megBody2, argumentCaptor.getAllValues().get(1).messageBody());
+        assertThat(megBody1).isEqualTo(argumentCaptor.getAllValues().get(0).messageBody());
+        assertThat(megBody2).isEqualTo(argumentCaptor.getAllValues().get(1).messageBody());
         verify(msg, times(2)).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_1);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID_2);
@@ -524,7 +522,7 @@ public class SQSMessageProducerTest {
      */
     @Test
     public void testGetQueue() throws JMSException {
-        assertEquals(destination, producer.getQueue());
+        assertThat(destination).isEqualTo(producer.getQueue());
     }
 
     /**
@@ -632,11 +630,11 @@ public class SQSMessageProducerTest {
 
     @Test
     public void testSetDeliveryDelay() throws JMSException {
-        assertEquals(0, producer.getDeliveryDelay());
+        assertThat(producer.getDeliveryDelay()).isZero();
 
         producer.setDeliveryDelay(2000);
 
-        assertEquals(2000, producer.getDeliveryDelay());
+        assertThat(producer.getDeliveryDelay()).isEqualTo(2000);
 
         ArgumentCaptor<SendMessageRequest> requestCaptor = ArgumentCaptor.forClass(SendMessageRequest.class);
         when(amazonSQSClient.sendMessage(requestCaptor.capture()))
@@ -645,7 +643,7 @@ public class SQSMessageProducerTest {
         SQSTextMessage msg = new SQSTextMessage("Sorry I'm late!");
         producer.send(msg);
 
-        assertEquals(2, requestCaptor.getValue().delaySeconds().intValue());
+        assertThat(requestCaptor.getValue().delaySeconds().intValue()).isEqualTo(2);
     }
 
 
@@ -675,9 +673,9 @@ public class SQSMessageProducerTest {
 
         @Override
         public boolean matches(SendMessageRequest request) {
-            assertEquals(queueUrl, request.queueUrl());
-            assertTrue(messagesBody.contains(request.messageBody()));
-            assertEquals(messageAttributes, request.messageAttributes());
+            assertThat(queueUrl).isEqualTo(request.queueUrl());
+            assertThat(messagesBody).contains(request.messageBody());
+            assertThat(messageAttributes).isEqualTo(request.messageAttributes());
             return true;
         }
     }
