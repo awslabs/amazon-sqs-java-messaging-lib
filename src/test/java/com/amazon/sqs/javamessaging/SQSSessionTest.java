@@ -361,6 +361,25 @@ public class SQSSessionTest  {
 
         assertThrows(JMSException.class, () -> sqsSession.createMapMessage(),
                 SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+
+        assertThrows(JMSException.class, () -> sqsSession.createSharedConsumer(null, "name"),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+
+        assertThrows(JMSException.class, () -> sqsSession.createSharedConsumer(null, "name", "messageSelector"),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+
+        assertThrows(JMSException.class, () -> sqsSession.createDurableConsumer(null, "name"),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+
+        assertThrows(JMSException.class, () ->
+                        sqsSession.createDurableConsumer(null, "name", "messageSelector", true),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+
+        assertThrows(JMSException.class, () -> sqsSession.createSharedDurableConsumer(null, "name"),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+
+        assertThrows(JMSException.class, () -> sqsSession.createSharedDurableConsumer(null, "name", "messageSelector"),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
     /**

@@ -16,6 +16,7 @@ package com.amazon.sqs.javamessaging;
 
 import jakarta.jms.JMSException;
 
+import jakarta.jms.JMSRuntimeException;
 import org.junit.jupiter.api.Test;
 
 import com.amazonaws.regions.Regions;
@@ -24,6 +25,7 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 public class SQSConnectionFactoryTest {
@@ -84,5 +86,19 @@ public class SQSConnectionFactoryTest {
         
         connection1.close();
         connection2.close();
+    }
+
+    // Test unsupported methods
+    @Test
+    public void testUnsupportedFeature() {
+        SQSConnectionFactory factory = SQSConnectionFactory.builder().build();
+        assertThrows(JMSRuntimeException.class, factory::createContext,
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        assertThrows(JMSRuntimeException.class, () -> factory.createContext("userName", "password"),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        assertThrows(JMSRuntimeException.class, () -> factory.createContext("userName", "password", 2),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        assertThrows(JMSRuntimeException.class, () -> factory.createContext(1),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 }

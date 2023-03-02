@@ -583,6 +583,8 @@ public class SQSConnectionTest {
         // Start connection
         assertThrows(IllegalStateException.class, () -> sqsConnection.createSession(false, Session.AUTO_ACKNOWLEDGE),
                 "Connection is closed or closing");
+        assertThrows(IllegalStateException.class, () -> sqsConnection.createSession(Session.AUTO_ACKNOWLEDGE),
+                "Connection is closed or closing");
 
         // Verify results
         assertEquals(2, sqsConnection.getSessions().size());
@@ -600,6 +602,14 @@ public class SQSConnectionTest {
 
         // Verify results
         assertEquals(2, sqsConnection.getSessions().size());
+    }
+
+    /**
+     * Test create session must parse in a parameter
+     */
+    @Test
+    public void testCreateSessionWithNoParseInValue() {
+        assertThrows(JMSException.class, () -> sqsConnection.createSession(), "Unsupported Method");
     }
 
     /**

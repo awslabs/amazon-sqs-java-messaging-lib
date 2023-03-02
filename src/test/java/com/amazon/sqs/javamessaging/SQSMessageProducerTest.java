@@ -24,6 +24,7 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
 import com.amazonaws.util.Base64;
+import jakarta.jms.CompletionListener;
 import jakarta.jms.Destination;
 import jakarta.jms.IllegalStateException;
 import jakarta.jms.InvalidDestinationException;
@@ -47,8 +48,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doNothing;
@@ -639,8 +640,7 @@ public class SQSMessageProducerTest {
         
         assertEquals(2, requestCaptor.getValue().getDelaySeconds().intValue());
     }
-    
-    
+
     @Test
     public void testSetDeliveryDelayInvalidDelays() {
         assertThrows(IllegalArgumentException.class, () -> producer.setDeliveryDelay(-1));
@@ -650,8 +650,24 @@ public class SQSMessageProducerTest {
 
         assertThrows(IllegalArgumentException.class, () -> producer.setDeliveryDelay(20));
     }
-    
-    
+
+    // Test unsupported methods
+    @Test
+    public void testUnsupportedFeature() {
+        Message message = mock(Message.class);
+        CompletionListener listener = mock(CompletionListener.class);
+        Destination msgDestination = mock(Destination.class);
+
+        assertThrows(JMSException.class, () -> producer.send(message, listener),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        assertThrows(JMSException.class, () -> producer.send(message, 1, 1, 100L, listener),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        assertThrows(JMSException.class, () -> producer.send(msgDestination, message, listener),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+        assertThrows(JMSException.class, () -> producer.send(destination, message, 0, 0, 20L, listener),
+                SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
     private Map<String, MessageAttributeValue> createMessageAttribute(String type) {
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setDataType("String");
