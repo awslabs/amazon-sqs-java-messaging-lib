@@ -14,23 +14,20 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
+import jakarta.jms.JMSException;
+import jakarta.jms.ObjectMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.utils.BinaryUtils;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-
-import javax.jms.JMSException;
-import javax.jms.ObjectMessage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.utils.BinaryUtils;
 
 /**
  * An ObjectMessage object is used to send a message that contains a Java
@@ -80,9 +77,9 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
      * 
      * @param payload
      *            The <code>Serializable</code> containing the message's body
-     * @throws MessageNotWriteableException
+     * @throws jakarta.jms.MessageNotWriteableException
      *             If the message is in read-only mode.
-     * @throws MessageFormatException
+     * @throws jakarta.jms.MessageFormatException
      *             If object serialization fails.
      */
     @Override
@@ -94,7 +91,7 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
     /**
      * Gets the <code>Serializable</code> containing this message's body
      * 
-     * @throws MessageFormatException
+     * @throws jakarta.jms.MessageFormatException
      *             If object deserialization fails.
      */
     @Override

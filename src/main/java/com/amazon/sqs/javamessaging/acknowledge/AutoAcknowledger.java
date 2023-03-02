@@ -14,16 +14,14 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import java.util.Collections;
-import java.util.List;
-
-import javax.jms.JMSException;
-
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
-
+import jakarta.jms.JMSException;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Used by session to automatically acknowledge a client's receipt of a message
@@ -65,7 +63,7 @@ public class AutoAcknowledger implements Acknowledger {
      */
     @Override
     public List<SQSMessageIdentifier> getUnAckMessages() {
-        return Collections.<SQSMessageIdentifier>emptyList(); 
+        return new ArrayList<>();
     }
     
     /** AutoAcknowledge doesn't need to do anything in this method. */

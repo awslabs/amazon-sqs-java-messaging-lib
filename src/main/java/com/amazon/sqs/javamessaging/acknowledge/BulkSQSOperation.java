@@ -14,15 +14,14 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
+import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
+import jakarta.jms.JMSException;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import javax.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 
 /**
  * This is used by different acknowledgers that requires partitioning of the
@@ -46,7 +45,7 @@ public abstract class BulkSQSOperation {
         assert indexOfMessage > 0;
         assert indexOfMessage <= messageIdentifierList.size();
 
-        Map<String, List<String>> receiptHandleWithSameQueueUrl = new HashMap<String, List<String>>();
+        Map<String, List<String>> receiptHandleWithSameQueueUrl = new HashMap<>();
         
         // Add all messages up to and including requested message into Map.
         // Map contains key as queueUrl and value as list receiptHandles from
@@ -55,12 +54,8 @@ public abstract class BulkSQSOperation {
         for (int i = 0; i < indexOfMessage; i++) {
             SQSMessageIdentifier messageIdentifier = messageIdentifierList.get(i);
             String queueUrl = messageIdentifier.getQueueUrl();
-            List<String> receiptHandles = receiptHandleWithSameQueueUrl.get(queueUrl);
+            List<String> receiptHandles = receiptHandleWithSameQueueUrl.computeIfAbsent(queueUrl, k -> new ArrayList<>());
             // if value of queueUrl is null create new list.
-            if (receiptHandles == null) {
-                receiptHandles = new ArrayList<String>();
-                receiptHandleWithSameQueueUrl.put(queueUrl, receiptHandles);
-            }
             // add receiptHandle to the list.
             receiptHandles.add(messageIdentifier.getReceiptHandle());
             // Once there are 10 messages in messageBatch, apply the batch action

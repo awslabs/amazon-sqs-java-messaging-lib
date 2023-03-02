@@ -14,19 +14,17 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
+import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
+import jakarta.jms.JMSException;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
 
 /**
  * Used to negative acknowledge of group of messages.
@@ -59,9 +57,9 @@ public class NegativeAcknowledger extends BulkSQSOperation {
      *             If <code>action</code> throws.
      */
     public void bulkAction(ArrayDeque<MessageManager> messageQueue, String queueUrl) throws JMSException {
-        List<String> receiptHandles = new ArrayList<String>();
+        List<String> receiptHandles = new ArrayList<>();
         while (!messageQueue.isEmpty()) {
-            receiptHandles.add(((SQSMessage) (messageQueue.pollFirst().getMessage())).getReceiptHandle());
+            receiptHandles.add(((SQSMessage) (messageQueue.pollFirst().message())).getReceiptHandle());
 
             // If there is more than 10 stop can call action
             if (receiptHandles.size() == SQSMessagingClientConstants.MAX_BATCH) {
@@ -88,13 +86,11 @@ public class NegativeAcknowledger extends BulkSQSOperation {
      */
     @Override
     public void action(String queueUrl, List<String> receiptHandles) throws JMSException {
-
         if (receiptHandles == null || receiptHandles.isEmpty()) {
             return;
         }
 
-        List<ChangeMessageVisibilityBatchRequestEntry> nackEntries = new ArrayList<ChangeMessageVisibilityBatchRequestEntry>(
-                receiptHandles.size());
+        List<ChangeMessageVisibilityBatchRequestEntry> nackEntries = new ArrayList<>(receiptHandles.size());
         int batchId = 0;
         for (String messageReceiptHandle : receiptHandles) {
             ChangeMessageVisibilityBatchRequestEntry changeMessageVisibilityBatchRequestEntry = ChangeMessageVisibilityBatchRequestEntry.builder()

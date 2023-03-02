@@ -14,6 +14,18 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
+import jakarta.jms.BytesMessage;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageEOFException;
+import jakarta.jms.MessageFormatException;
+import jakarta.jms.MessageNotReadableException;
+import jakarta.jms.MessageNotWriteableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.utils.BinaryUtils;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -22,28 +34,11 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
 
-import javax.jms.BytesMessage;
-import javax.jms.JMSException;
-import javax.jms.MessageEOFException;
-import javax.jms.MessageFormatException;
-import javax.jms.MessageNotReadableException;
-import javax.jms.MessageNotWriteableException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.utils.BinaryUtils;
-
 /**
  * This class borrows from <code>ActiveMQStreamMessage</code>, which is also
  * licensed under Apache2.0. Its methods are based largely on those found in
  * <code>java.io.DataInputStream</code> and
  * <code>java.io.DataOutputStream</code>.
- * 
- * @see org.apache.activemq.command.ActiveMQStreamMessage
  */
 public class SQSBytesMessage extends SQSMessage implements BytesMessage {
     private static final Logger LOG = LoggerFactory.getLogger(SQSBytesMessage.class);
@@ -62,9 +57,9 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
     public SQSBytesMessage(Acknowledger acknowledger, String queueUrl, Message sqsMessage) throws JMSException {
         super(acknowledger, queueUrl, sqsMessage);
         try {
-            /** Bytes is set by the reset() */
+            /* Bytes are set by the reset() */
             dataOut.write(BinaryUtils.fromBase64(sqsMessage.body()));
-            /** Makes it read-only */
+            /* Makes it read-only */
             reset();
         } catch (IOException e) {
             LOG.error("IOException: Message cannot be written", e);
@@ -433,7 +428,7 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
         }
         checkCanRead();
         try {
-            /**
+            /*
              * Almost copy of readFully implementation except that EOFException
              * is not thrown if the stream is at the end of file and no byte is
              * available
@@ -446,7 +441,7 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
                 }
                 n += count;
             }
-            /**
+            /*
              * JMS specification mentions that the next read of the stream
              * returns -1 if the previous read consumed the byte stream and
              * there are no more bytes left to be read from the stream
@@ -751,7 +746,6 @@ public class SQSBytesMessage extends SQSMessage implements BytesMessage {
      */
     @Override
     public void reset() throws JMSException {
-
         if (dataOut != null) {
             bytes = bytesOut.toByteArray();
             dataOut = null;

@@ -14,42 +14,39 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import java.util.ArrayList;
+import jakarta.jms.ConnectionMetaData;
+import jakarta.jms.JMSException;
+
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 
-import javax.jms.ConnectionMetaData;
-import javax.jms.JMSException;
-
 
 public class SQSConnectionMetaData implements ConnectionMetaData {
-    
-    private String jmsVersion;
-    private int jmsMajorVersion;
-    private int jmsMinorVersion;
-    
-    private String jmsProviderName;
-    private String providerVersion;
-    private int providerMajorVersion;
-    private int providerMinorVersion;
-    
-    private List<String> jmsxProperty;
-    
+
+    private final String jmsVersion;
+    private final int jmsMajorVersion;
+    private final int jmsMinorVersion;
+
+    private final String jmsProviderName;
+    private final String providerVersion;
+    private final int providerMajorVersion;
+    private final int providerMinorVersion;
+
+    private final List<String> jmsxProperty;
+
     SQSConnectionMetaData() {
         this.jmsVersion = "1.1";
         this.jmsMajorVersion = 1;
         this.jmsMinorVersion = 1;
-        
+
         this.jmsProviderName = "Amazon";
         this.providerVersion = "1.0";
         this.providerMajorVersion = 1;
         this.providerMinorVersion = 0;
-        
-        this.jmsxProperty = new ArrayList<String>();
-        jmsxProperty.add(SQSMessagingClientConstants.JMSX_DELIVERY_COUNT);
-        jmsxProperty.add(SQSMessagingClientConstants.JMSX_GROUP_ID);
-        jmsxProperty.add(SQSMessagingClientConstants.JMSX_GROUP_SEC);
+
+        this.jmsxProperty = List.of(SQSMessagingClientConstants.JMSX_DELIVERY_COUNT,
+                SQSMessagingClientConstants.JMSX_GROUP_ID, SQSMessagingClientConstants.JMSX_GROUP_SEC);
     }
 
     @Override
@@ -90,5 +87,5 @@ public class SQSConnectionMetaData implements ConnectionMetaData {
     @Override
     public Enumeration<String> getJMSXPropertyNames() throws JMSException {
         return Collections.enumeration(jmsxProperty);
-    }    
+    }
 }

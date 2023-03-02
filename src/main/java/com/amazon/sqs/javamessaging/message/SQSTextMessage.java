@@ -14,11 +14,9 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
-import javax.jms.JMSException;
-import javax.jms.TextMessage;
-
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-
+import jakarta.jms.JMSException;
+import jakarta.jms.TextMessage;
 import software.amazon.awssdk.services.sqs.model.Message;
 
 /**
@@ -66,7 +64,7 @@ public class SQSTextMessage extends SQSMessage implements TextMessage {
      * 
      * @param string
      *            The <code>String</code> containing the message's body
-     * @throws MessageNotWriteableException
+     * @throws jakarta.jms.MessageNotWriteableException
      *             If the message is in read-only mode.
      */
     @Override

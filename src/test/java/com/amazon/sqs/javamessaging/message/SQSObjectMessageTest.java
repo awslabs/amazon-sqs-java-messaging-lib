@@ -14,22 +14,19 @@
  */
 package com.amazon.sqs.javamessaging.message;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
+import jakarta.jms.JMSException;
+import jakarta.jms.ObjectMessage;
+import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.jms.JMSException;
-import javax.jms.ObjectMessage;
-
-import org.junit.Assert;
-import org.junit.Test;
-
-import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Test the SQSObjectMessageTest class
@@ -41,13 +38,12 @@ public class SQSObjectMessageTest {
      */
     @Test
     public void testSetObject() throws JMSException {
-        Map<String, String> expectedPayload = new HashMap<String, String>();
-        expectedPayload.put("testKey", "testValue");
+        Map<String, String> expectedPayload = Map.of("testKey", "testValue");
 
         ObjectMessage objectMessage = new SQSObjectMessage();
         objectMessage.setObject((Serializable) expectedPayload);
         
-        Map<String, String> actualPayload = (HashMap<String, String>) objectMessage.getObject();
+        Map<String, String> actualPayload = (Map<String, String>) objectMessage.getObject();
         assertEquals(expectedPayload, actualPayload);
     }
 
@@ -56,12 +52,11 @@ public class SQSObjectMessageTest {
      */
     @Test
     public void testCreateMessageWithObject() throws JMSException {
-        Map<String, String> expectedPayload = new HashMap<String, String>();
-        expectedPayload.put("testKey", "testValue");
+        Map<String, String> expectedPayload = Map.of("testKey", "testValue");
 
         ObjectMessage objectMessage = new SQSObjectMessage((Serializable) expectedPayload);
         
-        Map<String, String> actualPayload = (HashMap<String, String>) objectMessage.getObject();
+        Map<String, String> actualPayload = (Map<String, String>) objectMessage.getObject();
         assertEquals(expectedPayload, actualPayload);
     }
 
@@ -70,20 +65,20 @@ public class SQSObjectMessageTest {
      */
     @Test
     public void testObjectSerialization() throws JMSException {
-        Map<String, String> expectedPayload = new HashMap<String, String>();
+        Map<String, String> expectedPayload = new HashMap<>();
         expectedPayload.put("testKey", "testValue");
 
         SQSObjectMessage sqsObjectMessage = new SQSObjectMessage();
 
-        String serialized = sqsObjectMessage.serialize((Serializable) expectedPayload);
+        String serialized = SQSObjectMessage.serialize((Serializable) expectedPayload);
 
-        assertNotNull("Serialized object should not be null.", serialized);
-        Assert.assertFalse("Serialized object should not be empty.", "".equals(serialized));
+        assertNotNull(serialized, "Serialized object should not be null.");
+        assertNotEquals("", serialized, "Serialized object should not be empty.");
 
-        Map<String, String> deserialized = (Map<String, String>) sqsObjectMessage.deserialize(serialized);
+        Map<String, String> deserialized = (Map<String, String>) SQSObjectMessage.deserialize(serialized);
 
-        assertNotNull("Deserialized object should not be null.", deserialized);
-        assertEquals("Serialized object should be equal to original object.", expectedPayload, deserialized);
+        assertNotNull(deserialized, "Deserialized object should not be null.");
+        assertEquals(expectedPayload, deserialized, "Serialized object should be equal to original object.");
 
         sqsObjectMessage.clearBody();
 
@@ -96,17 +91,10 @@ public class SQSObjectMessageTest {
      */
     @Test
     public void testDeserializeIllegalInput() throws JMSException {
-        String wrongString = "Wrong String";
-        SQSObjectMessage sqsObjectMessage = new SQSObjectMessage();
+        assertThatThrownBy(() -> SQSObjectMessage.deserialize("Wrong String"))
+                .isInstanceOf(JMSException.class);
 
-        try {
-            sqsObjectMessage.deserialize(wrongString);
-            fail();
-        } catch (JMSException exception) {
-        }
-
-        assertNull(sqsObjectMessage.deserialize(null));
-
-        assertNull(sqsObjectMessage.serialize(null));
+        assertNull(SQSObjectMessage.deserialize(null));
+        assertNull(SQSObjectMessage.serialize(null));
     }
 }

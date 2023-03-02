@@ -16,15 +16,14 @@ package com.amazon.sqs.javamessaging;
 
 import com.amazon.sqs.javamessaging.acknowledge.BulkSQSOperation;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import javax.jms.JMSException;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.Test;
-import org.junit.Before; 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
@@ -39,13 +38,11 @@ public class BulkSQSOperationTest {
 
     private BulkSQSOperation bulkAction;
 
-    @Before
-    public void before() throws Exception {
-
+    @BeforeEach
+    public void before() {
         bulkAction = spy(new BulkSQSOperation() {
             @Override
-            public void action(String queueUrl, List<String> receiptHandles) throws JMSException {
-                return;
+            public void action(String queueUrl, List<String> receiptHandles) {
             }
         });
     }
@@ -54,34 +51,21 @@ public class BulkSQSOperationTest {
      * Test illegal index value cases
      */
     @Test
-    public void testBulkActionIllegalIndexValue() throws Exception {
-
-        List<SQSMessageIdentifier> messageIdentifierList = new ArrayList<SQSMessageIdentifier>();
-        messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL, "receiptHandle1", "sqsMessageId1"));
-        messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL, "receiptHandle2", "sqsMessageId2"));
-        messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL, "receiptHandle3", "sqsMessageId3"));
+    public void testBulkActionIllegalIndexValue() {
+        List<SQSMessageIdentifier> messageIdentifierList = List.of(
+                new SQSMessageIdentifier(QUEUE_URL, "receiptHandle1", "sqsMessageId1"),
+                new SQSMessageIdentifier(QUEUE_URL, "receiptHandle2", "sqsMessageId2"),
+                new SQSMessageIdentifier(QUEUE_URL, "receiptHandle3", "sqsMessageId3"));
 
         int negativeSize = -10;
-        try {
-            bulkAction.bulkAction(messageIdentifierList, negativeSize);
-            fail();
-        } catch(AssertionError ae) {
-            // expected exception
-        }
+        assertThatThrownBy(() -> bulkAction.bulkAction(messageIdentifierList, negativeSize))
+                .isInstanceOf(AssertionError.class);
 
-        try {
-            bulkAction.bulkAction(messageIdentifierList, 0);
-            fail();
-        } catch(AssertionError ae) {
-            // expected exception
-        }
+        assertThatThrownBy(() -> bulkAction.bulkAction(messageIdentifierList, 0))
+                .isInstanceOf(AssertionError.class);
 
-        try {
-            bulkAction.bulkAction(messageIdentifierList, 3);
-            fail();
-        } catch(AssertionError ae) {
-            // expected exception
-        }
+        assertThatThrownBy(() -> bulkAction.bulkAction(messageIdentifierList, messageIdentifierList.size() + 1))
+                .isInstanceOf(AssertionError.class);
     }
 
     /**
@@ -89,22 +73,21 @@ public class BulkSQSOperationTest {
      */
     @Test
     public void testBulkActionBelowBatchSize() throws Exception {
-
-        List<SQSMessageIdentifier> messageIdentifierList = new ArrayList<SQSMessageIdentifier>();
+        List<SQSMessageIdentifier> messageIdentifierList = new ArrayList<>();
 
         int numMessagesFromQueue = (SQSMessagingClientConstants.MAX_BATCH - 2) / 2;
 
         // Create message from the first queue
         int i = 0;
-        List<String> receiptHandles1 = new ArrayList<String>();
+        List<String> receiptHandles1 = new ArrayList<>();
         for (; i < numMessagesFromQueue; ++i) {
             messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL + 1,
-                                                               RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
+                    RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
             receiptHandles1.add(RECEIPT_HANDLE_PREFIX + i);
         }
 
         // Create message from the second queue
-        List<String> receiptHandles2 = new ArrayList<String>();
+        List<String> receiptHandles2 = new ArrayList<>();
         for (; i < numMessagesFromQueue * 2; ++i) {
             messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL + 2,
                     RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
@@ -123,14 +106,13 @@ public class BulkSQSOperationTest {
      */
     @Test
     public void testBulkActionAboveBatchSize() throws Exception {
-
-        List<SQSMessageIdentifier> messageIdentifierList = new ArrayList<SQSMessageIdentifier>();
+        List<SQSMessageIdentifier> messageIdentifierList = new ArrayList<>();
 
         int numMessagesFromQueue = SQSMessagingClientConstants.MAX_BATCH * 2 + 3;
 
         // Create messages from the first batch
         int i = 0;
-        List<String> firstBatchReceiptHandles = new ArrayList<String>();
+        List<String> firstBatchReceiptHandles = new ArrayList<>();
         for (; i < SQSMessagingClientConstants.MAX_BATCH; ++i) {
             messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL + 1,
                     RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
@@ -138,7 +120,7 @@ public class BulkSQSOperationTest {
         }
 
         // Create messages from the second batch
-        List<String> secondBatchReceiptHandles = new ArrayList<String>();
+        List<String> secondBatchReceiptHandles = new ArrayList<>();
         for (; i < SQSMessagingClientConstants.MAX_BATCH * 2; ++i) {
             messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL + 1,
                     RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
@@ -146,7 +128,7 @@ public class BulkSQSOperationTest {
         }
 
         // Create messages from the third batch
-        List<String> thirdBatchReceiptHandles = new ArrayList<String>();
+        List<String> thirdBatchReceiptHandles = new ArrayList<>();
         for (; i < numMessagesFromQueue; ++i) {
             messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL + 1,
                     RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
@@ -154,19 +136,19 @@ public class BulkSQSOperationTest {
         }
 
         // Create messages from a different queue
-        List<String> receiptHandles2 = new ArrayList<String>();
+        List<String> receiptHandles2 = new ArrayList<>();
         for (i = 0; i < SQSMessagingClientConstants.MAX_BATCH / 2; ++i) {
             messageIdentifierList.add(new SQSMessageIdentifier(QUEUE_URL + 2,
                     RECEIPT_HANDLE_PREFIX + i, MESSAGE_ID_PREFIX + i));
             receiptHandles2.add(RECEIPT_HANDLE_PREFIX + i);
         }
 
-        final List<List<String>> receiptHandlesList  = new ArrayList<List<String>>();
-        final List<String> queueUrlList  = new ArrayList<String>();
+        final List<List<String>> receiptHandlesList = new ArrayList<>();
+        final List<String> queueUrlList = new ArrayList<>();
         bulkAction = new BulkSQSOperation() {
             @Override
-            public void action(String queueUrl, List<String> receiptHandles) throws JMSException {
-                receiptHandlesList.add(new ArrayList<String>(receiptHandles));
+            public void action(String queueUrl, List<String> receiptHandles) {
+                receiptHandlesList.add(new ArrayList<>(receiptHandles));
                 queueUrlList.add(queueUrl);
             }
         };

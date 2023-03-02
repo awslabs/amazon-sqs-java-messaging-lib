@@ -14,11 +14,10 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import java.util.List;
-
-import javax.jms.JMSException;
-
 import com.amazon.sqs.javamessaging.message.SQSMessage;
+import jakarta.jms.JMSException;
+
+import java.util.List;
 
 public interface Acknowledger {
 
@@ -29,7 +28,7 @@ public interface Acknowledger {
      *            message to acknowledge.
      * @throws JMSException
      */
-    public void acknowledge(SQSMessage message) throws JMSException;
+    void acknowledge(SQSMessage message) throws JMSException;
 
     /**
      * Used when receiving messages. Depending on acknowledge mode this will
@@ -39,17 +38,17 @@ public interface Acknowledger {
      *            notify acknowledger message is received
      * @throws JMSException
      */
-    public void notifyMessageReceived(SQSMessage message) throws JMSException;
+    void notifyMessageReceived(SQSMessage message) throws JMSException;
 
     /**
      * Used in negative acknowledge. Gets all delivered but not acknowledged
      * messages.
      */
-    public List<SQSMessageIdentifier> getUnAckMessages();
+    List<SQSMessageIdentifier> getUnAckMessages();
 
     /**
      * Deletes all not acknowledged delivered messages.
      */
-    public void forgetUnAckMessages();
+    void forgetUnAckMessages();
 
 }

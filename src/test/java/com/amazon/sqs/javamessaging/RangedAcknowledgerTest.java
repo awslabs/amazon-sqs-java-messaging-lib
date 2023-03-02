@@ -14,32 +14,27 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
+import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
+import jakarta.jms.JMSException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequest;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.jms.JMSException;
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
-
-import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequest;
-
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 
 /**
@@ -47,7 +42,7 @@ import org.mockito.ArgumentCaptor;
  */
 public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
-    @Before
+    @BeforeEach
     public void setupRanded() throws JMSException {
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
         acknowledger = AcknowledgeMode.ACK_RANGE.createAcknowledger(amazonSQSClient, mock(SQSSession.class));
@@ -62,7 +57,7 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         populateMessage(populateMessageSize);
 
         acknowledger.forgetUnAckMessages();
-        Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
+        assertEquals(0, acknowledger.getUnAckMessages().size());
     }
 
     /**
@@ -73,10 +68,10 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         int populateMessageSize = 34;
         populateMessage(populateMessageSize);
         int ackMessage = 33;
-        
+
         testAcknowledge(populateMessageSize, ackMessage);
-        
-        Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
+
+        assertEquals(0, acknowledger.getUnAckMessages().size());
     }
 
     /**
@@ -92,22 +87,22 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
         ArgumentCaptor<DeleteMessageBatchRequest> argumentCaptor = ArgumentCaptor.forClass(DeleteMessageBatchRequest.class);
         verify(amazonSQSClient, times(5)).deleteMessageBatch(argumentCaptor.capture());
-        
+
         //key is the queue url
         //value is the sequence of sizes of expected batches
-        Map<String, List<Integer>> expectedCalls = new HashMap<String, List<Integer>>();
-        List<Integer> queue0Calls = new ArrayList<Integer>();
+        Map<String, List<Integer>> expectedCalls = new HashMap<>();
+        List<Integer> queue0Calls = new ArrayList<>();
         queue0Calls.add(10);
         queue0Calls.add(1);
         expectedCalls.put(baseQueueUrl + 0, queue0Calls);
-        List<Integer> queue1Calls = new ArrayList<Integer>();
+        List<Integer> queue1Calls = new ArrayList<>();
         queue1Calls.add(10);
         queue1Calls.add(1);
         expectedCalls.put(baseQueueUrl + 1, queue1Calls);
-        List<Integer> queue2Calls = new ArrayList<Integer>();
+        List<Integer> queue2Calls = new ArrayList<>();
         queue2Calls.add(4);
         expectedCalls.put(baseQueueUrl + 2, queue2Calls);
-        
+
         for (DeleteMessageBatchRequest request : argumentCaptor.getAllValues()) {
             String queueUrl = request.queueUrl();
             List<Integer> expectedSequence = expectedCalls.get(queueUrl);
@@ -119,7 +114,7 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
                 expectedCalls.remove(queueUrl);
             }
         }
-        
+
         assertTrue(expectedCalls.isEmpty());
     }
 
@@ -140,6 +135,7 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
     /**
      * Utility function to acknowledge the first <code>indexOfMessageToAck<code/> un-acknowledge messages
+     *
      * @param populateMessageSize current un-acknowledge messages size
      * @param indexOfMessageToAck index of message to acknowledge
      */
@@ -149,11 +145,11 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
         for (int i = 0; i < indexOfMessageToAck; i++) {
             SQSMessage message = populatedMessages.get(i);
-            SQSMessageIdentifier sqsMessageIdentifier = new SQSMessageIdentifier(message.getQueueUrl(), message.getReceiptHandle(),
-                    message.getSQSMessageId());
-            Assert.assertFalse(acknowledger.getUnAckMessages().contains(sqsMessageIdentifier));
+            SQSMessageIdentifier sqsMessageIdentifier = new SQSMessageIdentifier(
+                    message.getQueueUrl(), message.getReceiptHandle(), message.getSQSMessageId());
+            assertFalse(acknowledger.getUnAckMessages().contains(sqsMessageIdentifier));
         }
 
-        Assert.assertEquals((populateMessageSize - indexOfMessageToAck - 1), acknowledger.getUnAckMessages().size());
+        assertEquals((populateMessageSize - indexOfMessageToAck - 1), acknowledger.getUnAckMessages().size());
     }
 }

@@ -14,12 +14,46 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
+import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
+import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
+import com.amazon.sqs.javamessaging.message.SQSTextMessage;
+import jakarta.jms.Destination;
+import jakarta.jms.IllegalStateException;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageConsumer;
+import jakarta.jms.MessageProducer;
+import jakarta.jms.ObjectMessage;
+import jakarta.jms.Queue;
+import jakarta.jms.TextMessage;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
+import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -28,48 +62,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import javax.jms.Destination;
-import javax.jms.IllegalStateException;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.ObjectMessage;
-import javax.jms.Queue;
-import javax.jms.TextMessage;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatcher;
-
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
-import com.amazon.sqs.javamessaging.message.SQSTextMessage;
-
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
-import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
-import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
-import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
-import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
-
 /**
  * Test the SQSSessionTest class
  */
-public class SQSSessionTest  {
+public class SQSSessionTest {
 
     private static final String QUEUE_URL = "queueUrl";
     private static final String QUEUE_NAME = "queueName";
@@ -79,14 +75,14 @@ public class SQSSessionTest  {
     private SQSConnection parentSQSConnection;
     private Set<SQSMessageConsumer> messageConsumers;
     private Set<SQSMessageProducer> messageProducers;
-    private ScheduledExecutorService executorService = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(2);
     private SQSMessageConsumer consumer1;
     private SQSMessageConsumer consumer2;
     private SQSMessageProducer producer1;
     private SQSMessageProducer producer2;
     private AmazonSQSMessagingClientWrapper sqsClientJMSWrapper;
 
-    @Before
+    @BeforeEach
     public void setup() throws JMSException {
 
         sqsClientJMSWrapper = mock(AmazonSQSMessagingClientWrapper.class);
@@ -95,23 +91,21 @@ public class SQSSessionTest  {
         when(parentSQSConnection.getWrappedAmazonSQSClient())
                 .thenReturn(sqsClientJMSWrapper);
 
-        messageConsumers = new HashSet<SQSMessageConsumer>();
-        messageProducers = new HashSet<SQSMessageProducer>();
-
         consumer1 = mock(SQSMessageConsumer.class);
-        when(consumer1.getQueue()).thenReturn(new SQSQueueDestination("name1", "url1"));
         consumer2 = mock(SQSMessageConsumer.class);
+
+        when(consumer1.getQueue()).thenReturn(new SQSQueueDestination("name1", "url1"));
         when(consumer2.getQueue()).thenReturn(new SQSQueueDestination("name2", "url2"));
-        messageConsumers.add(consumer1);
-        messageConsumers.add(consumer2);
+
+        messageConsumers = new HashSet<>(Set.of(consumer1, consumer2));
 
         producer1 = mock(SQSMessageProducer.class);
         producer2 = mock(SQSMessageProducer.class);
-        messageProducers.add(producer1);
-        messageProducers.add(producer2);
+
+        messageProducers = new HashSet<>(Set.of(producer1, producer2));
 
         sqsSession = spy(new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO,
-                                        messageConsumers, messageProducers));
+                messageConsumers, messageProducers));
     }
 
     /**
@@ -119,7 +113,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testStopNoOpIfAlreadyClosed() throws JMSException {
-
         /*
          * Set up session
          */
@@ -129,12 +122,9 @@ public class SQSSessionTest  {
         /*
          * stop consumer
          */
-        try {
-            sqsSession.stop();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.stop())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
 
         /*
          * Verify results
@@ -147,8 +137,7 @@ public class SQSSessionTest  {
      * Test stop is a no op if closing
      */
     @Test
-    public void testStopNoOpIfClosing() throws JMSException {
-
+    public void testStopNoOpIfClosing() {
         /*
          * Set up session
          */
@@ -157,12 +146,9 @@ public class SQSSessionTest  {
         /*
          * stop consumer
          */
-        try {
-            sqsSession.stop();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed or closing", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.stop())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed or closing");
 
         /*
          * Verify results
@@ -175,8 +161,7 @@ public class SQSSessionTest  {
      * Test start is a no op if closing
      */
     @Test
-    public void testStartNoOpIfClosing() throws JMSException {
-
+    public void testStartNoOpIfClosing() {
         /*
          * Set up session
          */
@@ -185,12 +170,9 @@ public class SQSSessionTest  {
         /*
          * stop consumer
          */
-        try {
-            sqsSession.start();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed or closing", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.start())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed or closing");
 
         /*
          * Verify results
@@ -204,7 +186,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testStartNoOpIfAlreadyClosed() throws JMSException {
-
         /*
          * Set up session
          */
@@ -218,12 +199,9 @@ public class SQSSessionTest  {
         /*
          * stop consumer
          */
-        try {
-            sqsSession.start();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.start())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
 
         /*
          * Verify results
@@ -237,7 +215,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testStopBlocksOnStateLock() throws InterruptedException {
-
         /*
          * Set up the latches and mocks
          */
@@ -247,17 +224,14 @@ public class SQSSessionTest  {
         final CountDownLatch passedSessionStopCall = new CountDownLatch(1);
 
         // Run a thread to hold the stateLock
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    synchronized (sqsSession.getStateLock()) {
-                        holdStateLock.countDown();
-                        mainRelease.await();
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+        executorService.execute(() -> {
+            try {
+                synchronized (sqsSession.getStateLock()) {
+                    holdStateLock.countDown();
+                    mainRelease.await();
                 }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         });
 
@@ -265,16 +239,13 @@ public class SQSSessionTest  {
         holdStateLock.await();
 
         // Run another thread that tries to stop the session while state lock is been held
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                beforeSessionStopCall.countDown();
-                try {
-                    sqsSession.stop();
-                    passedSessionStopCall.countDown();
-                } catch (IllegalStateException e) {
-                    e.printStackTrace();
-                }
+        executorService.execute(() -> {
+            beforeSessionStopCall.countDown();
+            try {
+                sqsSession.stop();
+                passedSessionStopCall.countDown();
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
             }
         });
 
@@ -282,7 +253,7 @@ public class SQSSessionTest  {
         Thread.sleep(10);
 
         // Ensure that we wait on state lock
-        assertEquals(false, passedSessionStopCall.await(2, TimeUnit.SECONDS));
+        assertFalse(passedSessionStopCall.await(2, TimeUnit.SECONDS));
 
         // Release the thread holding the state lock
         mainRelease.countDown();
@@ -299,7 +270,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testStartBlocksOnStateLock() throws InterruptedException {
-
         /*
          * Set up the latches and mocks
          */
@@ -309,17 +279,14 @@ public class SQSSessionTest  {
         final CountDownLatch passedSessionStartCall = new CountDownLatch(1);
 
         // Run a thread to hold the stateLock
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    synchronized (sqsSession.getStateLock()) {
-                        holdStateLock.countDown();
-                        mainRelease.await();
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+        executorService.execute(() -> {
+            try {
+                synchronized (sqsSession.getStateLock()) {
+                    holdStateLock.countDown();
+                    mainRelease.await();
                 }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         });
 
@@ -327,16 +294,13 @@ public class SQSSessionTest  {
         holdStateLock.await();
 
         // Run another thread that tries to start the session while state lock is been held
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    beforeSessionStartCall.countDown();
-                    sqsSession.start();
-                    passedSessionStartCall.countDown();
-                } catch (IllegalStateException e) {
-                    e.printStackTrace();
-                }
+        executorService.execute(() -> {
+            try {
+                beforeSessionStartCall.countDown();
+                sqsSession.start();
+                passedSessionStartCall.countDown();
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
             }
         });
 
@@ -344,7 +308,7 @@ public class SQSSessionTest  {
         Thread.sleep(10);
 
         // Ensure that we wait on state lock
-        assertEquals(false, passedSessionStartCall.await(2, TimeUnit.SECONDS));
+        assertFalse(passedSessionStartCall.await(2, TimeUnit.SECONDS));
 
         // Release the thread holding the state lock
         mainRelease.countDown();
@@ -363,103 +327,61 @@ public class SQSSessionTest  {
     public void testUnsupportedFeature() throws JMSException {
         assertFalse(sqsSession.getTransacted());
 
-        try {
-            sqsSession.commit();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.commit())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.rollback();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.rollback())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.unsubscribe("test");
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.unsubscribe("test"))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createTopic("topic");
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createTopic("topic"))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createDurableSubscriber(null, "name");
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createDurableSubscriber(null, "name"))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createDurableSubscriber(null, "name", "messageSelector", false);
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createDurableSubscriber(null, "name", "messageSelector", false))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createBrowser(null);
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createBrowser(null))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createBrowser(null, "messageSelector");
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createBrowser(null, "messageSelector"))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createTemporaryQueue();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createTemporaryQueue())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createTemporaryTopic();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createTemporaryTopic())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.getMessageListener();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.getMessageListener())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.setMessageListener(null);
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.setMessageListener(null))
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createStreamMessage();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createStreamMessage())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
 
-        try {
-            sqsSession.createMapMessage();
-            fail();
-        } catch (JMSException e) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, e.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createMapMessage())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
     /**
@@ -467,7 +389,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testWaitForAllCallbackCompleteBlocksOnStateLock() throws InterruptedException, JMSException {
-
         /*
          * Set up the latches and mocks
          */
@@ -478,12 +399,10 @@ public class SQSSessionTest  {
 
         sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
         sqsSession.start();
-        MessageListener msgListener = mock(MessageListener.class);
-        SQSMessageConsumerPrefetch.MessageManager msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
 
         PrefetchManager prefetchManager = new PrefetchManager() {
             @Override
-            public void messageDispatched()  {
+            public void messageDispatched() {
                 holdStateLock.countDown();
                 try {
                     mainRelease.await();
@@ -502,8 +421,7 @@ public class SQSSessionTest  {
             }
         };
 
-        when(msgManager.getPrefetchManager())
-                .thenReturn(prefetchManager);
+        SQSMessageConsumerPrefetch.MessageManager msgManager = new SQSMessageConsumerPrefetch.MessageManager(prefetchManager, null);
 
         sqsSession.getSqsSessionRunnable().scheduleCallBacks(null, Collections.singletonList(msgManager));
 
@@ -511,21 +429,17 @@ public class SQSSessionTest  {
         holdStateLock.await();
 
         // Run another thread that tries to close the consumer while state lock is been held
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                beforeSessionWaitCall.countDown();
-                sqsSession.waitForCallbackComplete();
-                passedSessionWaitCall.countDown();
-
-            }
+        executorService.execute(() -> {
+            beforeSessionWaitCall.countDown();
+            sqsSession.waitForCallbackComplete();
+            passedSessionWaitCall.countDown();
         });
 
         beforeSessionWaitCall.await();
         Thread.sleep(10);
 
         // Ensure that we wait on state lock this time is longer then waitForAllCallbackComplete timeoutMillis input
-        assertEquals(false, passedSessionWaitCall.await(1, TimeUnit.SECONDS));
+        assertFalse(passedSessionWaitCall.await(1, TimeUnit.SECONDS));
 
         // Release the state lock
         mainRelease.countDown();
@@ -539,7 +453,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testWaitForAllCallbackComplete() throws InterruptedException, JMSException {
-
         /*
          * Set up session and mocks
          */
@@ -552,24 +465,21 @@ public class SQSSessionTest  {
         /*
          * call waitForAllCallbackComplete in different thread
          */
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                beforeWaitCall.countDown();
-                sqsSession.waitForCallbackComplete();
-                passedWaitCall.countDown();
-            }
+        executorService.execute(() -> {
+            beforeWaitCall.countDown();
+            sqsSession.waitForCallbackComplete();
+            passedWaitCall.countDown();
         });
 
         // Yield execution to allow the consumer to wait
-        assertEquals(true, beforeWaitCall.await(10, TimeUnit.SECONDS));
+        assertTrue(beforeWaitCall.await(10, TimeUnit.SECONDS));
         Thread.sleep(10);
 
         // Release the lock and ensure that we are still waiting since the prefetch message still equal to the limit
         synchronized (sqsSession.getStateLock()) {
             sqsSession.getStateLock().notifyAll();
         }
-        assertEquals(false, passedWaitCall.await(1, TimeUnit.SECONDS));
+        assertFalse(passedWaitCall.await(1, TimeUnit.SECONDS));
 
         // Simulate callback finished
         sqsSession.finishedCallback();
@@ -580,8 +490,7 @@ public class SQSSessionTest  {
      * Test finishedCallback decrease callbackCounter
      */
     @Test
-    public void testFinishedCallback() throws InterruptedException, JMSException {
-
+    public void testFinishedCallback() throws JMSException {
         /*
          * Set up session
          */
@@ -595,7 +504,7 @@ public class SQSSessionTest  {
         /*
          * verify result
          */
-        assertEquals(false, sqsSession.isCallbackActive());
+        assertFalse(sqsSession.isCallbackActive());
     }
 
     /**
@@ -603,12 +512,11 @@ public class SQSSessionTest  {
      */
     @Test
     public void testStartingCallbackNoOpIfAlreadyClosed() throws InterruptedException, JMSException {
-
         /*
          * Set up session
          */
         sqsSession.setClosed(true);
-        sqsSession.setActiveConsumerInCallback(null); 
+        sqsSession.setActiveConsumerInCallback(null);
         /*
          * Start callback
          */
@@ -617,30 +525,24 @@ public class SQSSessionTest  {
         /*
          * Verify results
          */
-        assertEquals(false, sqsSession.isCallbackActive());
+        assertFalse(sqsSession.isCallbackActive());
     }
 
     /**
      * Test startingCallback is a no op if closing
      */
     @Test
-    public void testStartingCallbackNoOpIfClosing() throws InterruptedException {
-
+    public void testStartingCallbackNoOpIfClosing() {
         /*
          * Set up session
          */
         sqsSession.setClosing(true);
         sqsSession.setActiveConsumerInCallback(null);
-        
+
         /*
          * Starting Callback
          */
-        try {
-            sqsSession.startingCallback(consumer1);
-            fail();
-        } catch (JMSException e) {
-            e.printStackTrace();
-        }
+        assertThatThrownBy(() -> sqsSession.startingCallback(consumer1)).isInstanceOf(JMSException.class);
     }
 
     /**
@@ -648,7 +550,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testStartingCallback() throws InterruptedException {
-
         /*
          * Set up session and mocks
          */
@@ -659,30 +560,25 @@ public class SQSSessionTest  {
         /*
          * call startingCallback in different thread
          */
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    beforeWaitCall.countDown();
-                    sqsSession.startingCallback(consumer1);
-                    passedWaitCall.countDown();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (JMSException e) {
-                    e.printStackTrace();
-                }
+        executorService.execute(() -> {
+            try {
+                beforeWaitCall.countDown();
+                sqsSession.startingCallback(consumer1);
+                passedWaitCall.countDown();
+            } catch (InterruptedException | JMSException e) {
+                e.printStackTrace();
             }
         });
 
         // Yield execution to allow the session to wait
-        assertEquals(true, beforeWaitCall.await(10, TimeUnit.SECONDS));
+        assertTrue(beforeWaitCall.await(10, TimeUnit.SECONDS));
         Thread.sleep(10);
 
         // Release the lock and ensure that we are still waiting since the did not run
         synchronized (sqsSession.getStateLock()) {
             sqsSession.getStateLock().notifyAll();
         }
-        assertEquals(false, passedWaitCall.await(2, TimeUnit.SECONDS));
+        assertFalse(passedWaitCall.await(2, TimeUnit.SECONDS));
 
         // Simulate callback finished
         sqsSession.setRunning(true);
@@ -691,7 +587,7 @@ public class SQSSessionTest  {
             sqsSession.getStateLock().notifyAll();
         }
         passedWaitCall.await();
-        assertEquals(true, sqsSession.isCallbackActive());
+        assertTrue(sqsSession.isCallbackActive());
     }
 
     /**
@@ -699,7 +595,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testRemoveConsumer() {
-
         assertEquals(2, messageConsumers.size());
 
         /*
@@ -719,7 +614,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testRemoveProducer() {
-
         assertEquals(2, messageProducers.size());
 
         /*
@@ -739,8 +633,7 @@ public class SQSSessionTest  {
      * Test create queue when session is already closed
      */
     @Test
-    public void testCreateQueueWhenAlreadyClosed() throws JMSException {
-
+    public void testCreateQueueWhenAlreadyClosed() {
         /*
          * Set up session
          */
@@ -749,12 +642,9 @@ public class SQSSessionTest  {
         /*
          * Create queue
          */
-        try {
-            sqsSession.createQueue("Test");
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createQueue("Test"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
     }
 
     /**
@@ -762,8 +652,7 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCreateQueue() throws JMSException {
-
-    	GetQueueUrlResponse result = GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build();
+        GetQueueUrlResponse result = GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build();
         when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME))
                 .thenReturn(result);
 
@@ -775,17 +664,16 @@ public class SQSSessionTest  {
         /*
          * Verify results
          */
-        assert(queue instanceof SQSQueueDestination);
+        assert (queue instanceof SQSQueueDestination);
         assertEquals(QUEUE_NAME, queue.getQueueName());
         assertEquals(QUEUE_URL, ((SQSQueueDestination) queue).getQueueUrl());
     }
-    
+
     /**
      * Test create queue when session is already closed
      */
     @Test
     public void testCreateQueueWithOwnerAccountId() throws JMSException {
-
         GetQueueUrlResponse result = GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build();
         when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME, OWNER_ACCOUNT_ID))
                 .thenReturn(result);
@@ -798,7 +686,7 @@ public class SQSSessionTest  {
         /*
          * Verify results
          */
-        assert(queue instanceof SQSQueueDestination);
+        assert (queue instanceof SQSQueueDestination);
         assertEquals(QUEUE_NAME, queue.getQueueName());
         assertEquals(QUEUE_URL, ((SQSQueueDestination) queue).getQueueUrl());
     }
@@ -807,42 +695,35 @@ public class SQSSessionTest  {
      * Test create consumer when session is already closed
      */
     @Test
-    public void testCreateConsumerProducerWhenAlreadyClosed() throws JMSException {
-
+    public void testCreateConsumerProducerWhenAlreadyClosed() {
         /*
          * Set up session
          */
         sqsSession.setClosed(true);
 
-        Destination destination = new Destination() {};
+        Destination destination = new Destination() {
+        };
 
         /*
          * Create consumer
          */
-        try {
-            sqsSession.createConsumer(destination);
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createConsumer(destination))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
 
         /*
          * Create producer
          */
-        try {
-            sqsSession.createProducer(destination);
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createProducer(destination))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
     }
 
     /**
      * Test create consumer when session is closing
      */
     @Test
-    public void testCreateConsumerProducerWhenClosing() throws JMSException {
-
+    public void testCreateConsumerProducerWhenClosing() {
         /*
          * Set up session
          */
@@ -852,54 +733,42 @@ public class SQSSessionTest  {
         /*
          * Create consumer
          */
-        try {
-            sqsSession.createConsumer(destination);
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed or closing", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createConsumer(destination))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed or closing");
 
         /*
          * Create producer
          */
-        try {
-            sqsSession.createProducer(destination);
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed or closing", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createProducer(destination))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed or closing");
     }
 
     /**
      * Test create consumer when destination is non SQSQueueDestination
      */
     @Test
-    public void testCreateConsumerProducerNonSQSQueueDestination() throws JMSException {
-
+    public void testCreateConsumerProducerNonSQSQueueDestination() {
         /*
          * Set up session
          */
-        Destination destination = new Destination() {};
+        Destination destination = new Destination() {
+        };
 
         /*
          * Create consumer
          */
-        try {
-            sqsSession.createConsumer(destination);
-            fail();
-        } catch(JMSException jmse) {
-            assertEquals("Actual type of Destination/Queue has to be SQSQueueDestination", jmse.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createConsumer(destination))
+                .isInstanceOf(JMSException.class)
+                .hasMessage("Actual type of Destination/Queue has to be SQSQueueDestination");
 
-           /*
+        /*
          * Create producer
          */
-        try {
-            sqsSession.createProducer(destination);
-            fail();
-        } catch(JMSException jmse) {
-            assertEquals("Actual type of Destination/Queue has to be SQSQueueDestination", jmse.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createProducer(destination))
+                .isInstanceOf(JMSException.class)
+                .hasMessage("Actual type of Destination/Queue has to be SQSQueueDestination");
     }
 
     /**
@@ -907,7 +776,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCreateConsumerNotRunning() throws JMSException {
-
         /*
          * Set up session
          */
@@ -935,7 +803,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCreateConsumerRunning() throws JMSException {
-
         /*
          * Set up session
          */
@@ -962,8 +829,7 @@ public class SQSSessionTest  {
      * Test create consumer with non null message selector
      */
     @Test
-    public void testCreateConsumerNonNullMessageSelector() throws JMSException {
-
+    public void testCreateConsumerNonNullMessageSelector() {
         /*
          * Set up session
          */
@@ -976,19 +842,13 @@ public class SQSSessionTest  {
         /*
          * Create consumer
          */
-        try {
-            sqsSession.createConsumer(destination, "Selector");
-            fail();
-        } catch(JMSException jmse) {
-            assertEquals("SQSSession does not support MessageSelector. This should be null.", jmse.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createConsumer(destination, "Selector"))
+                .isInstanceOf(JMSException.class)
+                .hasMessage("SQSSession does not support MessageSelector. This should be null.");
 
-        try {
-            sqsSession.createConsumer(destination, "Selector", true);
-            fail();
-        } catch(JMSException jmse) {
-            assertEquals("SQSSession does not support MessageSelector. This should be null.", jmse.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createConsumer(destination, "Selector", true))
+                .isInstanceOf(JMSException.class)
+                .hasMessage("SQSSession does not support MessageSelector. This should be null.");
     }
 
     /**
@@ -996,7 +856,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCreateConsumerWithMessageSelector() throws JMSException {
-
         /*
          * Set up session
          */
@@ -1010,7 +869,7 @@ public class SQSSessionTest  {
          * Create consumer
          */
         sqsSession.createConsumer(destination, null);
-        sqsSession.createConsumer(destination, null,true);
+        sqsSession.createConsumer(destination, null, true);
 
         /*
          * Verify results
@@ -1023,7 +882,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCreateProducer() throws JMSException {
-
         /*
          * Set up session
          */
@@ -1050,44 +908,41 @@ public class SQSSessionTest  {
         when(parentSQSConnection.getNumberOfMessagesToPrefetch()).thenReturn(4);
 
         when(sqsClientJMSWrapper.getQueueUrl("queue1"))
-            .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl1").build());
+                .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl1").build());
         when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl1"))))
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue1-group1-message1")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message2", "queue1-group2-message2")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message3", "queue1-group3-message3")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message4", "queue1-group1-message4")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message5", "queue1-group2-message5")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue1-group3-message6")).build())
-            .thenReturn(ReceiveMessageResponse.builder().build());
-        
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue1-group1-message1")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message2", "queue1-group2-message2")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message3", "queue1-group3-message3")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message4", "queue1-group1-message4")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message5", "queue1-group2-message5")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue1-group3-message6")).build())
+                .thenReturn(ReceiveMessageResponse.builder().build());
+
         when(sqsClientJMSWrapper.getQueueUrl("queue2"))
-            .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl2").build());
+                .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl2").build());
         when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl2"))))
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue2-group1-message1")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message2", "queue2-group2-message2")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message3", "queue2-group3-message3")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message4", "queue2-group1-message4")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message5", "queue2-group2-message5")).build())
-            .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue2-group3-message6")).build())
-            .thenReturn(ReceiveMessageResponse.builder().build());
-    
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue2-group1-message1")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message2", "queue2-group2-message2")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message3", "queue2-group3-message3")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message4", "queue2-group1-message4")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group2", "message5", "queue2-group2-message5")).build())
+                .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue2-group3-message6")).build())
+                .thenReturn(ReceiveMessageResponse.builder().build());
+
         MessageConsumer consumer1 = sqsSession.createConsumer(sqsSession.createQueue("queue1"));
         MessageConsumer consumer2 = sqsSession.createConsumer(sqsSession.createQueue("queue2"));
         final CountDownLatch listenerRelease = new CountDownLatch(1);
-        consumer2.setMessageListener(new MessageListener() {
-            @Override
-            public void onMessage(Message message) {
-                try {
-                    listenerRelease.await();
-                } catch (InterruptedException e) {
-                }
+        consumer2.setMessageListener(message -> {
+            try {
+                listenerRelease.await();
+            } catch (InterruptedException ignored) {
             }
         });
-        
+
         sqsSession.start();
-        
+
         Message message1 = consumer1.receive();
-        
+
         //let's give a moment for the background threads to:
         //prefetch another message for queue1
         //dispatch message to listener for queue2
@@ -1097,7 +952,7 @@ public class SQSSessionTest  {
          * Recover
          */
         sqsSession.recover();
-        
+
         //at this point we have two unacked messages:
         //queue1-group1-message1
         //queue2-group1-message1
@@ -1116,68 +971,56 @@ public class SQSSessionTest  {
         //queue2-group1-message1
         //queue1-group1-message4
         //queue2-group1-message4
-        
+
         ArgumentCaptor<ChangeMessageVisibilityBatchRequest> changeVisibilityCaptor = ArgumentCaptor.forClass(ChangeMessageVisibilityBatchRequest.class);
         verify(sqsClientJMSWrapper, times(2)).changeMessageVisibilityBatch(changeVisibilityCaptor.capture());
-        List<ChangeMessageVisibilityBatchRequest> changeVisibilityRequests = changeVisibilityCaptor.getAllValues();
-        
-        Set<String> handles = new HashSet<String>();
-        for (ChangeMessageVisibilityBatchRequest request : changeVisibilityRequests) {
-            for (ChangeMessageVisibilityBatchRequestEntry entry : request.entries()) {
-                handles.add(entry.receiptHandle());
-            }
-        }
-        
+
+        Set<String> handles = changeVisibilityCaptor.getAllValues().stream()
+                .map(ChangeMessageVisibilityBatchRequest::entries)
+                .flatMap(Collection::stream)
+                .map(ChangeMessageVisibilityBatchRequestEntry::receiptHandle)
+                .collect(Collectors.toSet());
+
         assertEquals(4, handles.size());
         assertTrue(handles.contains("queue1-group1-message1"));
         assertTrue(handles.contains("queue1-group1-message4"));
         assertTrue(handles.contains("queue2-group1-message1"));
         assertTrue(handles.contains("queue2-group1-message4"));
-        
+
         listenerRelease.countDown();
-        
+
         sqsSession.close();
     }
-    
-    private static class ReceiveRequestMatcher extends ArgumentMatcher<ReceiveMessageRequest> {
-        private String queueUrl;
-        
-        public ReceiveRequestMatcher(String queueUrl) {
-            this.queueUrl = queueUrl;
-        }
+
+    private record ReceiveRequestMatcher(String queueUrl) implements ArgumentMatcher<ReceiveMessageRequest> {
 
         @Override
-        public boolean matches(Object argument) {
-            if (argument instanceof ReceiveMessageRequest) {
-                ReceiveMessageRequest request = (ReceiveMessageRequest)argument;
-                return queueUrl.equals(request.queueUrl());
-            } else {
-                return false;
-            }
+        public boolean matches(ReceiveMessageRequest request) {
+            return request != null && queueUrl.equals(request.queueUrl());
         }
-        
+
     }
 
-    private software.amazon.awssdk.services.sqs.model.Message createFifoMessage(String groupId, String messageId, String receiptHandle) throws JMSException {
-    	Map<MessageSystemAttributeName, String> attributes = new HashMap<>();
-    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER), "728374687246872364");
-    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), messageId);
-    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID), groupId);
-    	attributes.put(MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "0");
-    	
-    	return software.amazon.awssdk.services.sqs.model.Message.builder()
-        .body("body")
-        .messageId(messageId)
-        .receiptHandle(receiptHandle)
-        .attributes(attributes).build();
+    private software.amazon.awssdk.services.sqs.model.Message createFifoMessage(
+            String groupId, String messageId, String receiptHandle) {
+        Map<MessageSystemAttributeName, String> attributes = Map.of(
+                MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.SEQUENCE_NUMBER), "728374687246872364",
+                MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID), messageId,
+                MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.MESSAGE_GROUP_ID), groupId,
+                MessageSystemAttributeName.fromValue(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT), "0");
+
+        return software.amazon.awssdk.services.sqs.model.Message.builder()
+                .body("body")
+                .messageId(messageId)
+                .receiptHandle(receiptHandle)
+                .attributes(attributes).build();
     }
 
     /**
      * Test recover when session is already closed
      */
     @Test
-    public void testRecoverWhenAlreadyClosed() throws JMSException {
-
+    public void testRecoverWhenAlreadyClosed() {
         /*
          * Set up session
          */
@@ -1186,12 +1029,9 @@ public class SQSSessionTest  {
         /*
          * Recover
          */
-        try {
-            sqsSession.recover();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.recover())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
     }
 
     /**
@@ -1199,7 +1039,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testDoCloseWhenAlreadyClosed() throws JMSException {
-
         /*
          * Set up session
          */
@@ -1225,8 +1064,7 @@ public class SQSSessionTest  {
      * Test close when session is closing
      */
     @Test
-    public void testDoCloseWhenClosing() throws JMSException, InterruptedException {
-
+    public void testDoCloseWhenClosing() throws InterruptedException {
         /*
          * Set up session and mocks
          */
@@ -1237,28 +1075,25 @@ public class SQSSessionTest  {
         /*
          * call doClose in different thread
          */
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    beforeDoCloseCall.countDown();
-                    sqsSession.doClose();
-                    passedDoCloseCall.countDown();
-                } catch (JMSException e) {
-                    e.printStackTrace();
-                }
+        executorService.execute(() -> {
+            try {
+                beforeDoCloseCall.countDown();
+                sqsSession.doClose();
+                passedDoCloseCall.countDown();
+            } catch (JMSException e) {
+                e.printStackTrace();
             }
         });
 
         // Yield execution to allow the session to wait
-        assertEquals(true, beforeDoCloseCall.await(10, TimeUnit.SECONDS));
+        assertTrue(beforeDoCloseCall.await(10, TimeUnit.SECONDS));
         Thread.sleep(10);
 
         // Release the lock and ensure that we are still waiting since the did not run
         synchronized (sqsSession.getStateLock()) {
             sqsSession.getStateLock().notifyAll();
         }
-        assertEquals(false, passedDoCloseCall.await(2, TimeUnit.SECONDS));
+        assertFalse(passedDoCloseCall.await(2, TimeUnit.SECONDS));
 
         // Simulate session closed
         sqsSession.setClosed(true);
@@ -1267,15 +1102,13 @@ public class SQSSessionTest  {
             sqsSession.getStateLock().notifyAll();
         }
         passedDoCloseCall.await();
-
     }
 
     /**
      * Test do close
      */
     @Test
-    public void testDoClose() throws JMSException, InterruptedException {
-
+    public void testDoClose() throws JMSException {
         sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
         /*
          * Do close
@@ -1300,7 +1133,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCloseWhenAlreadyClosed() throws JMSException {
-
         /*
          * Set up session
          */
@@ -1322,7 +1154,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testClose() throws JMSException, InterruptedException {
-
         /*
          * Set up the latches and mocks
          */
@@ -1332,23 +1163,20 @@ public class SQSSessionTest  {
         sqsSession.setActiveConsumerInCallback(consumer1);
 
         // Run thread that tries to close the session while activeConsumerInCallback is set
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                beforeCloseCall.countDown();
-                try {
-                    sqsSession.close();
-                    passedCloseCall.countDown();
-                } catch (JMSException e) {
-                    e.printStackTrace();
-                }
+        executorService.execute(() -> {
+            beforeCloseCall.countDown();
+            try {
+                sqsSession.close();
+                passedCloseCall.countDown();
+            } catch (JMSException e) {
+                e.printStackTrace();
             }
         });
 
         beforeCloseCall.await();
 
         // Ensure that we wait on activeConsumerInCallback
-        assertEquals(false, passedCloseCall.await(2, TimeUnit.SECONDS));
+        assertFalse(passedCloseCall.await(2, TimeUnit.SECONDS));
 
         // Release the activeConsumerInCallback
         sqsSession.finishedCallback();
@@ -1356,7 +1184,7 @@ public class SQSSessionTest  {
         // Ensure that the session close completed
         passedCloseCall.await();
 
-        assertEquals(true, sqsSession.isClosed());
+        assertTrue(sqsSession.isClosed());
     }
 
     /**
@@ -1364,7 +1192,6 @@ public class SQSSessionTest  {
      */
     @Test
     public void testCloseFromActiveCallbackThread() throws JMSException, InterruptedException {
-
         /*
          * Set up session
          */
@@ -1374,19 +1201,14 @@ public class SQSSessionTest  {
         /*
          * Verify result
          */
-        try {
-            sqsSession.close();
-            fail();
-        } catch (IllegalStateException ise) {
-            // expected
-        }
+        assertThatThrownBy(() -> sqsSession.close()).isInstanceOf(IllegalStateException.class);
     }
 
     /**
      * Test create receiver
      */
     @Test
-    public void testCreateReceiver() throws JMSException, InterruptedException {
+    public void testCreateReceiver() throws JMSException {
         SQSQueueDestination destination = new SQSQueueDestination(QUEUE_NAME, QUEUE_URL);
 
         /*
@@ -1405,7 +1227,7 @@ public class SQSSessionTest  {
      * Test create sender
      */
     @Test
-    public void testCreateSender() throws JMSException, InterruptedException {
+    public void testCreateSender() throws JMSException {
         SQSQueueDestination destination = new SQSQueueDestination(QUEUE_NAME, QUEUE_URL);
 
         /*
@@ -1423,36 +1245,28 @@ public class SQSSessionTest  {
      * Test create message
      */
     @Test
-    public void testCreateMessage() throws JMSException, InterruptedException {
-
+    public void testCreateMessage() {
         /*
          * Create  message
          */
-        try {
-            sqsSession.createMessage();
-            fail();
-        } catch(JMSException jsme) {
-            assertEquals(SQSMessagingClientConstants.UNSUPPORTED_METHOD, jsme.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createMessage())
+                .isInstanceOf(JMSException.class)
+                .hasMessage(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
     /**
      * Test create byte message
      */
     @Test
-    public void testCreateObjectMessage() throws JMSException, InterruptedException {
-
+    public void testCreateObjectMessage() throws JMSException {
         sqsSession.setClosed(true);
 
         /*
          * Create bytes message
          */
-        try {
-            sqsSession.createObjectMessage();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createObjectMessage())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
 
         sqsSession.setClosed(false);
 
@@ -1472,19 +1286,15 @@ public class SQSSessionTest  {
      * Test create byte message
      */
     @Test
-    public void testCreateTextMessage() throws JMSException, InterruptedException {
-
+    public void testCreateTextMessage() throws JMSException {
         sqsSession.setClosed(true);
 
         /*
          * Create bytes message
          */
-        try {
-            sqsSession.createTextMessage();
-            fail();
-        } catch(IllegalStateException ise) {
-            assertEquals("Session is closed", ise.getMessage());
-        }
+        assertThatThrownBy(() -> sqsSession.createTextMessage())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Session is closed");
 
         sqsSession.setClosed(false);
 
