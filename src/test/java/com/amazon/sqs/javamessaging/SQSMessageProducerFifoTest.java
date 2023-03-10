@@ -15,10 +15,6 @@
 package com.amazon.sqs.javamessaging;
 
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSMessageProducer;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
@@ -28,8 +24,10 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
 import com.amazonaws.util.Base64;
-
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatcher;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,13 +35,10 @@ import java.io.ObjectOutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentMatcher;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -68,13 +63,10 @@ public class SQSMessageProducerFifoTest {
     private AmazonSQSMessagingClientWrapper amazonSQSClient;
     private Acknowledger acknowledger;
 
-    @Before
+    @BeforeEach
     public void setup() throws JMSException {
-
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
-
         acknowledger = mock(Acknowledger.class);
-
         sqsSession = mock(SQSSession.class);
         destination = new SQSQueueDestination(QUEUE_NAME, QUEUE_URL);
         producer = spy(new SQSMessageProducer(amazonSQSClient, sqsSession, destination));
@@ -116,7 +108,6 @@ public class SQSMessageProducerFifoTest {
      */
     @Test
     public void testPropertyToMessageAttribute() throws JMSException {
-
         internalTestPropertyToMessageAttribute(new SQSTextMessage());
 
         internalTestPropertyToMessageAttribute(new SQSObjectMessage());
@@ -147,7 +138,7 @@ public class SQSMessageProducerFifoTest {
         sqsText.setFloatProperty(floatProperty, (float)5.0);
         sqsText.setDoubleProperty(doubleProperty, 6.0);
         sqsText.setStringProperty(stringProperty, "seven");
-        sqsText.setObjectProperty(objectProperty, new Integer(8));
+        sqsText.setObjectProperty(objectProperty, 8);
 
         MessageAttributeValue messageAttributeValueBoolean = new MessageAttributeValue();
         messageAttributeValueBoolean.setDataType("Number.Boolean");
@@ -202,7 +193,6 @@ public class SQSMessageProducerFifoTest {
         assertEquals(messageAttributeValueDouble, messageAttribute.get(doubleProperty));
         assertEquals(messageAttributeValueString, messageAttribute.get(stringProperty));
         assertEquals(messageAttributeValueObject, messageAttribute.get(objectProperty));
-
     }
 
     /**
@@ -210,7 +200,6 @@ public class SQSMessageProducerFifoTest {
      */
     @Test
     public void testSendInternalSQSTextMessage() throws JMSException {
-
         String messageBody = "MyText1";
         SQSTextMessage msg = spy(new SQSTextMessage(messageBody));
         msg.setStringProperty(SQSMessagingClientConstants.JMSX_GROUP_ID, GROUP_ID);
@@ -221,7 +210,8 @@ public class SQSMessageProducerFifoTest {
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.TEXT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(amazonSQSClient).sendMessage(argThat(new SendMessageRequestMatcher(
+                QUEUE_URL, messageBody, SQSMessage.TEXT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
         verify(msg).setSQSMessageId(MESSAGE_ID);
@@ -237,13 +227,13 @@ public class SQSMessageProducerFifoTest {
         /*
          * Set up non JMS sqs message
          */
-        Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<String, MessageAttributeValue>();
+        Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<>();
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setStringValue(SQSMessage.TEXT_MESSAGE_TYPE);
         messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
-        Map<String, String> mapAttributes = new HashMap<String, String>();
+        Map<String, String> mapAttributes = new HashMap<>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
         mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
         mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
@@ -262,7 +252,8 @@ public class SQSMessageProducerFifoTest {
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, "MessageBody", SQSMessage.TEXT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(amazonSQSClient).sendMessage(argThat(new SendMessageRequestMatcher(
+                QUEUE_URL, "MessageBody", SQSMessage.TEXT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
         verify(msg).setSQSMessageId(MESSAGE_ID);
@@ -274,8 +265,7 @@ public class SQSMessageProducerFifoTest {
      */
     @Test
     public void testSendInternalSQSObjectMessage() throws JMSException {
-
-        HashSet<String> set = new HashSet<String>();
+        HashSet<String> set = new HashSet<>();
         set.add("data1");
 
         SQSObjectMessage msg = spy(new SQSObjectMessage(set));
@@ -288,7 +278,7 @@ public class SQSMessageProducerFifoTest {
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, msgBody, SQSMessage.OBJECT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(amazonSQSClient).sendMessage(argThat(new SendMessageRequestMatcher(QUEUE_URL, msgBody, SQSMessage.OBJECT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
         verify(msg).setSQSMessageId(MESSAGE_ID);
@@ -304,21 +294,21 @@ public class SQSMessageProducerFifoTest {
         /*
          * Set up non JMS sqs message
          */
-        Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<String, MessageAttributeValue>();
+        Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<>();
 
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setStringValue(SQSMessage.OBJECT_MESSAGE_TYPE);
         messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
-        Map<String, String> mapAttributes = new HashMap<String, String>();
+        Map<String, String> mapAttributes = new HashMap<>();
         mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
         mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
         mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
         mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
 
         // Encode an object to byte array
-        Integer integer = new Integer("10");
+        Integer integer = 10;
         ByteArrayOutputStream array = new ByteArrayOutputStream(10);
         ObjectOutputStream oStream = new ObjectOutputStream(array);
         oStream.writeObject(integer);
@@ -338,7 +328,8 @@ public class SQSMessageProducerFifoTest {
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.OBJECT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(amazonSQSClient).sendMessage(argThat(new SendMessageRequestMatcher(
+                QUEUE_URL, messageBody, SQSMessage.OBJECT_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
         verify(msg).setSQSMessageId(MESSAGE_ID);
@@ -363,7 +354,8 @@ public class SQSMessageProducerFifoTest {
         producer.sendInternal(destination, msg);
 
         String messageBody = "AA==";
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.BYTE_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(amazonSQSClient).sendMessage(argThat(new SendMessageRequestMatcher(
+                QUEUE_URL, messageBody, SQSMessage.BYTE_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
 
         verify(msg).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
@@ -375,22 +367,22 @@ public class SQSMessageProducerFifoTest {
      * Test sendInternal input with SQSByteMessage
      */
     @Test
-    public void testSendInternalSQSByteMessageFromReceivedMessage() throws JMSException, IOException {
+    public void testSendInternalSQSByteMessageFromReceivedMessage() throws JMSException {
         
         /*
          * Set up non JMS sqs message
          */
-        Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<String, MessageAttributeValue>();
+        Map<String,MessageAttributeValue> mapMessageAttributes = new HashMap<>();
         MessageAttributeValue messageAttributeValue = new MessageAttributeValue();
         messageAttributeValue.setStringValue(SQSMessage.BYTE_MESSAGE_TYPE);
         messageAttributeValue.setDataType(SQSMessagingClientConstants.STRING);
         mapMessageAttributes.put(SQSMessage.JMS_SQS_MESSAGE_TYPE, messageAttributeValue);
 
-        Map<String, String> mapAttributes = new HashMap<String, String>();
-        mapAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1");
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID);
-        mapAttributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
+        Map<String, String> mapAttributes = Map.of(
+            SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1",
+            SQSMessagingClientConstants.MESSAGE_GROUP_ID, GROUP_ID,
+            SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, DEDUP_ID,
+            SQSMessagingClientConstants.SEQUENCE_NUMBER, SEQ_NUMBER);
 
         byte[] byteArray = new byte[] { 1, 0, 'a', 65 };
         String messageBody = Base64.encodeAsString(byteArray);
@@ -407,39 +399,20 @@ public class SQSMessageProducerFifoTest {
 
         producer.sendInternal(destination, msg);
 
-        verify(amazonSQSClient).sendMessage(argThat(new sendMessageRequestMatcher(QUEUE_URL, messageBody, SQSMessage.BYTE_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
+        verify(amazonSQSClient).sendMessage(argThat(new SendMessageRequestMatcher(
+                QUEUE_URL, messageBody, SQSMessage.BYTE_MESSAGE_TYPE, GROUP_ID, DEDUP_ID)));
         verify(msg).setJMSDestination(destination);
         verify(msg).setJMSMessageID("ID:" + MESSAGE_ID);
         verify(msg).setSQSMessageId(MESSAGE_ID);
         verify(msg).setSequenceNumber(SEQ_NUMBER_2);
     }
 
-    private class sendMessageRequestMatcher extends ArgumentMatcher<SendMessageRequest> {
-
-        private String queueUrl;
-        private String messagesBody;
-        private String messageType;
-        private String groupId;
-        private String deduplicationId;
-
-        private sendMessageRequestMatcher(String queueUrl, String messagesBody, String messageType, String groupId, String deduplicationId) {
-            this.queueUrl = queueUrl;
-            this.messagesBody = messagesBody;
-            this.messageType = messageType;
-            this.groupId = groupId;
-            this.deduplicationId = deduplicationId;
-        }
-
+    private record SendMessageRequestMatcher(String queueUrl, String messageBody, String messageType, String groupId,
+                                             String deduplicationId) implements ArgumentMatcher<SendMessageRequest> {
         @Override
-        public boolean matches(Object argument) {
-
-            if (!(argument instanceof SendMessageRequest)) {
-                return false;
-            }
-
-            SendMessageRequest request = (SendMessageRequest)argument;
+        public boolean matches(SendMessageRequest request) {
             assertEquals(queueUrl, request.getQueueUrl());
-            assertEquals(messagesBody, request.getMessageBody());
+            assertEquals(messageBody, request.getMessageBody());
             String messageType = request.getMessageAttributes().get(SQSMessage.JMS_SQS_MESSAGE_TYPE).getStringValue();
             assertEquals(this.messageType, messageType);
             assertEquals(this.groupId, request.getMessageGroupId());

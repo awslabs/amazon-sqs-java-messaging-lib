@@ -14,14 +14,6 @@
  */
 package com.amazon.sqs.javamessaging;
 
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.PrefetchManager;
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageConsumer;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.SQSSessionCallbackScheduler;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
@@ -29,10 +21,12 @@ import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 import com.amazonaws.services.sqs.model.Message;
-
-import javax.jms.JMSException;
-import javax.jms.MessageListener;
-import javax.jms.Session;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageListener;
+import jakarta.jms.Session;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -41,16 +35,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-
-import static junit.framework.Assert.fail;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyList;
-import static org.mockito.Matchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -78,9 +69,8 @@ public class SQSSessionCallbackSchedulerTest {
     private Acknowledger acknowledger;
     private SQSMessageConsumer consumer;
     
-    @Before
+    @BeforeEach
     public void setup() {
-
         sqsClient = mock(AmazonSQSMessagingClientWrapper.class);
 
         sqsConnection = mock(SQSConnection.class);
@@ -110,9 +100,7 @@ public class SQSSessionCallbackSchedulerTest {
      */
     @Test
     public void testNackQueueMessageWhenEmpty() throws JMSException {
-
-        when(callbackQueue.isEmpty())
-                .thenReturn(true);
+        when(callbackQueue.isEmpty()).thenReturn(true);
 
         /*
          * Nack the messages
@@ -130,35 +118,21 @@ public class SQSSessionCallbackSchedulerTest {
      */
     @Test
     public void testNackQueueMessageAcknowledgerThrowJMSException() throws JMSException {
-
         MessageListener msgListener = mock(MessageListener.class);
 
         SQSMessage sqsMessage = mock(SQSMessage.class);
-        when(sqsMessage.getReceiptHandle())
-                .thenReturn("r1");
-        when(sqsMessage.getSQSMessageId())
-                .thenReturn("messageId1");
-        when(sqsMessage.getQueueUrl())
-                .thenReturn(QUEUE_URL_1);
+        when(sqsMessage.getReceiptHandle()).thenReturn("r1");
+        when(sqsMessage.getSQSMessageId()).thenReturn("messageId1");
+        when(sqsMessage.getQueueUrl()).thenReturn(QUEUE_URL_1);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager.getMessage())
-                .thenReturn(sqsMessage);
-
-        when(msgManager.getPrefetchManager())
-                .thenReturn(mock(PrefetchManager.class));
+        when(msgManager.message()).thenReturn(sqsMessage);
+        when(msgManager.prefetchManager()).thenReturn(mock(PrefetchManager.class));
 
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(msgListener, msgManager);
-
-        when(callbackQueue.isEmpty())
-                .thenReturn(false)
-                .thenReturn(true);
-
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1);
-
-        doThrow(new JMSException("Exception"))
-                .when(negativeAcknowledger).bulkAction(anyList(), anyInt());
+        when(callbackQueue.isEmpty()).thenReturn(false).thenReturn(true);
+        when(callbackQueue.pollFirst()).thenReturn(entry1);
+        doThrow(new JMSException("Exception")).when(negativeAcknowledger).bulkAction(anyList(), anyInt());
 
         /*
          * Nack the messages, no exception expected
@@ -171,46 +145,27 @@ public class SQSSessionCallbackSchedulerTest {
      */
     @Test
     public void testNackQueueMessageAcknowledgerThrowError() throws JMSException {
-
         MessageListener msgListener = mock(MessageListener.class);
 
         SQSMessage sqsMessage = mock(SQSMessage.class);
-        when(sqsMessage.getReceiptHandle())
-                .thenReturn("r2");
-        when(sqsMessage.getSQSMessageId())
-                .thenReturn("messageId2");
-        when(sqsMessage.getQueueUrl())
-                .thenReturn(QUEUE_URL_2);
+        when(sqsMessage.getReceiptHandle()).thenReturn("r2");
+        when(sqsMessage.getSQSMessageId()).thenReturn("messageId2");
+        when(sqsMessage.getQueueUrl()).thenReturn(QUEUE_URL_2);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager.getMessage())
-                .thenReturn(sqsMessage);
-
-        when(msgManager.getPrefetchManager())
-                .thenReturn(mock(PrefetchManager.class));
-
+        when(msgManager.message()).thenReturn(sqsMessage);
+        when(msgManager.prefetchManager()).thenReturn(mock(PrefetchManager.class));
 
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(msgListener, msgManager);
+        when(callbackQueue.isEmpty()).thenReturn(false).thenReturn(true);
+        when(callbackQueue.pollFirst()).thenReturn(entry1);
 
-        when(callbackQueue.isEmpty())
-                .thenReturn(false)
-                .thenReturn(true);
-
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1);
-
-        doThrow(new Error("error"))
-                .when(negativeAcknowledger).bulkAction(anyList(), anyInt());
+        doThrow(new Error("error")).when(negativeAcknowledger).bulkAction(anyList(), anyInt());
 
         /*
          * Nack the messages, exception expected
          */
-        try {
-            sqsSessionRunnable.nackQueuedMessages();
-            fail();
-        } catch(Error e) {
-            // expected error
-        }
+        assertThrows(Error.class, () -> sqsSessionRunnable.nackQueuedMessages());
     }
 
     /**
@@ -225,48 +180,32 @@ public class SQSSessionCallbackSchedulerTest {
         MessageListener msgListener = mock(MessageListener.class);
 
         SQSMessage sqsMessage1 = mock(SQSMessage.class);
-        when(sqsMessage1.getReceiptHandle())
-                .thenReturn("r1");
-        when(sqsMessage1.getSQSMessageId())
-                .thenReturn("messageId1");
-        when(sqsMessage1.getQueueUrl())
-                .thenReturn(QUEUE_URL_1);
+        when(sqsMessage1.getReceiptHandle()).thenReturn("r1");
+        when(sqsMessage1.getSQSMessageId()).thenReturn("messageId1");
+        when(sqsMessage1.getQueueUrl()).thenReturn(QUEUE_URL_1);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager1 = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager1.getMessage())
-                .thenReturn(sqsMessage1);
+        when(msgManager1.message()).thenReturn(sqsMessage1);
 
-        when(msgManager1.getPrefetchManager())
-                .thenReturn(mock(PrefetchManager.class));
+        when(msgManager1.prefetchManager()).thenReturn(mock(PrefetchManager.class));
 
         SQSMessage sqsMessage2 = mock(SQSMessage.class);
-        when(sqsMessage2.getReceiptHandle())
-                .thenReturn("r2");
-        when(sqsMessage2.getSQSMessageId())
-                .thenReturn("messageId2");
-        when(sqsMessage2.getQueueUrl())
-                .thenReturn(QUEUE_URL_2);
+        when(sqsMessage2.getReceiptHandle()).thenReturn("r2");
+        when(sqsMessage2.getSQSMessageId()).thenReturn("messageId2");
+        when(sqsMessage2.getQueueUrl()).thenReturn(QUEUE_URL_2);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager2 = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager2.getMessage())
-                .thenReturn(sqsMessage2);
-
-        when(msgManager2.getPrefetchManager())
-                .thenReturn(mock(PrefetchManager.class));
+        when(msgManager2.message()).thenReturn(sqsMessage2);
+        when(msgManager2.prefetchManager()).thenReturn(mock(PrefetchManager.class));
 
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(msgListener, msgManager1);
         SQSSession.CallbackEntry entry2 = new SQSSession.CallbackEntry(msgListener, msgManager2);
 
-        when(callbackQueue.isEmpty())
-                .thenReturn(false)
-                .thenReturn(false)
-                .thenReturn(true);
+        when(callbackQueue.isEmpty()).thenReturn(false).thenReturn(false).thenReturn(true);
 
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1)
-                .thenReturn(entry2);
+        when(callbackQueue.pollFirst()).thenReturn(entry1).thenReturn(entry2);
 
-        List<SQSMessageIdentifier> nackMessageIdentifiers = new ArrayList<SQSMessageIdentifier>();
+        List<SQSMessageIdentifier> nackMessageIdentifiers = new ArrayList<>();
         nackMessageIdentifiers.add(new SQSMessageIdentifier(QUEUE_URL_1, "r1", "messageId1"));
         nackMessageIdentifiers.add(new SQSMessageIdentifier(QUEUE_URL_2, "r2", "messageId2"));
 
@@ -290,26 +229,20 @@ public class SQSSessionCallbackSchedulerTest {
         /*
          * Set up mocks
          */
-        doThrow(new JMSException("closed"))
-                .when(sqsSession).startingCallback(consumer);
+        doThrow(new JMSException("closed")).when(sqsSession).startingCallback(consumer);
 
-        doNothing()
-                .when(sqsSessionRunnable).nackQueuedMessages();
+        doNothing().when(sqsSessionRunnable).nackQueuedMessages();
 
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
-        when(prefetchManager.getMessageConsumer())
-                .thenReturn(consumer);
+        when(prefetchManager.getMessageConsumer()).thenReturn(consumer);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager1 = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager1.getMessage())
-                .thenReturn(mock(SQSMessage.class));
-        when(msgManager1.getPrefetchManager())
-                .thenReturn(prefetchManager);
+        when(msgManager1.message()).thenReturn(mock(SQSMessage.class));
+        when(msgManager1.prefetchManager()).thenReturn(prefetchManager);
 
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(null, msgManager1);
 
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1);
+        when(callbackQueue.pollFirst()).thenReturn(entry1);
 
         /*
          * Nack the messages, exit the loop
@@ -334,7 +267,7 @@ public class SQSSessionCallbackSchedulerTest {
          * Set up mocks
          */
         doNothing()
-        .doThrow(new JMSException("Closing"))
+                .doThrow(new JMSException("Closing"))
                 .when(sqsSession).startingCallback(any(SQSMessageConsumer.class));
 
         SQSMessageConsumerPrefetch.MessageManager msgManager1 = createMessageManager(1);
@@ -343,12 +276,8 @@ public class SQSSessionCallbackSchedulerTest {
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(null, msgManager1);
         SQSSession.CallbackEntry entry2 = new SQSSession.CallbackEntry(null, msgManager2);
 
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1)
-                .thenReturn(entry2);
-
-        when(callbackQueue.isEmpty())
-                .thenReturn(true);
+        when(callbackQueue.pollFirst()).thenReturn(entry1).thenReturn(entry2);
+        when(callbackQueue.isEmpty()).thenReturn(true);
 
         // Setup ConsumerCloseAfterCallback
         SQSMessageConsumer messageConsumer = mock(SQSMessageConsumer.class);
@@ -378,7 +307,6 @@ public class SQSSessionCallbackSchedulerTest {
 
         // Verify do close is called on set ConsumerCloseAfterCallback
         verify(messageConsumer).doClose();
-
         verify(sqsSession).finishedCallback();
     }
 
@@ -392,30 +320,23 @@ public class SQSSessionCallbackSchedulerTest {
          * Set up mocks
          */
         doNothing()
-        .doThrow(new JMSException("Closing"))
+                .doThrow(new JMSException("Closing"))
                 .when(sqsSession).startingCallback(consumer);
 
         SQSMessage sqsMessage1 = mock(SQSMessage.class);
-        when(sqsMessage1.getReceiptHandle())
-                .thenReturn("r1");
-        when(sqsMessage1.getSQSMessageId())
-                .thenReturn("messageId1");
-        when(sqsMessage1.getQueueUrl())
-                .thenReturn(QUEUE_URL_1);
+        when(sqsMessage1.getReceiptHandle()).thenReturn("r1");
+        when(sqsMessage1.getSQSMessageId()).thenReturn("messageId1");
+        when(sqsMessage1.getQueueUrl()).thenReturn(QUEUE_URL_1);
 
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
-        when(prefetchManager.getMessageConsumer())
-                .thenReturn(consumer);
+        when(prefetchManager.getMessageConsumer()).thenReturn(consumer);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager1 = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager1.getMessage())
-                .thenReturn(sqsMessage1);
-        when(msgManager1.getPrefetchManager())
-                .thenReturn(prefetchManager);
+        when(msgManager1.message()).thenReturn(sqsMessage1);
+        when(msgManager1.prefetchManager()).thenReturn(prefetchManager);
 
         // Throw an exception when try to acknowledge the message
-        doThrow(new JMSException("Exception"))
-                .when(sqsMessage1).acknowledge();
+        doThrow(new JMSException("Exception")).when(sqsMessage1).acknowledge();
 
         MessageListener msgListener = mock(MessageListener.class);
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(msgListener, msgManager1);
@@ -423,12 +344,9 @@ public class SQSSessionCallbackSchedulerTest {
         SQSMessageConsumerPrefetch.MessageManager msgManager2 = createMessageManager(2);
         SQSSession.CallbackEntry entry2 = new SQSSession.CallbackEntry(msgListener, msgManager2);
 
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1)
-                .thenReturn(entry2);
+        when(callbackQueue.pollFirst()).thenReturn(entry1).thenReturn(entry2);
 
-        when(callbackQueue.isEmpty())
-                .thenReturn(true);
+        when(callbackQueue.isEmpty()).thenReturn(true);
 
         /*
          * Nack the messages, exception expected
@@ -467,26 +385,20 @@ public class SQSSessionCallbackSchedulerTest {
          * Set up mocks
          */
         doNothing()
-        .doThrow(new JMSException("Closing"))
+                .doThrow(new JMSException("Closing"))
                 .when(sqsSession).startingCallback(consumer);
 
         SQSMessage sqsMessage1 = mock(SQSMessage.class);
-        when(sqsMessage1.getReceiptHandle())
-                .thenReturn("r1");
-        when(sqsMessage1.getSQSMessageId())
-                .thenReturn("messageId1");
-        when(sqsMessage1.getQueueUrl())
-                .thenReturn(QUEUE_URL_1);
+        when(sqsMessage1.getReceiptHandle()).thenReturn("r1");
+        when(sqsMessage1.getSQSMessageId()).thenReturn("messageId1");
+        when(sqsMessage1.getQueueUrl()).thenReturn(QUEUE_URL_1);
 
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
-        when(prefetchManager.getMessageConsumer())
-                .thenReturn(consumer);
+        when(prefetchManager.getMessageConsumer()).thenReturn(consumer);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager1 = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager1.getMessage())
-                .thenReturn(sqsMessage1);
-        when(msgManager1.getPrefetchManager())
-                .thenReturn(prefetchManager);
+        when(msgManager1.message()).thenReturn(sqsMessage1);
+        when(msgManager1.prefetchManager()).thenReturn(prefetchManager);
 
         // Set message listener as null to force a nack
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(null, msgManager1);
@@ -494,15 +406,11 @@ public class SQSSessionCallbackSchedulerTest {
         SQSMessageConsumerPrefetch.MessageManager msgManager2 = createMessageManager(2);
         SQSSession.CallbackEntry entry2 = new SQSSession.CallbackEntry(null, msgManager2);
 
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1)
-                .thenReturn(entry2);
-        when(callbackQueue.isEmpty())
-                .thenReturn(true);
+        when(callbackQueue.pollFirst()).thenReturn(entry1).thenReturn(entry2);
+        when(callbackQueue.isEmpty()).thenReturn(true);
 
         // Throw an exception when try to negative acknowledge the message
-        doThrow(new JMSException("Exception"))
-                .when(negativeAcknowledger).action(QUEUE_URL_1, Collections.singletonList("r1"));
+        doThrow(new JMSException("Exception")).when(negativeAcknowledger).action(QUEUE_URL_1, Collections.singletonList("r1"));
 
         /*
          * Nack the messages, exception expected
@@ -532,12 +440,12 @@ public class SQSSessionCallbackSchedulerTest {
      * Test schedule callback
      */
     @Test
-    public void testScheduleCallBack() throws JMSException, InterruptedException {
+    public void testScheduleCallBack() {
 
         /*
          * Set up mocks
          */
-        sqsSessionRunnable.callbackQueue = new ArrayDeque<SQSSession.CallbackEntry>();
+        sqsSessionRunnable.callbackQueue = new ArrayDeque<>();
 
         MessageListener msgListener = mock(MessageListener.class);
         SQSMessageConsumerPrefetch.MessageManager msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
@@ -550,8 +458,9 @@ public class SQSSessionCallbackSchedulerTest {
 
         SQSSession.CallbackEntry entry = sqsSessionRunnable.callbackQueue.pollFirst();
 
-        assertEquals(msgListener, entry.getMessageListener());
-        assertEquals(msgManager, entry.getMessageManager());
+        assertNotNull(entry);
+        assertEquals(msgListener, entry.messageListener());
+        assertEquals(msgManager, entry.messageManager());
     }
 
     /**
@@ -560,7 +469,7 @@ public class SQSSessionCallbackSchedulerTest {
     @Test
     public void testMessageNotAckWithClientAckMode() throws JMSException, InterruptedException {
 
-        /**
+        /*
          * Set up mocks
          */
         sqsSessionRunnable = spy(new SQSSessionCallbackScheduler(sqsSession,
@@ -573,30 +482,22 @@ public class SQSSessionCallbackSchedulerTest {
                 .when(sqsSession).startingCallback(consumer);
 
         SQSMessage sqsMessage1 = mock(SQSMessage.class);
-        when(sqsMessage1.getReceiptHandle())
-                .thenReturn("r1");
-        when(sqsMessage1.getSQSMessageId())
-                .thenReturn("messageId1");
-        when(sqsMessage1.getQueueUrl())
-                .thenReturn(QUEUE_URL_1);
+        when(sqsMessage1.getReceiptHandle()).thenReturn("r1");
+        when(sqsMessage1.getSQSMessageId()).thenReturn("messageId1");
+        when(sqsMessage1.getQueueUrl()).thenReturn(QUEUE_URL_1);
 
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
-        when(prefetchManager.getMessageConsumer())
-                .thenReturn(consumer);
+        when(prefetchManager.getMessageConsumer()).thenReturn(consumer);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager1 = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager1.getMessage())
-                .thenReturn(sqsMessage1);
-        when(msgManager1.getPrefetchManager())
-                .thenReturn(prefetchManager);
+        when(msgManager1.message()).thenReturn(sqsMessage1);
+        when(msgManager1.prefetchManager()).thenReturn(prefetchManager);
 
         MessageListener msgListener = mock(MessageListener.class);
         SQSSession.CallbackEntry entry1 = new SQSSession.CallbackEntry(msgListener, msgManager1);
 
-        when(callbackQueue.pollFirst())
-                .thenReturn(entry1);
-        when(callbackQueue.isEmpty())
-                .thenReturn(true);
+        when(callbackQueue.pollFirst()).thenReturn(entry1);
+        when(callbackQueue.isEmpty()).thenReturn(true);
 
         /*
          * Start the callback
@@ -619,9 +520,10 @@ public class SQSSessionCallbackSchedulerTest {
      * Test that no auto ack messages occurs when client acknowledge is set
      */
     @Test
-    public void testWhenListenerThrowsWhenAutoAckThenCallbackQueuePurgedFromMessagesWithSameQueueAndGroup() throws JMSException, InterruptedException {
+    public void testWhenListenerThrowsWhenAutoAckThenCallbackQueuePurgedFromMessagesWithSameQueueAndGroup()
+            throws JMSException, InterruptedException {
 
-        /**
+        /*
          * Set up mocks
          */
         sqsSessionRunnable = spy(new SQSSessionCallbackScheduler(sqsSession,
@@ -630,7 +532,7 @@ public class SQSSessionCallbackSchedulerTest {
 
         MessageListener messageListener = mock(MessageListener.class);
         doThrow(RuntimeException.class)
-            .when(messageListener).onMessage(any(javax.jms.Message.class));
+            .when(messageListener).onMessage(any(jakarta.jms.Message.class));
         
         List<SQSMessageConsumerPrefetch.MessageManager> messages = new ArrayList<SQSMessageConsumerPrefetch.MessageManager>();
         messages.add(createFifoMessageManager("queue1", "group1", "message1", "handle1"));
@@ -651,7 +553,7 @@ public class SQSSessionCallbackSchedulerTest {
         ArgumentCaptor<Integer> indexOfMessageCaptor = ArgumentCaptor.forClass(Integer.class);
         verify(negativeAcknowledger, times(3)).bulkAction(messageIdentifierListCaptor.capture(), indexOfMessageCaptor.capture());
         List<SQSMessageIdentifier> nackedMessages = messageIdentifierListCaptor.getAllValues().get(0);
-        int nackedMessagesSize = indexOfMessageCaptor.getAllValues().get(0).intValue();
+        int nackedMessagesSize = indexOfMessageCaptor.getAllValues().get(0);
         
         //failing to process 'message1' should nack all messages for queue1 and group1, that is 'message1', 'message2' and 'message5'
         assertEquals(3, nackedMessagesSize);
@@ -660,12 +562,13 @@ public class SQSSessionCallbackSchedulerTest {
         assertEquals("message5", nackedMessages.get(2).getSQSMessageID());
     }
 
-    private SQSMessageConsumerPrefetch.MessageManager createFifoMessageManager(String queueUrl, String groupId, String messageId, String receiptHandle) throws JMSException {
+    private SQSMessageConsumerPrefetch.MessageManager createFifoMessageManager(
+            String queueUrl, String groupId, String messageId, String receiptHandle) throws JMSException {
         Message message = new Message();
         message.setBody("body");
         message.setMessageId(messageId);
         message.setReceiptHandle(receiptHandle);
-        Map<String, String> attributes = new HashMap<String, String>();
+        Map<String, String> attributes = new HashMap<>();
         attributes.put(SQSMessagingClientConstants.SEQUENCE_NUMBER, "728374687246872364");
         attributes.put(SQSMessagingClientConstants.MESSAGE_DEDUPLICATION_ID, messageId);
         attributes.put(SQSMessagingClientConstants.MESSAGE_GROUP_ID, groupId);
@@ -675,28 +578,21 @@ public class SQSSessionCallbackSchedulerTest {
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
         when(prefetchManager.getMessageConsumer())
             .thenReturn(consumer);
-        SQSMessageConsumerPrefetch.MessageManager msgManager = new SQSMessageConsumerPrefetch.MessageManager(prefetchManager, sqsMessage);
-        return msgManager;
+        return new SQSMessageConsumerPrefetch.MessageManager(prefetchManager, sqsMessage);
     }
 
     private SQSMessageConsumerPrefetch.MessageManager createMessageManager(int index) {
         SQSMessage sqsMessage = mock(SQSMessage.class);
-        when(sqsMessage.getReceiptHandle())
-                .thenReturn("r" + index);
-        when(sqsMessage.getSQSMessageId())
-                .thenReturn("messageId" + index);
-        when(sqsMessage.getQueueUrl())
-                .thenReturn(QUEUE_URL_PREFIX + index);
+        when(sqsMessage.getReceiptHandle()).thenReturn("r" + index);
+        when(sqsMessage.getSQSMessageId()).thenReturn("messageId" + index);
+        when(sqsMessage.getQueueUrl()).thenReturn(QUEUE_URL_PREFIX + index);
 
         PrefetchManager prefetchManager = mock(PrefetchManager.class);
-        when(prefetchManager.getMessageConsumer())
-                .thenReturn(consumer);
+        when(prefetchManager.getMessageConsumer()).thenReturn(consumer);
 
         SQSMessageConsumerPrefetch.MessageManager msgManager = mock(SQSMessageConsumerPrefetch.MessageManager.class);
-        when(msgManager.getMessage())
-                .thenReturn(sqsMessage);
-        when(msgManager.getPrefetchManager())
-                .thenReturn(prefetchManager);
+        when(msgManager.message()).thenReturn(sqsMessage);
+        when(msgManager.prefetchManager()).thenReturn(prefetchManager);
         return msgManager;
     }
 }

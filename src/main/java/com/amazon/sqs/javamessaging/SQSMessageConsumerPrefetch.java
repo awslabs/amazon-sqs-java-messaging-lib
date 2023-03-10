@@ -23,9 +23,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.MessageListener;
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageListener;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -76,7 +76,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     private final SQSQueueDestination sqsDestination;
 
     /**
-     * Internal buffer of Messages. The size of queue is MIN_BATCH by default
+     * Internal buffer of Messages. The size of queue is MIN_BATCH by default,
      * and it can be changed by user.
      */
     protected final ArrayDeque<MessageManager> messageQueue;
@@ -134,7 +134,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         queueUrl = sqsDestination.getQueueUrl();
         this.sqsDestination = sqsDestination;
         this.sqsSessionRunnable = sqsSessionRunnable;
-        messageQueue = new ArrayDeque<MessageManager>(numberOfMessagesToPrefetch);
+        messageQueue = new ArrayDeque<>(numberOfMessagesToPrefetch);
     }
 
     MessageListener getMessageListener() {
@@ -170,7 +170,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 return;
             }
 
-            List<MessageManager> allPrefetchedMessages = new ArrayList<MessageManager>(messageQueue);
+            List<MessageManager> allPrefetchedMessages = new ArrayList<>(messageQueue);
             sqsSessionRunnable.scheduleCallBacks(messageListener, allPrefetchedMessages);
             messageQueue.clear();
 
@@ -268,11 +268,11 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * converted to JMS message will be immediately negative acknowledged.
      */
     protected void processReceivedMessages(List<Message> messages) {
-        List<String> nackMessages = new ArrayList<String>();
-        List<MessageManager> messageManagers = new ArrayList<MessageManager>();
+        List<String> nackMessages = new ArrayList<>();
+        List<MessageManager> messageManagers = new ArrayList<>();
         for (Message message : messages) {
             try {
-                javax.jms.Message jmsMessage = convertToJMSMessage(message);
+                jakarta.jms.Message jmsMessage = convertToJMSMessage(message);
                 messageManagers.add(new MessageManager(this, jmsMessage));
             } catch (JMSException e) {
                 LOG.warn("Caught exception while converting received messages", e);
@@ -323,7 +323,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                     stateLock.wait();
                 } catch (InterruptedException e) {
                     LOG.warn("Interrupted while waiting on prefetch", e);
-                    /** For interruption, we do not nack the messages */
+                    // For interruption, we do not nack the messages
                     throw e;
                 }
             }
@@ -334,12 +334,12 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * Convert the return SQS message into JMS message
      * @param message SQS message to convert
      * @return Converted JMS message
-     * @throws JMSException
+     * @throws JMSException jmsException
      */
-    protected javax.jms.Message convertToJMSMessage(Message message) throws JMSException {
+    protected jakarta.jms.Message convertToJMSMessage(Message message) throws JMSException {
         MessageAttributeValue messageTypeAttribute = message.getMessageAttributes().get(
                 SQSMessage.JMS_SQS_MESSAGE_TYPE);
-        javax.jms.Message jmsMessage = null;
+        jakarta.jms.Message jmsMessage;
         if (messageTypeAttribute == null) {
             jmsMessage = new SQSTextMessage(acknowledger, queueUrl, message);
         } else {
@@ -456,31 +456,15 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         }
     }
 
-    public static class MessageManager {
+    public record MessageManager(PrefetchManager prefetchManager, jakarta.jms.Message message) {
 
-        private final PrefetchManager prefetchManager;
-
-        private final javax.jms.Message message;
-
-        public MessageManager(PrefetchManager prefetchManager, javax.jms.Message message) {
-            this.prefetchManager = prefetchManager;
-            this.message = message;
-        }
-
-        public PrefetchManager getPrefetchManager() {
-            return prefetchManager;
-        }
-
-        public javax.jms.Message getMessage() {
-            return message;
-        }
     }
 
-    javax.jms.Message receive() throws JMSException {
+    jakarta.jms.Message receive() throws JMSException {
         return receive(0);
     }
 
-    javax.jms.Message receive(long timeout) throws JMSException {
+    jakarta.jms.Message receive(long timeout) throws JMSException {
         if (cannotDeliver()) {
             return null;
         }
@@ -533,7 +517,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         }
     }
 
-    javax.jms.Message receiveNoWait() throws JMSException {
+    jakarta.jms.Message receiveNoWait() throws JMSException {
         if (cannotDeliver()) {
             return null;
         }
@@ -588,11 +572,11 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     /**
      * Helper that notifies PrefetchThread that message is dispatched and AutoAcknowledge
      */
-    private javax.jms.Message messageHandler(MessageManager messageManager) throws JMSException {
+    private jakarta.jms.Message messageHandler(MessageManager messageManager) throws JMSException {
         if (messageManager == null) {
             return null;
         }
-        javax.jms.Message message = messageManager.getMessage();
+        jakarta.jms.Message message = messageManager.message();
 
         // Notify PrefetchThread that message is dispatched
         this.messageDispatched();
@@ -631,13 +615,13 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     }
 
     List<SQSMessageIdentifier> purgePrefetchedMessagesWithGroups(Set<String> affectedGroups) throws JMSException {
-        List<SQSMessageIdentifier> purgedMessages = new ArrayList<SQSMessageIdentifier>();
+        List<SQSMessageIdentifier> purgedMessages = new ArrayList<>();
         synchronized (stateLock) {
             //let's walk over the prefetched messages
             Iterator<MessageManager> managerIterator = messageQueue.iterator();
             while (managerIterator.hasNext()) {
                 MessageManager messageManager = managerIterator.next();
-                SQSMessage prefetchedMessage = (SQSMessage)messageManager.getMessage();
+                SQSMessage prefetchedMessage = (SQSMessage)messageManager.message();
                 SQSMessageIdentifier messageIdentifier = SQSMessageIdentifier.fromSQSMessage(prefetchedMessage);
 
                 //is the prefetch entry for one of the affected group ids?

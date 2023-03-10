@@ -14,34 +14,30 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-
-import javax.jms.JMSException;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
+import jakarta.jms.JMSException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * Test the UnorderedAcknowledgerTest class
  */
 public class UnorderedAcknowledgerTest extends AcknowledgerCommon {
 
-    @Before
+    @BeforeEach
     public void setupUnordered() throws JMSException {
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
         acknowledger = AcknowledgeMode.ACK_UNORDERED.createAcknowledger(amazonSQSClient, mock(SQSSession.class));
@@ -68,9 +64,8 @@ public class UnorderedAcknowledgerTest extends AcknowledgerCommon {
         populateMessage(populateMessageSize);
         int counter = 0;
 
-        List<SQSMessage> populatedMessagesCopy =  new ArrayList<SQSMessage>(populatedMessages);
+        List<SQSMessage> populatedMessagesCopy =  new ArrayList<>(populatedMessages);
         while (!populatedMessagesCopy.isEmpty()) {
-
             int rand = new Random().nextInt(populatedMessagesCopy.size());
             SQSMessage message = populatedMessagesCopy.remove(rand);
             message.acknowledge();

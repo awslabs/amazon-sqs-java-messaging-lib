@@ -14,34 +14,26 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
+import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
+import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
+import com.amazon.sqs.javamessaging.util.SQSMessagingClientThreadFactory;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageListener;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.JMSException;
-import javax.jms.MessageListener;
-
-import com.amazon.sqs.javamessaging.SQSConnection;
-import com.amazon.sqs.javamessaging.SQSMessageConsumer;
-import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch;
-import com.amazon.sqs.javamessaging.SQSQueueDestination;
-import com.amazon.sqs.javamessaging.SQSSession;
-import com.amazon.sqs.javamessaging.SQSSessionCallbackScheduler;
-import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
-import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
-import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
-import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
-import com.amazon.sqs.javamessaging.util.SQSMessagingClientThreadFactory;
-
-import org.junit.Before;
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -55,7 +47,6 @@ import static org.mockito.Mockito.when;
 public class SQSMessageConsumerTest {
 
     private static final String QUEUE_URL_1 = "QueueUrl1";
-    private static final String QUEUE_URL_2 = "queueUrl2";
     private static final String QUEUE_NAME = "QueueName";
 
     private SQSMessageConsumer consumer;
@@ -64,13 +55,13 @@ public class SQSMessageConsumerTest {
     private SQSSessionCallbackScheduler sqsSessionRunnable;
     private Acknowledger acknowledger;
 
-    private ScheduledExecutorService executorService = Executors.newScheduledThreadPool(5);
+    private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(5);
     private SQSMessageConsumerPrefetch sqsMessageConsumerPrefetch;
     private NegativeAcknowledger negativeAcknowledger;
     private SQSMessagingClientThreadFactory threadFactory;
     private SQSQueueDestination destination;
 
-    @Before
+    @BeforeEach
     public void setup() throws JMSException{
 
         sqsConnection = mock(SQSConnection.class);
@@ -98,13 +89,7 @@ public class SQSMessageConsumerTest {
      */
     @Test
     public void testGetMessageSelectorNotSupported() {
-        
-        try {
-            consumer.getMessageSelector();
-            fail();
-        } catch(JMSException jmse) {
-            assertEquals("Unsupported Method", jmse.getMessage());
-        }
+        assertThrows(JMSException.class, () -> consumer.getMessageSelector(), "Unsupported Method");
     }
 
     /**
@@ -148,24 +133,20 @@ public class SQSMessageConsumerTest {
         sqsSession.startingCallback(consumer);
 
         // Run another thread that tries to close the consumer while activeConsumerInCallback is set
-        executorService.execute(new Runnable() {
-
-            @Override
-            public void run() {
-                beforeConsumerStopCall.countDown();
-                try {
-                    consumer.close();
-                } catch (JMSException e) {
-                    fail();
-                }
-                passedConsumerStopCall.countDown();
+        executorService.execute(() -> {
+            beforeConsumerStopCall.countDown();
+            try {
+                consumer.close();
+            } catch (JMSException e) {
+                fail();
             }
+            passedConsumerStopCall.countDown();
         });
 
         beforeConsumerStopCall.await();
         Thread.sleep(10);
         // Ensure that we wait on activeConsumerInCallback
-        assertEquals(false, passedConsumerStopCall.await(2, TimeUnit.SECONDS));
+        assertFalse(passedConsumerStopCall.await(2, TimeUnit.SECONDS));
 
         // Release the activeConsumerInCallback
         sqsSession.finishedCallback();
@@ -173,7 +154,7 @@ public class SQSMessageConsumerTest {
         // Ensure that the consumer close completed
         passedConsumerStopCall.await();
 
-        assertEquals(true, consumer.closed);
+        assertTrue(consumer.closed);
     }
 
 
@@ -203,7 +184,7 @@ public class SQSMessageConsumerTest {
      * Test do close results in no op when the consumer is already closed
      */
     @Test
-    public void testDoCloseNoOpWhenAlreadyClosed() throws InterruptedException, JMSException {
+    public void testDoCloseNoOpWhenAlreadyClosed() {
 
         /*
          * Set up consumer
@@ -226,8 +207,7 @@ public class SQSMessageConsumerTest {
      * Test do close
      */
     @Test
-    public void testDoClose() throws InterruptedException, JMSException {
-
+    public void testDoClose() {
         consumer = new SQSMessageConsumer(sqsConnection, sqsSession, sqsSessionRunnable,
                 destination, acknowledger, negativeAcknowledger, threadFactory, sqsMessageConsumerPrefetch);
 
@@ -248,7 +228,7 @@ public class SQSMessageConsumerTest {
      * Test close results in no op when the consumer is already closed
      */
     @Test
-    public void testCloseNoOpWhenAlreadyClosed() throws InterruptedException, JMSException {
+    public void testCloseNoOpWhenAlreadyClosed() throws JMSException {
 
         /*
          * Set up consumer
@@ -273,7 +253,7 @@ public class SQSMessageConsumerTest {
      * we do not close but set a consumer close after callback
      */
     @Test
-    public void testCloseCalledFromCallbackExecutionThread() throws InterruptedException, JMSException {
+    public void testCloseCalledFromCallbackExecutionThread() throws JMSException {
 
         /*
          * Set up consumer
@@ -300,7 +280,7 @@ public class SQSMessageConsumerTest {
      * Test consumer close
      */
     @Test
-    public void testClose() throws InterruptedException, JMSException {
+    public void testClose() throws JMSException {
 
         /*
          * Set up consumer
@@ -324,7 +304,7 @@ public class SQSMessageConsumerTest {
      * Test set message listener fails when consumer is already closed
      */
     @Test
-    public void testSetMessageListenerAlreadyClosed() throws InterruptedException, JMSException {
+    public void testSetMessageListenerAlreadyClosed() throws JMSException {
 
         /*
          * Set up consumer
@@ -351,7 +331,7 @@ public class SQSMessageConsumerTest {
      * Test receive fails when consumer is already closed
      */
     @Test
-    public void testReceiveAlreadyClosed() throws InterruptedException, JMSException {
+    public void testReceiveAlreadyClosed() throws JMSException {
 
         /*
          * Set up consumer
@@ -378,7 +358,7 @@ public class SQSMessageConsumerTest {
      * Test set message listener fails when consumer is already closed
      */
     @Test
-    public void testReceiveWithTimeoutAlreadyClosed() throws InterruptedException, JMSException {
+    public void testReceiveWithTimeoutAlreadyClosed() throws JMSException {
 
         /*
          * Set up consumer
@@ -407,7 +387,7 @@ public class SQSMessageConsumerTest {
      * Test set message listener fails when consumer is already closed
      */
     @Test
-    public void testReceiveNoWaitAlreadyClosed() throws InterruptedException, JMSException {
+    public void testReceiveNoWaitAlreadyClosed() throws JMSException {
 
         /*
          * Set up consumer
@@ -420,20 +400,14 @@ public class SQSMessageConsumerTest {
         /*
          * Call receive no wait
          */
-        try {
-
-            consumer.receiveNoWait();
-            fail();
-        } catch (JMSException ex) {
-            assertEquals("Consumer is closed", ex.getMessage());
-        }
+        assertThrows(JMSException.class, () -> consumer.receiveNoWait(), "Consumer is closed");
     }
 
     /**
      * Test set message listener
      */
     @Test
-    public void testSetMessageListener() throws InterruptedException, JMSException {
+    public void testSetMessageListener() throws JMSException {
 
         /*
          * Set up consumer
@@ -458,7 +432,7 @@ public class SQSMessageConsumerTest {
      * Test get message listener
      */
     @Test
-    public void testGetMessageListener() throws InterruptedException, JMSException {
+    public void testGetMessageListener() throws JMSException {
 
         /*
          * Set up consumer
@@ -481,7 +455,7 @@ public class SQSMessageConsumerTest {
      * Test get message listener
      */
     @Test
-    public void testGetQueue() throws InterruptedException, JMSException {
+    public void testGetQueue() throws JMSException {
 
         /*
          * Set up consumer
@@ -496,7 +470,7 @@ public class SQSMessageConsumerTest {
      * Test receive
      */
     @Test
-    public void testReceive() throws InterruptedException, JMSException {
+    public void testReceive() throws JMSException {
 
         /*
          * Set up consumer
@@ -519,7 +493,7 @@ public class SQSMessageConsumerTest {
      * Test receive with timeout
      */
     @Test
-    public void testReceiveWithTimeout() throws InterruptedException, JMSException {
+    public void testReceiveWithTimeout() throws JMSException {
 
         /*
          * Set up consumer
@@ -544,7 +518,7 @@ public class SQSMessageConsumerTest {
      * Test receive no wait
      */
     @Test
-    public void testReceiveNoWait() throws InterruptedException, JMSException {
+    public void testReceiveNoWait() throws JMSException {
 
         /*
          * Set up consumer

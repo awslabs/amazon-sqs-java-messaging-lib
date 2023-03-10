@@ -17,7 +17,7 @@ package com.amazon.sqs.javamessaging.acknowledge;
 import java.util.Collections;
 import java.util.List;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSSession;
@@ -62,7 +62,7 @@ public class AutoAcknowledger implements Acknowledger {
      */
     @Override
     public List<SQSMessageIdentifier> getUnAckMessages() {
-        return Collections.<SQSMessageIdentifier>emptyList(); 
+        return Collections.emptyList();
     }
     
     /** AutoAcknowledge doesn't need to do anything in this method. */

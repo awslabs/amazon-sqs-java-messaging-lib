@@ -22,7 +22,6 @@ import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ModifyWaitTimeSecondsTest {
-
     @DisplayName("Should be able to modify SQSMessageConsumerPrefetch.WAIT_TIME_SECONDS via Reflection")
     @Test
     public void waitTimeSecondsShouldBeModifiableViaReflection() throws NoSuchFieldException, IllegalAccessException {

@@ -14,9 +14,6 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -26,19 +23,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
-import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.acknowledge.AcknowledgeMode;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
 
-import junit.framework.Assert;
-
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 
@@ -47,7 +44,7 @@ import org.mockito.ArgumentCaptor;
  */
 public class RangedAcknowledgerTest extends AcknowledgerCommon {
 
-    @Before
+    @BeforeEach
     public void setupRanded() throws JMSException {
         amazonSQSClient = mock(AmazonSQSMessagingClientWrapper.class);
         acknowledger = AcknowledgeMode.ACK_RANGE.createAcknowledger(amazonSQSClient, mock(SQSSession.class));
@@ -62,7 +59,7 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         populateMessage(populateMessageSize);
 
         acknowledger.forgetUnAckMessages();
-        Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
+        assertEquals(0, acknowledger.getUnAckMessages().size());
     }
 
     /**
@@ -76,7 +73,7 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
         
         testAcknowledge(populateMessageSize, ackMessage);
         
-        Assert.assertEquals(0, acknowledger.getUnAckMessages().size());
+        assertEquals(0, acknowledger.getUnAckMessages().size());
     }
 
     /**
@@ -151,9 +148,9 @@ public class RangedAcknowledgerTest extends AcknowledgerCommon {
             SQSMessage message = populatedMessages.get(i);
             SQSMessageIdentifier sqsMessageIdentifier = new SQSMessageIdentifier(message.getQueueUrl(), message.getReceiptHandle(),
                     message.getSQSMessageId());
-            Assert.assertFalse(acknowledger.getUnAckMessages().contains(sqsMessageIdentifier));
+            assertFalse(acknowledger.getUnAckMessages().contains(sqsMessageIdentifier));
         }
 
-        Assert.assertEquals((populateMessageSize - indexOfMessageToAck - 1), acknowledger.getUnAckMessages().size());
+        assertEquals((populateMessageSize - indexOfMessageToAck - 1), acknowledger.getUnAckMessages().size());
     }
 }

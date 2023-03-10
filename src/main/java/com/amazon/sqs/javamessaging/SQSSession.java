@@ -26,28 +26,28 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.BytesMessage;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.MapMessage;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.ObjectMessage;
-import javax.jms.Queue;
-import javax.jms.QueueBrowser;
-import javax.jms.QueueReceiver;
-import javax.jms.QueueSender;
-import javax.jms.QueueSession;
-import javax.jms.Session;
-import javax.jms.StreamMessage;
-import javax.jms.TemporaryQueue;
-import javax.jms.TemporaryTopic;
-import javax.jms.TextMessage;
-import javax.jms.Topic;
-import javax.jms.TopicSubscriber;
-import javax.jms.IllegalStateException;
+import jakarta.jms.BytesMessage;
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
+import jakarta.jms.MapMessage;
+import jakarta.jms.Message;
+import jakarta.jms.MessageConsumer;
+import jakarta.jms.MessageListener;
+import jakarta.jms.MessageProducer;
+import jakarta.jms.ObjectMessage;
+import jakarta.jms.Queue;
+import jakarta.jms.QueueBrowser;
+import jakarta.jms.QueueReceiver;
+import jakarta.jms.QueueSender;
+import jakarta.jms.QueueSession;
+import jakarta.jms.Session;
+import jakarta.jms.StreamMessage;
+import jakarta.jms.TemporaryQueue;
+import jakarta.jms.TemporaryTopic;
+import jakarta.jms.TextMessage;
+import jakarta.jms.Topic;
+import jakarta.jms.TopicSubscriber;
+import jakarta.jms.IllegalStateException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -181,8 +181,8 @@ public class SQSSession implements Session, QueueSession {
 
     SQSSession(SQSConnection parentSQSConnection, AcknowledgeMode acknowledgeMode) throws JMSException{
         this(parentSQSConnection, acknowledgeMode,
-                Collections.newSetFromMap(new ConcurrentHashMap<SQSMessageConsumer, Boolean>()),
-                Collections.newSetFromMap(new ConcurrentHashMap<SQSMessageProducer, Boolean>()));
+                Collections.newSetFromMap(new ConcurrentHashMap<>()),
+                Collections.newSetFromMap(new ConcurrentHashMap<>()));
     }
 
     SQSSession(SQSConnection parentSQSConnection, AcknowledgeMode acknowledgeMode,
@@ -233,7 +233,7 @@ public class SQSSession implements Session, QueueSession {
      * 
      * @param queue
      *            a queue destination
-     * @param messageSelector           
+     * @param messageSelector message selector
      * @return new message receiver
      * @throws JMSException
      *             If session is closed
@@ -380,7 +380,7 @@ public class SQSSession implements Session, QueueSession {
             return;
         }
         
-        /**
+        /*
          * A MessageListener must not attempt to close its own Session as
          * this would lead to deadlock
          */
@@ -420,7 +420,7 @@ public class SQSSession implements Session, QueueSession {
                     if (executor != null) {
                         LOG.info("Shutting down " + SESSION_EXECUTOR_NAME + " executor");
 
-                        /** Shut down executor. */
+                        // Shut down executor
                         executor.shutdown();
                         
                         waitForCallbackComplete();
@@ -450,7 +450,7 @@ public class SQSSession implements Session, QueueSession {
                     stateLock.notifyAll();
                 }
             }
-        }/** Blocks until closing of the session completes */
+        }// Blocks until closing of the session completes
         else {
             synchronized (stateLock) {
                 while (!closed) {
@@ -501,13 +501,13 @@ public class SQSSession implements Session, QueueSession {
     }
 
     private Map<String, Set<String>> getAffectedGroupsPerQueueUrl(List<SQSMessageIdentifier> messages) {
-        Map<String, Set<String>> queueToGroupsMapping = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> queueToGroupsMapping = new HashMap<>();
         for (SQSMessageIdentifier message : messages) {
             String groupId = message.getGroupId();
             if (groupId != null) {
                 String queueUrl = message.getQueueUrl();
                 if (!queueToGroupsMapping.containsKey(queueUrl)) {
-                    queueToGroupsMapping.put(queueUrl, new HashSet<String>());
+                    queueToGroupsMapping.put(queueUrl, new HashSet<>());
                 }
                 queueToGroupsMapping.get(queueUrl).add(groupId);
             }
@@ -585,9 +585,8 @@ public class SQSSession implements Session, QueueSession {
      * Only queue destinations are supported at this time.
      * It will ignore any argument in messageSelector.
      * 
-     * @param destination
-     *            a queue destination
-     * @param messageSelector           
+     * @param destination a queue destination
+     * @param messageSelector message selector
      * @return new message consumer
      * @throws JMSException
      *             If session is closed or queue destination is not used
@@ -622,10 +621,22 @@ public class SQSSession implements Session, QueueSession {
         return createConsumer(destination);
     }
 
+    /** This method is not supported. */
+    @Override
+    public MessageConsumer createSharedConsumer(Topic topic, String sharedSubscriptionName) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public MessageConsumer createSharedConsumer(Topic topic, String sharedSubscriptionName, String messageSelector) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
     /**
      * This does not create SQS Queue. This method is only to create JMS Queue Object.
      * Make sure the queue exists corresponding to the queueName.
-     * @param queueName
+     * @param queueName name of the queue
      * @return a queue destination
      * @throws JMSException
      *         If session is closed or invalid queue is provided
@@ -641,7 +652,7 @@ public class SQSSession implements Session, QueueSession {
      * Object. Make sure the queue exists corresponding to the queueName and
      * ownerAccountId.
      * 
-     * @param queueName
+     * @param queueName name of the queue
      * @param ownerAccountId
      *            the account id, which originally created the queue on SQS
      * @return a queue destination
@@ -774,6 +785,30 @@ public class SQSSession implements Session, QueueSession {
 
     /** This method is not supported. */
     @Override
+    public MessageConsumer createDurableConsumer(Topic topic, String name) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public MessageConsumer createDurableConsumer(Topic topic, String name, String messageSelector, boolean noLocal) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public MessageConsumer createSharedDurableConsumer(Topic topic, String name) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public MessageConsumer createSharedDurableConsumer(Topic topic, String name, String messageSelector) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
     public QueueBrowser createBrowser(Queue queue) throws JMSException {
         throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
@@ -820,22 +855,7 @@ public class SQSSession implements Session, QueueSession {
         throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
-    static class CallbackEntry {
-        private final MessageListener messageListener;
-        private final MessageManager messageManager;
-        
-        CallbackEntry(MessageListener messageListener, MessageManager messageManager) {
-            this.messageListener = messageListener;
-            this.messageManager = messageManager;
-        }
-        
-        public MessageListener getMessageListener() {
-            return messageListener;
-        }
-        
-        public MessageManager getMessageManager() {
-            return messageManager;
-        }
+    record CallbackEntry(MessageListener messageListener, MessageManager messageManager) {
     }
     
     /**
@@ -882,10 +902,9 @@ public class SQSSession implements Session, QueueSession {
         }
     }
 
-    /*
+    /**
      * Unit Tests Utility Functions
      */
-
     boolean isCallbackActive() {
         return activeConsumerInCallback != null;
     }

@@ -20,15 +20,16 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.jms.Destination;
-import javax.jms.IllegalStateException;
-import javax.jms.InvalidDestinationException;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageFormatException;
-import javax.jms.MessageProducer;
-import javax.jms.Queue;
-import javax.jms.QueueSender;
+import jakarta.jms.CompletionListener;
+import jakarta.jms.Destination;
+import jakarta.jms.IllegalStateException;
+import jakarta.jms.InvalidDestinationException;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.MessageFormatException;
+import jakarta.jms.MessageProducer;
+import jakarta.jms.Queue;
+import jakarta.jms.QueueSender;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,7 +57,7 @@ import com.amazonaws.util.Base64;
 public class SQSMessageProducer implements MessageProducer, QueueSender {
     private static final Log LOG = LogFactory.getLog(SQSMessageProducer.class);
 
-    private long MAXIMUM_DELIVERY_DELAY_MILLISECONDS = TimeUnit.MILLISECONDS.convert(15, TimeUnit.MINUTES);
+    private final long MAXIMUM_DELIVERY_DELAY_MILLISECONDS = TimeUnit.MILLISECONDS.convert(15, TimeUnit.MINUTES);
     
     private int deliveryDelaySeconds = 0;
 
@@ -92,12 +93,11 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         checkClosed();
         String sqsMessageBody = null;
         String messageType = null;
-        if (!(rawMessage instanceof SQSMessage)) {
+        if (!(rawMessage instanceof SQSMessage message)) {
             throw new MessageFormatException(
                     "Unrecognized message type. Messages have to be one of: SQSBytesMessage, SQSObjectMessage, or SQSTextMessage");            
         }
-        
-        SQSMessage message = (SQSMessage)rawMessage;
+
         message.setJMSDestination(queue);
         if (message instanceof SQSBytesMessage) {
             sqsMessageBody = Base64.encodeAsString(((SQSBytesMessage) message).getBodyAsBytes());
@@ -113,9 +113,9 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         if (sqsMessageBody == null || sqsMessageBody.isEmpty()) {
             throw new JMSException("Message body cannot be null or empty");
         }
-        Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute((SQSMessage) message);
+        Map<String, MessageAttributeValue> messageAttributes = propertyToMessageAttribute(message);
 
-        /**
+        /*
          * These will override existing attributes if they exist. Everything that
          * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
          * attribute, it will be overwritten.
@@ -143,7 +143,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
         SendMessageResult sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest);
         String messageId = sendMessageResult.getMessageId();
         LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
-        /** TODO: Do not support disableMessageID for now. */
+        // TODO: Do not support disableMessageID for now.
         message.setSQSMessageId(messageId);
 
         // if the message was sent to FIFO queue, the sequence number will be
@@ -196,7 +196,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      */
     Map<String, MessageAttributeValue> propertyToMessageAttribute(SQSMessage message)
             throws JMSException {
-        Map<String, MessageAttributeValue> messageAttributes = new HashMap<String, MessageAttributeValue>();
+        Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
         Enumeration<String> propertyNames = message.getPropertyNames();
 
         while (propertyNames.hasMoreElements()) {
@@ -248,10 +248,9 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
                                                    SQSMessage message) throws JMSException {
 
         Destination replyTo = message.getJMSReplyTo();
-        if (replyTo instanceof SQSQueueDestination) {
-            SQSQueueDestination replyToQueue = (SQSQueueDestination)replyTo;
-    
-            /**
+        if (replyTo instanceof SQSQueueDestination replyToQueue) {
+
+            /*
              * This will override the existing attributes if exists. Everything that
              * has prefix JMS_ is reserved for JMS Provider, but if the user sets that
              * attribute, it will be overwritten.
@@ -295,9 +294,9 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      *            the queue destination to send this message to
      * @param message
      *            the message to send
-     * @param deliveryMode
-     * @param priority
-     * @param timeToLive           
+     * @param deliveryMode delivery mode
+     * @param priority delivery priority
+     * @param timeToLive delivery time
      * @throws InvalidDestinationException
      *             If a client uses this method with a destination other than
      *             SQS queue destination.
@@ -366,13 +365,11 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      * Send does not support deliveryMode, priority, and timeToLive. It will
      * ignore anything in deliveryMode, priority, and timeToLive.
      * 
-     * @param message
-     *            the message to send
-     * @param deliveryMode
-     * @param priority
-     * @param timeToLive           
-     * @throws MessageFormatException
-     *             If an invalid message is specified.
+     * @param message the message to send
+     * @param deliveryMode delivery mode
+     * @param priority delivery priority
+     * @param timeToLive delivery time
+     * @throws MessageFormatException If an invalid message is specified.
      * @throws UnsupportedOperationException
      *             If a client uses this method with a MessageProducer that did
      *             not specify a destination at creation time.
@@ -441,6 +438,31 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     @Override
     public void send(Destination destination, Message message, int deliveryMode, int priority, long timeToLive) throws JMSException {
         send(destination, message);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public void send(Message message, CompletionListener completionListener) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public void send(Message message, int deliveryMode, int priority, long timeToLive, CompletionListener completionListener) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public void send(Destination destination, Message message, CompletionListener completionListener) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
+    }
+
+    /** This method is not supported. */
+    @Override
+    public void send(Destination destination, Message message, int deliveryMode, int priority, long timeToLive,
+                     CompletionListener completionListener) throws JMSException {
+        throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 
     /** This method is not supported. */
@@ -525,7 +547,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      * message is sent before the JMS provider may deliver the message to a consumer.
      */
     public long getDeliveryDelay() {
-        return deliveryDelaySeconds * 1000;
+        return deliveryDelaySeconds * 1000L;
     }
     
     void checkClosed() throws IllegalStateException {

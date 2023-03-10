@@ -14,7 +14,7 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 
@@ -24,13 +24,13 @@ import com.amazon.sqs.javamessaging.message.SQSMessage;
 public class SQSMessageIdentifier {
 
     // The queueUrl where the message was sent or received from
-    private String queueUrl;
+    private final String queueUrl;
 
     // The receipt handle returned after the delivery of the message from SQS
-    private String receiptHandle;
+    private final String receiptHandle;
 
     // The SQS message id assigned on send.
-    private String sqsMessageId;
+    private final String sqsMessageId;
     
     // The group id to which the message belongs
     private String groupId;
@@ -120,11 +120,8 @@ public class SQSMessageIdentifier {
         } else if (!receiptHandle.equals(other.receiptHandle))
             return false;
         if (sqsMessageId == null) {
-            if (other.sqsMessageId != null)
-                return false;
-        } else if (!sqsMessageId.equals(other.sqsMessageId))
-            return false;
-        return true;
+            return other.sqsMessageId == null;
+        } else return sqsMessageId.equals(other.sqsMessageId);
     }
 
     @Override

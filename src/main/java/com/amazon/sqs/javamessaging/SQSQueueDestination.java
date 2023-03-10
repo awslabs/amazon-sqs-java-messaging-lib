@@ -14,10 +14,10 @@
  */
 package com.amazon.sqs.javamessaging;
 
-import javax.jms.Destination;
-import javax.jms.JMSException;
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
 
-import javax.jms.Queue;
+import jakarta.jms.Queue;
 
 /**
  * A SQSQueueDestination object encapsulates a queue name and SQS specific queue
@@ -90,10 +90,7 @@ public class SQSQueueDestination implements Destination, Queue {
         } else if (!queueName.equals(other.queueName))
             return false;
         if (queueUrl == null) {
-            if (other.queueUrl != null)
-                return false;
-        } else if (!queueUrl.equals(other.queueUrl))
-            return false;
-        return true;
+            return other.queueUrl == null;
+        } else return queueUrl.equals(other.queueUrl);
     }
 }

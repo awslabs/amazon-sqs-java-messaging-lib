@@ -22,15 +22,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.jms.JMSException;
+import jakarta.jms.JMSException;
 
-import junit.framework.Assert;
-
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 import com.amazonaws.services.sqs.model.Message;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Parent class for the Acknowledger tests
@@ -40,7 +39,7 @@ public class AcknowledgerCommon {
     protected String baseQueueUrl = "queueUrl";
     protected Acknowledger acknowledger;
     protected AmazonSQSMessagingClientWrapper amazonSQSClient;
-    protected List<SQSMessage> populatedMessages = new ArrayList<SQSMessage>();
+    protected List<SQSMessage> populatedMessages = new ArrayList<>();
 
     /*
      * Generate and populate the list with sqs message from different queues
@@ -63,15 +62,15 @@ public class AcknowledgerCommon {
             when(sqsMessage.getReceiptHandle()).thenReturn("ReceiptHandle" + i);
             when(sqsMessage.getMessageId()).thenReturn("MessageId" + i);
             // Add mock Attributes
-            Map<String, String> mockAttributes = new HashMap<String, String>();
+            Map<String, String> mockAttributes = new HashMap<>();
             mockAttributes.put(SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "2");
             when(sqsMessage.getAttributes()).thenReturn(mockAttributes);
             
-            SQSMessage message = (SQSMessage) new SQSTextMessage(acknowledger, queueUrl, sqsMessage);
+            SQSMessage message = new SQSTextMessage(acknowledger, queueUrl, sqsMessage);
             
             populatedMessages.add(message);
             acknowledger.notifyMessageReceived(message);
         }
-        Assert.assertEquals(populateMessageSize, acknowledger.getUnAckMessages().size());
+        assertEquals(populateMessageSize, acknowledger.getUnAckMessages().size());
     }
 }
