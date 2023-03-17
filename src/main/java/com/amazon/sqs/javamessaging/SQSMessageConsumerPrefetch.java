@@ -349,8 +349,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
                 try {
                     jmsMessage = new SQSBytesMessage(acknowledger, queueUrl, message);
                 } catch (JMSException e) {
-                    LOG.warn("MessageReceiptHandle - " + message.receiptHandle() +
-                             "cannot be serialized to BytesMessage", e);
+                    LOG.warn("MessageReceiptHandle - {} cannot be serialized to BytesMessage", message.receiptHandle(), e);
                     throw e;
                 }
             } else if (SQSMessage.OBJECT_MESSAGE_TYPE.equals(messageType)) {

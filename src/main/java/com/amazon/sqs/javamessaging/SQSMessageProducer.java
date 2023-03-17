@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -152,7 +152,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
 
         SendMessageResponse sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest.build());
         String messageId = sendMessageResult.messageId();
-        LOG.info("Message sent to SQS with SQS-assigned messageId: " + messageId);
+        LOG.info("Message sent to SQS with SQS-assigned messageId: {}", messageId);
         // TODO: Do not support disableMessageID for now.
         message.setSQSMessageId(messageId);
 
