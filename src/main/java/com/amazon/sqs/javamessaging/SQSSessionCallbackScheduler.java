@@ -143,7 +143,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
                                 try {
                                     messageListener.onMessage(message);
                                 } catch (Throwable ex) {
-                                    LOG.info("Exception thrown from onMessage callback for message {}",
+                                    LOG.warn("Exception thrown from onMessage callback for message {}",
                                             message.getSQSMessageId(), ex);
                                     callbackFailed = true;
                                 } finally {

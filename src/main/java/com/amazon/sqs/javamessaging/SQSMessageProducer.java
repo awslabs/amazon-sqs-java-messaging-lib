@@ -152,7 +152,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
 
         SendMessageResponse sendMessageResult = amazonSQSClient.sendMessage(sendMessageRequest.build());
         String messageId = sendMessageResult.messageId();
-        LOG.info("Message sent to SQS with SQS-assigned messageId: {}", messageId);
+        LOG.debug("Message sent to SQS with SQS-assigned messageId: {}", messageId);
         // TODO: Do not support disableMessageID for now.
         message.setSQSMessageId(messageId);
 

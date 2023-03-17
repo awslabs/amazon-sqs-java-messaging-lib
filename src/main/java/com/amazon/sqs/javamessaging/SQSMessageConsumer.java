@@ -224,7 +224,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
 
         try {
             if (!prefetchExecutor.isShutdown()) {
-                LOG.info("Shutting down {} executor", SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME);
+                LOG.debug("Shutting down {} executor", SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME);
                 // Shut down executor.
                 prefetchExecutor.shutdown();
             }

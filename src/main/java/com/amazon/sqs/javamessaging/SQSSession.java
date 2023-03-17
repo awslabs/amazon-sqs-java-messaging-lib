@@ -405,7 +405,7 @@ public class SQSSession implements Session, QueueSession {
 
                 try {
                     if (executor != null) {
-                        LOG.info("Shutting down {} executor", SESSION_EXECUTOR_NAME);
+                        LOG.debug("Shutting down {} executor", SESSION_EXECUTOR_NAME);
 
                         executor.shutdown();
 
