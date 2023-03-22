@@ -224,7 +224,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
 
         try {
             if (!prefetchExecutor.isShutdown()) {
-                LOG.info("Shutting down " + SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME + " executor");
+                LOG.debug("Shutting down {} executor", SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME);
                 // Shut down executor.
                 prefetchExecutor.shutdown();
             }
@@ -233,9 +233,8 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
 
             if (!prefetchExecutor.awaitTermination(PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME, TimeUnit.SECONDS)) {
 
-                LOG.warn("Can't terminate executor service " + SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME +
-                         " after " + PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME +
-                         " seconds, some running threads will be shutdown immediately");
+                LOG.warn("Can't terminate executor service {} after {} seconds, some running threads will be shutdown immediately",
+                        SQSSession.CONSUMER_PREFETCH_EXECUTOR_NAME, PREFETCH_EXECUTOR_GRACEFUL_SHUTDOWN_TIME);
                 prefetchExecutor.shutdownNow();
             }
         } catch (InterruptedException e) {

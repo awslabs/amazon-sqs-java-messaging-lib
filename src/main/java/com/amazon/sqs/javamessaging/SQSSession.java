@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -405,7 +405,7 @@ public class SQSSession implements Session, QueueSession {
 
                 try {
                     if (executor != null) {
-                        LOG.info("Shutting down " + SESSION_EXECUTOR_NAME + " executor");
+                        LOG.debug("Shutting down {} executor", SESSION_EXECUTOR_NAME);
 
                         executor.shutdown();
 
@@ -419,9 +419,8 @@ public class SQSSession implements Session, QueueSession {
 
                         if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
 
-                            LOG.warn("Can't terminate executor service " + SESSION_EXECUTOR_NAME + " after " +
-                                    SESSION_EXECUTOR_GRACEFUL_SHUTDOWN_TIME +
-                                    " seconds, some running threads will be shutdown immediately");
+                            LOG.warn("Can't terminate executor service {} after {} seconds, some running threads will be shutdown immediately",
+                                    SESSION_EXECUTOR_NAME, SESSION_EXECUTOR_GRACEFUL_SHUTDOWN_TIME);
                             executor.shutdownNow();
                         }
                     }

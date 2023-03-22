@@ -72,8 +72,8 @@ public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger
          * the messages received before that
          */
         if (indexOfMessage == -1) {
-            LOG.warn("SQSMessageID: " + message.getSQSMessageId() + " with SQSMessageReceiptHandle: " +
-                     message.getReceiptHandle() + " does not exist.");
+            LOG.warn("SQSMessageID: {} with SQSMessageReceiptHandle: {} does not exist.", message.getSQSMessageId(),
+                    message.getReceiptHandle());
         } else {
             bulkAction(getUnAckMessages(), indexOfMessage);
         }
