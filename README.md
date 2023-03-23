@@ -9,13 +9,13 @@ for communicating with Amazon Simple Queue Service. This project builds on top o
 ## Getting Started
 
 * **Sign up for AWS** — Before you begin, you need an AWS account. For more information about creating an AWS account and retrieving your AWS credentials, see [AWS Account and Credentials](http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-setup.html) in the AWS SDK for Java Developer Guide.
-* **Minimum requirements** — To use the sample application, you'll need Java 7 (or later) and [Maven 3](http://maven.apache.org/). For more information about the requirements, see the [Getting Started](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/jmsclient.html) section of the Amazon SQS Developer Guide.
+* **Minimum requirements** — To use the sample application, you'll need Java 8 (or later) and [Maven 3](http://maven.apache.org/). For more information about the requirements, see the [Getting Started](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/jmsclient.html) section of the Amazon SQS Developer Guide.
 * **Download** — Download the [latest release](https://github.com/awslabs/amazon-sqs-java-messaging-lib/releases) or pick it up from Maven:
 ```xml
   <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>amazon-sqs-java-messaging-lib</artifactId>
-    <version>2.1.0</version>
+    <version>2.1.1</version>
     <type>jar</type>
   </dependency>
 ```
