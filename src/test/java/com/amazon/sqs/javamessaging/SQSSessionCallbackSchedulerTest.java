@@ -577,9 +577,9 @@ public class SQSSessionCallbackSchedulerTest {
 
         //failing to process 'message1' should nack all messages for queue1 and group1, that is 'message1', 'message2' and 'message5'
         assertEquals(3, nackedMessagesSize);
-        assertEquals("message1", nackedMessages.get(0).getSqsMessageId());
-        assertEquals("message2", nackedMessages.get(1).getSqsMessageId());
-        assertEquals("message5", nackedMessages.get(2).getSqsMessageId());
+        assertEquals("message1", nackedMessages.get(0).getSQSMessageID());
+        assertEquals("message2", nackedMessages.get(1).getSQSMessageID());
+        assertEquals("message5", nackedMessages.get(2).getSQSMessageID());
     }
 
     private SQSMessageConsumerPrefetch.MessageManager createFifoMessageManager(
