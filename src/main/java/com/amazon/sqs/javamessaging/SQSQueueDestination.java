@@ -16,18 +16,12 @@ package com.amazon.sqs.javamessaging;
 
 import jakarta.jms.Destination;
 import jakarta.jms.Queue;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.ToString;
 
 /**
  * A SQSQueueDestination object encapsulates a queue name and SQS specific queue
  * URL. This is the way a client specifies the identity of a queue to JMS API
  * methods.
  */
-@Getter
-@ToString(exclude = {"isFifo"})
-@EqualsAndHashCode
 public class SQSQueueDestination implements Destination, Queue {
     
     private final String queueName;
@@ -40,5 +34,61 @@ public class SQSQueueDestination implements Destination, Queue {
         this.queueName = queueName;
         this.queueUrl = queueUrl;
         this.isFifo = this.queueName.endsWith(".fifo");
+    }
+
+    /**
+     * Returns the name of this queue.
+     *
+     * @return queueName
+     */
+    @Override
+    public String getQueueName() {
+        return this.queueName;
+    }
+
+    /**
+     * Returns the queueUrl of this queue.
+     *
+     * @return queueUrl
+     */
+    public String getQueueUrl() {
+        return this.queueUrl;
+    }
+
+    public boolean isFifo() {
+        return this.isFifo;
+    }
+
+    @Override
+    public String toString() {
+        return "SQSDestination [queueName=" + queueName + ", queueUrl=" + queueUrl + "]";
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((queueName == null) ? 0 : queueName.hashCode());
+        result = prime * result + ((queueUrl == null) ? 0 : queueUrl.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        SQSQueueDestination other = (SQSQueueDestination) obj;
+        if (queueName == null) {
+            if (other.queueName != null)
+                return false;
+        } else if (!queueName.equals(other.queueName))
+            return false;
+        if (queueUrl == null) {
+            return other.queueUrl == null;
+        } else return queueUrl.equals(other.queueUrl);
     }
 }
