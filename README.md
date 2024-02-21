@@ -1,7 +1,7 @@
 Amazon SQS Java Messaging Library
 ========================================
 The **Amazon SQS Java Messaging Library** holds the Java Message Service compatible classes, that are used
-for communicating with Amazon Simple Queue Service. This project builds on top of the AWS SDK for Java to use Amazon SQS as the JMS (as defined in 1.1 specification) provider for the messaging applications without running any additional software.
+for communicating with Amazon Simple Queue Service. This project builds on top of the AWS SDK for Java to use Amazon SQS as the JMS (as defined in Jakarta [3.1 specification](https://jakarta.ee/specifications/messaging/3.1/)) provider for the messaging applications without running any additional software.
 
 * You can download release builds through the [releases section of this](https://github.com/awslabs/amazon-sqs-java-messaging-lib) project.
 * For more information on using the amazon-sqs-java-messaging-lib, see our getting started guide to SQS [here](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/jmsclient.html).
