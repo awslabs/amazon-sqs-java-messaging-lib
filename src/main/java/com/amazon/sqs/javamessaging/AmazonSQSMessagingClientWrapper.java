@@ -377,7 +377,7 @@ public class AmazonSQSMessagingClientWrapper {
     }
 
     private static String errorCode(AwsServiceException e) {
-        return e.awsErrorDetails() != null ? e.awsErrorDetails().errorCode() : "";
+        return e.awsErrorDetails() != null && e.awsErrorDetails().errorCode() != null ? e.awsErrorDetails().errorCode() : "";
     }
 
 
