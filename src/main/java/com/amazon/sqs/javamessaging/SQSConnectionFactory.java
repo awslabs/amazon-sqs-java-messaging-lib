@@ -53,6 +53,15 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     private final Supplier<SqsClient> amazonSQSClientSupplier;
 
     /**
+     * Creates a SQSConnectionFactory that uses default ProviderConfiguration
+     * and SqsClientBuilder.standard() for creating SqsClient connections.
+     * Every SQSConnection will have its own copy of SqsClient.
+     */
+    public SQSConnectionFactory() {
+        this(new ProviderConfiguration());
+    }
+
+    /**
      * Creates a SQSConnectionFactory that uses SqsClientBuilder.standard() for creating SqsClient connections.
      * Every SQSConnection will have its own copy of SqsClient.
      */

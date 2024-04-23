@@ -26,7 +26,15 @@ import static org.mockito.Mockito.mock;
 
 
 public class SQSConnectionFactoryTest {
-    
+
+    @Test
+    public void canCreateFactoryWithNoSetting() throws JMSException{
+        System.setProperty("aws.region", "eu-central-1");
+        SQSConnectionFactory factory= new SQSConnectionFactory();
+        SQSConnection connection = factory.createConnection();
+        connection.close();
+    }
+
     @Test
     public void canCreateFactoryWithDefaultProviderSettings() {
         System.setProperty("aws.region", "eu-central-1");
