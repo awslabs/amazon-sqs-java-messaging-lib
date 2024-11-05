@@ -14,7 +14,7 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClient;
 import com.amazon.sqs.javamessaging.SQSSession;
 
 /**
@@ -60,7 +60,7 @@ public enum AcknowledgeMode {
      * @param parentSQSSession
      *            the associated session for the acknowledger
      */
-    public Acknowledger createAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession parentSQSSession) {
+    public Acknowledger createAcknowledger(AmazonSQSMessagingClient amazonSQSClient, SQSSession parentSQSSession) {
         return switch (this) {
             case ACK_AUTO -> new AutoAcknowledger(amazonSQSClient, parentSQSSession);
             case ACK_RANGE -> new RangedAcknowledger(amazonSQSClient, parentSQSSession);

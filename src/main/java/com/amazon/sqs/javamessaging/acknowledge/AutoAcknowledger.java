@@ -14,7 +14,7 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClient;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import jakarta.jms.JMSException;
@@ -31,10 +31,10 @@ import java.util.List;
  */
 public class AutoAcknowledger implements Acknowledger {
 
-    private final AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private final AmazonSQSMessagingClient amazonSQSClient;
     private final SQSSession session;
 
-    public AutoAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession session) {
+    public AutoAcknowledger(AmazonSQSMessagingClient amazonSQSClient, SQSSession session) {
         this.amazonSQSClient = amazonSQSClient;
         this.session = session;
     }

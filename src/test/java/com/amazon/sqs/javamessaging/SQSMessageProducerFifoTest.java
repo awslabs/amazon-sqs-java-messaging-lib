@@ -62,7 +62,7 @@ public class SQSMessageProducerFifoTest {
 
     private SQSMessageProducer producer;
     private SQSQueueDestination destination;
-    private AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private AmazonSQSMessagingClient amazonSQSClient;
     private Acknowledger acknowledger;
 
     @BeforeEach

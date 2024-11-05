@@ -14,7 +14,7 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClient;
 import com.amazon.sqs.javamessaging.SQSSession;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
 import jakarta.jms.JMSException;
@@ -41,13 +41,13 @@ import java.util.Queue;
 public class RangedAcknowledger extends BulkSQSOperation implements Acknowledger {
     private static final Logger LOG = LoggerFactory.getLogger(RangedAcknowledger.class);
     
-    private final AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private final AmazonSQSMessagingClient amazonSQSClient;
 
     private final SQSSession session;
     
     private final Queue<SQSMessageIdentifier> unAckMessages;
 
-    public RangedAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient, SQSSession session) {
+    public RangedAcknowledger(AmazonSQSMessagingClient amazonSQSClient, SQSSession session) {
         this.amazonSQSClient = amazonSQSClient;
         this.session = session;
         this.unAckMessages  = new LinkedList<>();
