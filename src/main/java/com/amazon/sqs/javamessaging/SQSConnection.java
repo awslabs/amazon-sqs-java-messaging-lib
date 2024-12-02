@@ -31,7 +31,7 @@ import jakarta.jms.Session;
 import jakarta.jms.Topic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.awscore.AwsClient;
 
 import java.util.Collections;
 import java.util.Set;
@@ -84,7 +84,7 @@ public class SQSConnection implements Connection, QueueConnection {
     /** Used for interactions with connection state. */
     private final Object stateLock = new Object();
     
-    private final AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private final AmazonSQSMessagingClient amazonSQSClient;
 
     /**
      * Configures the amount of messages that can be prefetched by a consumer. A
@@ -106,7 +106,7 @@ public class SQSConnection implements Connection, QueueConnection {
 
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    SQSConnection(AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper, int numberOfMessagesToPrefetch) {
+    SQSConnection(AmazonSQSMessagingClient amazonSQSClientJMSWrapper, int numberOfMessagesToPrefetch) {
         amazonSQSClient = amazonSQSClientJMSWrapper;
         this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
 
@@ -116,9 +116,9 @@ public class SQSConnection implements Connection, QueueConnection {
      * Get the AmazonSQSClient used by this connection. This can be used to do administrative operations
      * that aren't included in the JMS specification, e.g. creating new queues.
      * 
-     * @return the SqsClient used by this connection
+     * @return the AwsClient used by this connection
      */
-    public SqsClient getAmazonSQSClient() {
+    public AwsClient getAmazonSQSClient() {
         return amazonSQSClient.getAmazonSQSClient();
     }
 
@@ -130,7 +130,7 @@ public class SQSConnection implements Connection, QueueConnection {
      * 
      * @return  wrapped version of the AmazonSQSClient used by this connection
      */
-    public AmazonSQSMessagingClientWrapper getWrappedAmazonSQSClient() {
+    public AmazonSQSMessagingClient getWrappedAmazonSQSClient() {
         return amazonSQSClient;        
     }
     

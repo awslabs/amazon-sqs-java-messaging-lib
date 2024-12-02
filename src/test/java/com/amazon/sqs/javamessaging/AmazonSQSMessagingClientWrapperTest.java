@@ -49,7 +49,7 @@ public class AmazonSQSMessagingClientWrapperTest {
     private static final String OWNER_ACCOUNT_ID = "accountId";
 
     private SqsClient amazonSQSClient;
-    private AmazonSQSMessagingClientWrapper wrapper;
+    private AmazonSQSMessagingClient wrapper;
 
     @BeforeEach
     public void setup() throws JMSException {

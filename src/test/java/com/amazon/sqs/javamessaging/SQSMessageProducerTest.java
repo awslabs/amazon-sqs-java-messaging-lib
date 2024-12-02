@@ -72,7 +72,7 @@ public class SQSMessageProducerTest {
     private SQSMessageProducer producer;
     private SQSQueueDestination destination;
     private SQSSession sqsSession;
-    private AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private AmazonSQSMessagingClient amazonSQSClient;
     private Acknowledger acknowledger;
 
     @BeforeEach

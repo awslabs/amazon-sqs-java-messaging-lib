@@ -44,7 +44,7 @@ public class MessageListenerConcurrentOperationTest {
     private static final String QUEUE_NAME = "queueName";
     private static final int NUMBER_OF_MESSAGES_TO_PREFETCH = 10;
 
-    private AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private AmazonSQSMessagingClient amazonSQSClient;
     private SQSMessageConsumerPrefetch.MessageManager msgManager;
     private volatile SQSSession session;
     private volatile SQSConnection connection;

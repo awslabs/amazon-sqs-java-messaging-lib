@@ -80,7 +80,7 @@ public class SQSSessionTest {
     private SQSMessageConsumer consumer2;
     private SQSMessageProducer producer1;
     private SQSMessageProducer producer2;
-    private AmazonSQSMessagingClientWrapper sqsClientJMSWrapper;
+    private AmazonSQSMessagingClient sqsClientJMSWrapper;
 
     @BeforeEach
     public void setup() throws JMSException {
