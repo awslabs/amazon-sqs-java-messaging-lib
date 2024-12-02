@@ -52,6 +52,8 @@ public class SQSMessagingClientConstants {
 
     public static final String SHORT = "Number.short";
 
+    public static final String BINARY = "Binary";
+
     public static final String INT_FALSE = "0";
 
     public static final String INT_TRUE = "1";

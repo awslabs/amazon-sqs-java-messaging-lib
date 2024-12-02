@@ -23,6 +23,7 @@ import jakarta.jms.JMSException;
 import jakarta.jms.Message;
 import jakarta.jms.MessageFormatException;
 import jakarta.jms.MessageNotWriteableException;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
@@ -34,8 +35,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.BINARY;
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.BOOLEAN;
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.BYTE;
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.DOUBLE;
@@ -77,6 +81,7 @@ import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.STRING;
  */
 public class SQSMessage implements Message {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SQSMessage.class);
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
     // Define constant message types.
@@ -1051,9 +1056,12 @@ public class SQSMessage implements Message {
                 return Float.valueOf(value);
             } else if (SHORT.equals(type)) {
                 return Short.valueOf(value);
-            } else if (type != null && (type.startsWith(STRING) || type.startsWith(NUMBER))) {
+            } else if (type != null &&
+                    (type.startsWith(STRING) || type.startsWith(NUMBER) || type.startsWith(BINARY))) {
                 return value;
             } else {
+                LOG.debug("Caught exception while constructing message attribute. " +
+                        "Unknown or yet supported JMS property type - " + type);
                 throw new JMSException(type + " is not a supported JMS property type");
             }
         }

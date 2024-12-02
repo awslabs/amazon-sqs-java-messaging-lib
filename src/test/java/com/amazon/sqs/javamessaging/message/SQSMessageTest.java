@@ -23,6 +23,7 @@ import jakarta.jms.MessageFormatException;
 import jakarta.jms.MessageNotWriteableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 
@@ -60,6 +61,8 @@ public class SQSMessageTest {
     final String myString = "myString";
     final String myCustomString = "myCustomString";
     final String myNumber = "myNumber";
+    final String myBinary = "myBinary";
+    final String myCustomBinary = "myCustomBinary";
 
     @BeforeEach
     public void setup() {
@@ -321,6 +324,17 @@ public class SQSMessageTest {
                 .stringValue("500")
                 .build());
 
+        messageAttributes.put(myBinary, MessageAttributeValue.builder()
+                .dataType(SQSMessagingClientConstants.BINARY)
+                .stringValue("BQUZTR1ZzYkc4PQ==")
+                .build());
+
+        messageAttributes.put(myCustomBinary, MessageAttributeValue.builder()
+                .dataType(SQSMessagingClientConstants.BINARY + ".custom")
+                .stringValue("data:image/gif;base64,QABAAACAkQBADs=")
+                .binaryValue(SdkBytes.fromUtf8String("data:image/gif;base64,QABAAACAkQBADs="))
+                .build());
+
         software.amazon.awssdk.services.sqs.model.Message sqsMessage = software.amazon.awssdk.services.sqs.model.Message.builder()
                 .messageAttributes(messageAttributes)
                 .attributes(systemAttributes)
@@ -379,6 +393,12 @@ public class SQSMessageTest {
         assertEquals(message.getFloatProperty(myNumber), 500f, 0.0);
         assertEquals(message.getDoubleProperty(myNumber), 500d, 0.0);
 
+        assertTrue(message.propertyExists(myBinary));
+        assertEquals(message.getObjectProperty(myBinary), "BQUZTR1ZzYkc4PQ==");
+        assertEquals(message.getStringProperty(myBinary), "BQUZTR1ZzYkc4PQ==");
+        assertTrue(message.propertyExists(myCustomBinary));
+        assertEquals(message.getObjectProperty(myCustomBinary), "data:image/gif;base64,QABAAACAkQBADs=");
+        assertEquals(message.getStringProperty(myCustomBinary), "data:image/gif;base64,QABAAACAkQBADs=");
 
         // Validate property names
         Set<String> propertyNamesSet = Set.of(
@@ -393,6 +413,8 @@ public class SQSMessageTest {
                 myString,
                 myCustomString,
                 myNumber,
+                myBinary,
+                myCustomBinary,
                 JMSX_DELIVERY_COUNT);
 
         Enumeration<String> propertyNames = message.getPropertyNames();
@@ -413,6 +435,8 @@ public class SQSMessageTest {
         assertFalse(message.propertyExists("myByteProperty"));
         assertFalse(message.propertyExists("myString"));
         assertFalse(message.propertyExists("myNumber"));
+        assertFalse(message.propertyExists("myBinary"));
+        assertFalse(message.propertyExists("myCustomBinary"));
 
         propertyNames = message.getPropertyNames();
         assertFalse(propertyNames.hasMoreElements());
