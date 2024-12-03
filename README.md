@@ -15,7 +15,7 @@ for communicating with Amazon Simple Queue Service. This project builds on top o
   <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>amazon-sqs-java-messaging-lib</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <type>jar</type>
   </dependency>
 ```
@@ -23,7 +23,7 @@ for communicating with Amazon Simple Queue Service. This project builds on top o
 
 ## Feedback
 * Give us feedback [here](https://github.com/awslabs/amazon-sqs-java-messaging-lib/issues).
-* If you'd like to contribute a new feature or bug fix, we'd love to see Github pull requests from you.
+* If you'd like to contribute a new feature or bug fix, we'd love to see GitHub pull requests from you.
 
 
 

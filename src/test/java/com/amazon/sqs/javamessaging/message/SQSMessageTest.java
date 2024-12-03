@@ -25,6 +25,8 @@ import jakarta.jms.MessageNotWriteableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT;
+import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.BINARY;
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.JMSX_DELIVERY_COUNT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -59,6 +62,8 @@ public class SQSMessageTest {
     final String myString = "myString";
     final String myCustomString = "myCustomString";
     final String myNumber = "myNumber";
+    final String myBinary = "myBinary";
+    final String myCustomBinary = "myCustomBinary";
 
     @BeforeEach
     public void setup() {
@@ -296,6 +301,18 @@ public class SQSMessageTest {
                 .withDataType(SQSMessagingClientConstants.NUMBER)
                 .withStringValue("500"));
 
+        messageAttributes.put(myBinary, new MessageAttributeValue()
+                .withDataType(SQSMessagingClientConstants.BINARY)
+                .withStringValue("BQUZTR1ZzYkc4PQ=="));
+
+        messageAttributes.put(myCustomBinary, new MessageAttributeValue()
+                .withDataType(SQSMessagingClientConstants.BINARY + ".custom")
+                .withStringValue("data:image/gif;base64,QABAAACAkQBADs=")
+                .withBinaryValue(ByteBuffer.wrap("data:image/gif;base64,QABAAACAkQBADs="
+                        .getBytes(StandardCharsets.UTF_8))
+                )
+        );
+
         com.amazonaws.services.sqs.model.Message sqsMessage = new com.amazonaws.services.sqs.model.Message()
                 .withMessageAttributes(messageAttributes)
                 .withAttributes(systemAttributes)
@@ -353,6 +370,12 @@ public class SQSMessageTest {
         assertEquals(message.getFloatProperty(myNumber), 500f);
         assertEquals(message.getDoubleProperty(myNumber), 500d);
 
+        assertTrue(message.propertyExists(myBinary));
+        assertEquals(message.getObjectProperty(myBinary), "BQUZTR1ZzYkc4PQ==");
+        assertEquals(message.getStringProperty(myBinary), "BQUZTR1ZzYkc4PQ==");
+        assertTrue(message.propertyExists(myCustomBinary));
+        assertEquals(message.getObjectProperty(myCustomBinary), "data:image/gif;base64,QABAAACAkQBADs=");
+        assertEquals(message.getStringProperty(myCustomBinary), "data:image/gif;base64,QABAAACAkQBADs=");
 
         // Validate property names
         Set<String> propertyNamesSet = Set.of(
@@ -367,6 +390,8 @@ public class SQSMessageTest {
                 myString,
                 myCustomString,
                 myNumber,
+                myBinary,
+                myCustomBinary,
                 JMSX_DELIVERY_COUNT
         );
 
@@ -388,6 +413,8 @@ public class SQSMessageTest {
         assertFalse(message.propertyExists("myByteProperty"));
         assertFalse(message.propertyExists("myString"));
         assertFalse(message.propertyExists("myNumber"));
+        assertFalse(message.propertyExists("myBinary"));
+        assertFalse(message.propertyExists("myCustomBinary"));
 
         propertyNames = message.getPropertyNames();
         assertFalse(propertyNames.hasMoreElements());

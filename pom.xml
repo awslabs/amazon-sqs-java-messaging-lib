@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.amazonaws</groupId>
   <artifactId>amazon-sqs-java-messaging-lib</artifactId>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <name>Amazon SQS Java Messaging Library</name>
   <description>The Amazon SQS Java Messaging Library holds the Java Message Service compatible classes, that are used
     for communicating with Amazon Simple Queue Service.
@@ -29,7 +29,7 @@
     </developer>
   </developers>
   <properties>
-    <aws-java-sdk.version>1.12.415</aws-java-sdk.version>
+    <aws-java-sdk.version>1.12.778</aws-java-sdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -47,19 +47,19 @@
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>5.9.2</version>
+      <version>5.11.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.13.1</version>
+      <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>5.1.1</version>
+      <version>5.14.2</version>
       <scope>test</scope>
     </dependency>
     <dependency>

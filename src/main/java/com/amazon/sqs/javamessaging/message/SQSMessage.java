@@ -35,6 +35,8 @@ import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.SQSQueueDestination;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.*;
 
@@ -60,7 +62,8 @@ import static com.amazon.sqs.javamessaging.SQSMessagingClientConstants.*;
  * approximate Receive Count observed on the SQS side.
  */
 public class SQSMessage implements Message {
-        
+
+    private static final Log LOG = LogFactory.getLog(SQSMessage.class);
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     
     // Define constant message types.
@@ -1150,9 +1153,11 @@ public class SQSMessage implements Message {
                 return Float.valueOf(value);
             } else if (SHORT.equals(type)) {
                 return Short.valueOf(value);
-            } else if (type != null && (type.startsWith(STRING) || type.startsWith(NUMBER))) {
+            } else if (type != null && (type.startsWith(STRING) || type.startsWith(NUMBER) || type.startsWith(BINARY))) {
                 return value;
             } else {
+                LOG.debug("Caught exception while constructing message attribute. " +
+                    "Unknown or yet supported JMS property type - " + type);
                 throw new JMSException(type + " is not a supported JMS property type");
             }
         }        
