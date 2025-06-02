@@ -80,6 +80,8 @@ public class SQSMessagingClientConstants {
 
     public static final String SEQUENCE_NUMBER = "SequenceNumber";
 
+    public static final String APPROXIMATE_FIRST_RECEIVE_TIMESTAMP = "ApproximateFirstReceiveTimestamp";
+
     static final String APPENDED_USER_AGENT_HEADER_VERSION;
     static {
         try {

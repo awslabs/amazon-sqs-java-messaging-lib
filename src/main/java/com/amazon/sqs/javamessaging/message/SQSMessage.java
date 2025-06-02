@@ -104,6 +104,7 @@ public class SQSMessage implements Message {
     private String type;
     private SQSQueueDestination replyTo;
     private Destination destination;
+    private long deliveryTime;
 
     private final Map<String, JMSMessagePropertyValue> properties = new HashMap<>();
 
@@ -422,13 +423,12 @@ public class SQSMessage implements Message {
 
     @Override
     public long getJMSDeliveryTime() throws JMSException {
-        // FIXME
-        return 0;
+        return deliveryTime;
     }
 
     @Override
     public void setJMSDeliveryTime(long deliveryTime) throws JMSException {
-        // FIXME
+        this.deliveryTime = deliveryTime;
     }
 
     @Override
