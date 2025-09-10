@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -552,7 +552,7 @@ public class SQSSessionCallbackSchedulerTest {
 
         MessageListener messageListener = mock(MessageListener.class);
         doThrow(RuntimeException.class)
-                .when(messageListener).onMessage(any(jakarta.jms.Message.class));
+                .when(messageListener).onMessage(any(SQSMessage.class));
 
         List<SQSMessageConsumerPrefetch.MessageManager> messages = List.of(
                 createFifoMessageManager("queue1", "group1", "message1", "handle1"),

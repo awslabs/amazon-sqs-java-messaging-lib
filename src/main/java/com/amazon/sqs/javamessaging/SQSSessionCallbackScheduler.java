@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
 
                     MessageListener messageListener = callbackEntry.messageListener();
                     MessageManager messageManager = callbackEntry.messageManager();
-                    SQSMessage message = (SQSMessage) messageManager.message();
+                    SQSMessage message = messageManager.message();
                     SQSMessageConsumer messageConsumer = messageManager.prefetchManager().getMessageConsumer();
                     if (messageConsumer.isClosed()) {
                         nackReceivedMessage(message);
@@ -186,7 +186,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
             }
         } finally {
             if (callbackEntry != null) {
-                nackReceivedMessage((SQSMessage) callbackEntry.messageManager().message());
+                nackReceivedMessage(callbackEntry.messageManager().message());
             }
             nackQueuedMessages();
         }
@@ -214,7 +214,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
             try {
                 List<SQSMessageIdentifier> nackMessageIdentifiers = new ArrayList<>();
                 while (!callbackQueue.isEmpty()) {
-                    SQSMessage nackMessage = (SQSMessage) callbackQueue.pollFirst().messageManager().message();
+                    SQSMessage nackMessage = callbackQueue.pollFirst().messageManager().message();
                     nackMessageIdentifiers.add(SQSMessageIdentifier.fromSQSMessage(nackMessage));
                 }
 
@@ -254,7 +254,7 @@ public class SQSSessionCallbackScheduler implements Runnable {
             Iterator<CallbackEntry> callbackIterator = callbackQueue.iterator();
             while (callbackIterator.hasNext()) {
                 CallbackEntry callbackEntry = callbackIterator.next();
-                SQSMessageIdentifier pendingCallbackIdentifier = SQSMessageIdentifier.fromSQSMessage((SQSMessage) callbackEntry.messageManager().message());
+                SQSMessageIdentifier pendingCallbackIdentifier = SQSMessageIdentifier.fromSQSMessage(callbackEntry.messageManager().message());
                 
                 //is the callback entry for one of the affected queues?
                 Set<String> affectedGroupsInQueue = queueToGroupsMapping.get(pendingCallbackIdentifier.getQueueUrl());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import jakarta.jms.ConnectionFactory;
 import jakarta.jms.JMSContext;
 import jakarta.jms.JMSException;
 import jakarta.jms.JMSRuntimeException;
-import jakarta.jms.QueueConnection;
 import jakarta.jms.QueueConnectionFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
@@ -156,12 +155,12 @@ public class SQSConnectionFactory implements ConnectionFactory, QueueConnectionF
     }
 
     @Override
-    public QueueConnection createQueueConnection() throws JMSException {
+    public SQSConnection createQueueConnection() throws JMSException {
         return createConnection();
     }
 
     @Override
-    public QueueConnection createQueueConnection(String userName, String password) throws JMSException {
+    public SQSConnection createQueueConnection(String userName, String password) throws JMSException {
         return createConnection(userName, password);
     }
 }

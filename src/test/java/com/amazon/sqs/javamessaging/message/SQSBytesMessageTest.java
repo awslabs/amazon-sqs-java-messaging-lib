@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ public class SQSBytesMessageTest {
     @Test
     public void testReadWrite() throws JMSException {
         when(mockSQSSession.createBytesMessage()).thenReturn(new SQSBytesMessage());
-        SQSBytesMessage msg = (SQSBytesMessage) mockSQSSession.createBytesMessage();
+        SQSBytesMessage msg = mockSQSSession.createBytesMessage();
 
         byte[] byteArray = new byte[]{1, 0, 'a', 65};
         byte byteData = 'a';
@@ -348,7 +348,7 @@ public class SQSBytesMessageTest {
     @Test
     public void testReadable() throws JMSException {
         when(mockSQSSession.createBytesMessage()).thenReturn(new SQSBytesMessage());
-        SQSBytesMessage msg = (SQSBytesMessage) mockSQSSession.createBytesMessage();
+        SQSBytesMessage msg = mockSQSSession.createBytesMessage();
 
         byte[] byteArray = new byte[]{'a', 0, 34, 65};
         msg.writeBytes(byteArray);
