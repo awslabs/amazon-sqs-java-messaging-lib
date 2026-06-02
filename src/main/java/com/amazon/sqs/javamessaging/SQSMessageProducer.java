@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
     }
 
     @Override
-    public Queue getQueue() throws JMSException {
+    public SQSQueueDestination getQueue() throws JMSException {
         return sqsDestination;
     }
 
@@ -307,7 +307,7 @@ public class SQSMessageProducer implements MessageProducer, QueueSender {
      * @return this producer's queue destination
      */
     @Override
-    public Destination getDestination() throws JMSException {
+    public SQSQueueDestination getDestination() throws JMSException {
         return sqsDestination;
     }
 

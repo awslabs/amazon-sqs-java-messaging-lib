@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import jakarta.jms.Message;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.MessageProducer;
 import jakarta.jms.ObjectMessage;
-import jakarta.jms.Queue;
 import jakarta.jms.TextMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -659,14 +658,13 @@ public class SQSSessionTest {
         /*
          * Create queue
          */
-        Queue queue = sqsSession.createQueue(QUEUE_NAME);
+        SQSQueueDestination queue = sqsSession.createQueue(QUEUE_NAME);
 
         /*
          * Verify results
          */
-        assert (queue instanceof SQSQueueDestination);
         assertEquals(QUEUE_NAME, queue.getQueueName());
-        assertEquals(QUEUE_URL, ((SQSQueueDestination) queue).getQueueUrl());
+        assertEquals(QUEUE_URL, queue.getQueueUrl());
     }
 
     /**
@@ -681,14 +679,13 @@ public class SQSSessionTest {
         /*
          * Create queue
          */
-        Queue queue = sqsSession.createQueue(QUEUE_NAME, OWNER_ACCOUNT_ID);
+        SQSQueueDestination queue = sqsSession.createQueue(QUEUE_NAME, OWNER_ACCOUNT_ID);
 
         /*
          * Verify results
          */
-        assert (queue instanceof SQSQueueDestination);
         assertEquals(QUEUE_NAME, queue.getQueueName());
-        assertEquals(QUEUE_URL, ((SQSQueueDestination) queue).getQueueUrl());
+        assertEquals(QUEUE_URL, queue.getQueueUrl());
     }
 
     /**
