@@ -91,7 +91,7 @@ public class SQSMessageConsumerPrefetchTest {
     private ExponentialBackoffStrategy backoffStrategy;
 
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private AmazonSQSMessagingClient amazonSQSClient;
 
     /**
      * Test one full prefetch operation works as expected

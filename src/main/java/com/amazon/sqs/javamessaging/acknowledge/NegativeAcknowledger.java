@@ -14,7 +14,7 @@
  */
 package com.amazon.sqs.javamessaging.acknowledge;
 
-import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
+import com.amazon.sqs.javamessaging.AmazonSQSMessagingClient;
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
 import com.amazon.sqs.javamessaging.message.SQSMessage;
@@ -39,9 +39,9 @@ public class NegativeAcknowledger extends BulkSQSOperation {
 
     private static final int NACK_TIMEOUT = 0;
 
-    private final AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private final AmazonSQSMessagingClient amazonSQSClient;
 
-    public NegativeAcknowledger(AmazonSQSMessagingClientWrapper amazonSQSClient) {
+    public NegativeAcknowledger(AmazonSQSMessagingClient amazonSQSClient) {
         this.amazonSQSClient = amazonSQSClient;
     }
     

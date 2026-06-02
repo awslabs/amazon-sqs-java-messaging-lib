@@ -1,17 +1,3 @@
-/*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
 package com.amazon.sqs.javamessaging;
 
 import jakarta.jms.InvalidDestinationException;
@@ -24,7 +10,7 @@ import software.amazon.awssdk.awscore.AwsRequest;
 import software.amazon.awssdk.awscore.AwsRequestOverrideConfiguration;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkException;
-import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
 import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchResponse;
 import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityRequest;
@@ -45,29 +31,29 @@ import java.util.Set;
 
 
 /**
- * This is a JMS Wrapper of <code>SqsClient</code>. This class changes all
+ * This is a JMS Wrapper of <code>SqsAsyncClient</code>. This class changes all
  * <code>AwsServiceException</code> and <code>SdkException</code> into
  * JMSException/JMSSecurityException.
  */
-public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient {
-    private static final Logger LOG = LoggerFactory.getLogger(AmazonSQSMessagingClientWrapper.class);
+public class AmazonSQSAsyncMessagingClientWrapper implements AmazonSQSMessagingClient {
+    private static final Logger LOG = LoggerFactory.getLogger(AmazonSQSAsyncMessagingClientWrapper.class);
 
     /**
      * List of exceptions that can classified as security. These exceptions
      * are not thrown during connection-set-up rather after the service
-     * calls of the <code>SqsClient</code>.
+     * calls of the <code>SqsAsyncClient</code>.
      */
     private static final Set<String> SECURITY_EXCEPTION_ERROR_CODES = Set.of("MissingClientTokenId",
             "InvalidClientTokenId", "MissingAuthenticationToken", "AccessDenied");
 
-    private final SqsClient amazonSQSClient;
+    private final SqsAsyncClient amazonSQSClient;
     private final AwsCredentialsProvider credentialsProvider;
 
     /**
      * @param amazonSQSClient The AWS SDK Client for SQS.
      * @throws JMSException if the client is null
      */
-    public AmazonSQSMessagingClientWrapper(SqsClient amazonSQSClient) throws JMSException {
+    public AmazonSQSAsyncMessagingClientWrapper(SqsAsyncClient amazonSQSClient) throws JMSException {
         this(amazonSQSClient, null);
     }
 
@@ -75,7 +61,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * @param amazonSQSClient The AWS SDK Client for SQS.
      * @throws JMSException if the client is null
      */
-    public AmazonSQSMessagingClientWrapper(SqsClient amazonSQSClient, AwsCredentialsProvider credentialsProvider) throws JMSException {
+    public AmazonSQSAsyncMessagingClientWrapper(SqsAsyncClient amazonSQSClient, AwsCredentialsProvider credentialsProvider) throws JMSException {
         if (amazonSQSClient == null) {
             throw new JMSException("Amazon SQS client cannot be null");
         }
@@ -91,7 +77,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * @return amazonSQSClient
      */
     @Override
-    public SqsClient getAmazonSQSClient() {
+    public SqsAsyncClient getAmazonSQSClient() {
         return amazonSQSClient;
     }
 
@@ -100,7 +86,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * acknowledge single messages, so that they can be deleted from SQS queue.
      *
      * @param deleteMessageRequest Container for the necessary parameters to execute the
-     *                             deleteMessage service method on SqsClient.
+     *                             deleteMessage service method on SqsAsyncClient.
      * @throws JMSException
      */
     @Override
@@ -119,16 +105,16 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * queue.
      *
      * @param deleteMessageBatchRequest Container for the necessary parameters to execute the
-     *                                  deleteMessageBatch service method on SqsClient. This is the
+     *                                  deleteMessageBatch service method on SqsAsyncClient. This is the
      *                                  batch version of deleteMessage. Max batch size is 10.
      * @return The response from the deleteMessageBatch service method, as
-     * returned by SqsClient
+     * returned by SqsAsyncClient
      * @throws JMSException
      */
     @Override
     public DeleteMessageBatchResponse deleteMessageBatch(DeleteMessageBatchRequest deleteMessageBatchRequest) throws JMSException {
         try {
-            return amazonSQSClient.deleteMessageBatch(prepareRequest(deleteMessageBatchRequest));
+            return amazonSQSClient.deleteMessageBatch(prepareRequest(deleteMessageBatchRequest)).join();
         } catch (SdkException e) {
             throw handleException(e, "deleteMessageBatch");
         }
@@ -139,15 +125,15 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * <code>AmazonClientException</code>.
      *
      * @param sendMessageRequest Container for the necessary parameters to execute the
-     *                           sendMessage service method on SqsClient.
+     *                           sendMessage service method on SqsAsyncClient.
      * @return The response from the sendMessage service method, as returned by
-     * SqsClient
+     * SqsAsyncClient
      * @throws JMSException
      */
     @Override
     public SendMessageResponse sendMessage(SendMessageRequest sendMessageRequest) throws JMSException {
         try {
-            return amazonSQSClient.sendMessage(prepareRequest(sendMessageRequest));
+            return amazonSQSClient.sendMessage(prepareRequest(sendMessageRequest)).join();
         } catch (SdkException e) {
             throw handleException(e, "sendMessage");
         }
@@ -207,7 +193,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      *
      * @param queueName
      * @return The response from the GetQueueUrl service method, as returned by
-     * SqsClient, which will include queue`s URL
+     * SqsAsyncClient, which will include queue`s URL
      * @throws JMSException
      */
     @Override
@@ -224,7 +210,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * @param queueName
      * @param queueOwnerAccountId The AWS accountId of the account that created the queue
      * @return The response from the GetQueueUrl service method, as returned by
-     * SqsClient, which will include queue`s URL
+     * SqsAsyncClient, which will include queue`s URL
      * @throws JMSException
      */
     @Override
@@ -240,15 +226,15 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * Calls <code>getQueueUrl</code> and wraps <code>SdkException</code>
      *
      * @param getQueueUrlRequest Container for the necessary parameters to execute the
-     *                           getQueueUrl service method on SqsClient.
+     *                           getQueueUrl service method on SqsAsyncClient.
      * @return The response from the GetQueueUrl service method, as returned by
-     * SqsClient, which will include queue`s URL
+     * SqsAsyncClient, which will include queue`s URL
      * @throws JMSException
      */
     @Override
     public GetQueueUrlResponse getQueueUrl(GetQueueUrlRequest getQueueUrlRequest) throws JMSException {
         try {
-            return amazonSQSClient.getQueueUrl(prepareRequest(getQueueUrlRequest));
+            return amazonSQSClient.getQueueUrl(prepareRequest(getQueueUrlRequest)).join();
         } catch (SdkException e) {
             throw handleException(e, "getQueueUrl");
         }
@@ -260,7 +246,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      *
      * @param queueName
      * @return The response from the createQueue service method, as returned by
-     * SqsClient. This call creates a new queue, or returns the URL of
+     * SqsAsyncClient. This call creates a new queue, or returns the URL of
      * an existing one.
      * @throws JMSException
      */
@@ -274,16 +260,16 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * if any, and wraps <code>SdkException</code>
      *
      * @param createQueueRequest Container for the necessary parameters to execute the
-     *                           createQueue service method on SqsClient.
+     *                           createQueue service method on SqsAsyncClient.
      * @return The response from the createQueue service method, as returned by
-     * SqsClient. This call creates a new queue, or returns the URL of
+     * SqsAsyncClient. This call creates a new queue, or returns the URL of
      * an existing one.
      * @throws JMSException
      */
     @Override
     public CreateQueueResponse createQueue(CreateQueueRequest createQueueRequest) throws JMSException {
         try {
-            return amazonSQSClient.createQueue(prepareRequest(createQueueRequest));
+            return amazonSQSClient.createQueue(prepareRequest(createQueueRequest)).join();
         } catch (SdkException e) {
             throw handleException(e, "createQueue");
         }
@@ -296,15 +282,15 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * prefetch buffers.
      *
      * @param receiveMessageRequest Container for the necessary parameters to execute the
-     *                              receiveMessage service method on SqsClient.
+     *                              receiveMessage service method on SqsAsyncClient.
      * @return The response from the ReceiveMessage service method, as returned
-     * by SqsClient.
+     * by SqsAsyncClient.
      * @throws JMSException
      */
     @Override
     public ReceiveMessageResponse receiveMessage(ReceiveMessageRequest receiveMessageRequest) throws JMSException {
         try {
-            return amazonSQSClient.receiveMessage(prepareRequest(receiveMessageRequest));
+            return amazonSQSClient.receiveMessage(prepareRequest(receiveMessageRequest)).join();
         } catch (SdkException e) {
             throw handleException(e, "receiveMessage");
         }
@@ -315,7 +301,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
      * used to for negative acknowledge of a single message, so that messages can be received again without any delay.
      *
      * @param changeMessageVisibilityRequest Container for the necessary parameters to execute the
-     *                                       changeMessageVisibility service method on SqsClient.
+     *                                       changeMessageVisibility service method on SqsAsyncClient.
      * @throws JMSException
      */
     @Override
@@ -342,7 +328,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
     public ChangeMessageVisibilityBatchResponse changeMessageVisibilityBatch(
             ChangeMessageVisibilityBatchRequest changeMessageVisibilityBatchRequest) throws JMSException {
         try {
-            return amazonSQSClient.changeMessageVisibilityBatch(prepareRequest(changeMessageVisibilityBatchRequest));
+            return amazonSQSClient.changeMessageVisibilityBatch(prepareRequest(changeMessageVisibilityBatchRequest)).join();
         } catch (SdkException e) {
             throw handleException(e, "changeMessageVisibilityBatch");
         }
@@ -401,7 +387,7 @@ public class AmazonSQSMessagingClientWrapper implements AmazonSQSMessagingClient
 
     private <T extends AwsRequest> T prepareRequest(T request) {
         return credentialsProvider == null ? request : (T) request.toBuilder().overrideConfiguration(
-                AwsRequestOverrideConfiguration.builder().credentialsProvider(credentialsProvider).build())
+                        AwsRequestOverrideConfiguration.builder().credentialsProvider(credentialsProvider).build())
                 .build();
     }
 

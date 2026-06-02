@@ -65,7 +65,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
     private NegativeAcknowledger negativeAcknowledger;
     private SQSMessageConsumerPrefetch consumerPrefetch;
 
-    private AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private AmazonSQSMessagingClient amazonSQSClient;
 
     /**
      * Test one full prefetch operation works as expected

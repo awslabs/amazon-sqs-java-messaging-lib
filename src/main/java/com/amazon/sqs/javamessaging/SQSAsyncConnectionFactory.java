@@ -1,17 +1,3 @@
-/*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
 package com.amazon.sqs.javamessaging;
 
 import jakarta.jms.JMSException;
@@ -20,56 +6,37 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.SqsClientBuilder;
+import software.amazon.awssdk.services.sqs.SqsAsyncClient;
+import software.amazon.awssdk.services.sqs.SqsAsyncClientBuilder;
 
 import java.util.function.Supplier;
 
-/**
- * A ConnectionFactory object encapsulates a set of connection configuration
- * parameters for <code>SqsClient</code> as well as setting
- * <code>numberOfMessagesToPrefetch</code>.
- * <p>
- * The <code>numberOfMessagesToPrefetch</code> parameter is used to size of the
- * prefetched messages, which can be tuned based on the application workload. It
- * helps in returning messages from internal buffers(if there is any) instead of
- * waiting for the SQS <code>receiveMessage</code> call to return.
- * <p>
- * If more physical connections than the default maximum value (that is 50 as of
- * today) are needed on the connection pool,
- * {@link software.amazon.awssdk.core.client.config.ClientOverrideConfiguration} needs to be configured.
- * <p>
- * None of the <code>createConnection</code> methods set-up the physical
- * connection to SQS, so validity of credentials are not checked with those
- * methods.
- */
-
-public class SQSConnectionFactory extends AbstractSQSConnectionFactory {
+public class SQSAsyncConnectionFactory extends AbstractSQSConnectionFactory {
     private final ProviderConfiguration providerConfiguration;
-    private final Supplier<SqsClient> amazonSQSClientSupplier;
+    private final Supplier<SqsAsyncClient> amazonSQSClientSupplier;
 
     /**
      * Creates a SQSConnectionFactory that uses default ProviderConfiguration
-     * and SqsClientBuilder.standard() for creating SqsClient connections.
-     * Every SQSConnection will have its own copy of SqsClient.
+     * and SqsClientAsyncBuilder.standard() for creating SqsAsyncClient connections.
+     * Every SQSConnection will have its own copy of SqsAsyncClient.
      */
-    public SQSConnectionFactory() {
+    public SQSAsyncConnectionFactory() {
         this(new ProviderConfiguration());
     }
 
     /**
-     * Creates a SQSConnectionFactory that uses SqsClientBuilder.standard() for creating SqsClient connections.
-     * Every SQSConnection will have its own copy of SqsClient.
+     * Creates a SQSConnectionFactory that uses SqsAsyncClientBuilder.standard() for creating SqsAsyncClient connections.
+     * Every SQSConnection will have its own copy of SqsAsyncClient.
      */
-    public SQSConnectionFactory(ProviderConfiguration providerConfiguration) {
-        this(providerConfiguration, SqsClient.create());
+    public SQSAsyncConnectionFactory(ProviderConfiguration providerConfiguration) {
+        this(providerConfiguration, SqsAsyncClient.create());
     }
 
     /**
-     * Creates a SQSConnectionFactory that uses the provided SqsClient connection.
-     * Every SQSConnection will use the same provided SqsClient.
+     * Creates a SQSConnectionFactory that uses the provided SqsAsyncClient connection.
+     * Every SQSConnection will use the same provided SqsAsyncClient.
      */
-    public SQSConnectionFactory(ProviderConfiguration providerConfiguration, final SqsClient client) {
+    public SQSAsyncConnectionFactory(ProviderConfiguration providerConfiguration, final SqsAsyncClient client) {
         if (providerConfiguration == null) {
             throw new IllegalArgumentException("Provider configuration cannot be null");
         }
@@ -84,7 +51,7 @@ public class SQSConnectionFactory extends AbstractSQSConnectionFactory {
      * Creates a SQSConnectionFactory that uses the provided SqsClientBuilder for creating AmazonSQS client connections.
      * Every SQSConnection will have its own copy of AmazonSQS client created through the provided builder.
      */
-    public SQSConnectionFactory(ProviderConfiguration providerConfiguration, final SqsClientBuilder clientBuilder) {
+    public SQSAsyncConnectionFactory(ProviderConfiguration providerConfiguration, final SqsAsyncClientBuilder clientBuilder) {
         if (providerConfiguration == null) {
             throw new IllegalArgumentException("Provider configuration cannot be null");
         }
@@ -99,7 +66,7 @@ public class SQSConnectionFactory extends AbstractSQSConnectionFactory {
     @Override
     public SQSConnection createConnection() throws JMSException {
         try {
-            SqsClient amazonSQS = amazonSQSClientSupplier.get();
+            SqsAsyncClient amazonSQS = amazonSQSClientSupplier.get();
             return createConnection(amazonSQS, null);
         } catch (RuntimeException e) {
             throw (JMSException) new JMSException("Error creating SQS client: " + e.getMessage()).initCause(e);
@@ -119,15 +86,15 @@ public class SQSConnectionFactory extends AbstractSQSConnectionFactory {
 
     public SQSConnection createConnection(AwsCredentialsProvider awsCredentialsProvider) throws JMSException {
         try {
-            SqsClient amazonSQS = amazonSQSClientSupplier.get();
+            SqsAsyncClient amazonSQS = amazonSQSClientSupplier.get();
             return createConnection(amazonSQS, awsCredentialsProvider);
         } catch (Exception e) {
             throw (JMSException) new JMSException("Error creating SQS client: " + e.getMessage()).initCause(e);
         }
     }
 
-    private SQSConnection createConnection(SqsClient amazonSQS, AwsCredentialsProvider awsCredentialsProvider) throws JMSException {
-        AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSMessagingClientWrapper(amazonSQS, awsCredentialsProvider);
+    private SQSConnection createConnection(SqsAsyncClient amazonSQS, AwsCredentialsProvider awsCredentialsProvider) throws JMSException {
+        AmazonSQSAsyncMessagingClientWrapper amazonSQSClientJMSWrapper = new AmazonSQSAsyncMessagingClientWrapper(amazonSQS, awsCredentialsProvider);
         return new SQSConnection(amazonSQSClientJMSWrapper, providerConfiguration.getNumberOfMessagesToPrefetch());
     }
 

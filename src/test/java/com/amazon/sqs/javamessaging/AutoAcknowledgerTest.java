@@ -41,7 +41,7 @@ public class AutoAcknowledgerTest {
     private static final String RECEIPT_HANDLE = "ReceiptHandle";
 
     private AutoAcknowledger acknowledger;
-    private AmazonSQSMessagingClientWrapper amazonSQSClient;
+    private AmazonSQSMessagingClient amazonSQSClient;
     private SQSSession session;
 
     @BeforeEach
