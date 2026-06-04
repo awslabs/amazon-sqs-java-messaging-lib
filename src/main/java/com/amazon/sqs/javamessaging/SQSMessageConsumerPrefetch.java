@@ -382,12 +382,23 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         }
 
         jmsMessage.setJMSTimestamp(getJMSTimestamp(message));
+        jmsMessage.setJMSDeliveryTime(getApproximateFirstReceiveTimestamp(message));
         return jmsMessage;
     }
 
     private long getJMSTimestamp(Message message) {
         Map<String, String> systemAttributes = message.attributesAsStrings();
         String timestamp = systemAttributes.get(SQSMessagingClientConstants.SENT_TIMESTAMP);
+        if (timestamp != null) {
+            return Long.parseLong(timestamp);
+        } else {
+            return 0L;
+        }
+    }
+
+    private long getApproximateFirstReceiveTimestamp(Message message) {
+        Map<String, String> systemAttributes = message.attributesAsStrings();
+        String timestamp = systemAttributes.get(SQSMessagingClientConstants.APPROXIMATE_FIRST_RECEIVE_TIMESTAMP);
         if (timestamp != null) {
             return Long.parseLong(timestamp);
         } else {

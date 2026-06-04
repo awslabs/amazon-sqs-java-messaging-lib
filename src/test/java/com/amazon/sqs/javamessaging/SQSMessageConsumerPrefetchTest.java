@@ -997,7 +997,8 @@ public class SQSMessageConsumerPrefetchTest {
         long now = System.currentTimeMillis();
         Map<String, String> mapAttributes = Map.of(
                 SQSMessagingClientConstants.APPROXIMATE_RECEIVE_COUNT, "1",
-                SQSMessagingClientConstants.SENT_TIMESTAMP, Long.toString(now));
+                SQSMessagingClientConstants.SENT_TIMESTAMP, Long.toString(now),
+                SQSMessagingClientConstants.APPROXIMATE_FIRST_RECEIVE_TIMESTAMP, Long.toString(now));
 
         // Return message attributes with message type 'TEXT'
         Message message = Message.builder()
@@ -1017,6 +1018,7 @@ public class SQSMessageConsumerPrefetchTest {
         assertTrue(jsmMessage instanceof SQSTextMessage);
         assertEquals(message.body(), "MessageBody");
         assertEquals(jsmMessage.getJMSTimestamp(), now);
+        assertEquals(jsmMessage.getJMSDeliveryTime(), now);
     }
 
     /**
@@ -1830,7 +1832,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         // Wait to make sure the received calls have gotten far enough to
         // wait on the message queue
-        allReceivesWaiting.await();
+        allReceivesWaiting.await(1000, TimeUnit.MILLISECONDS);
 
         assertEquals(concurrentReceives, consumerPrefetch.messagesRequested);
 
