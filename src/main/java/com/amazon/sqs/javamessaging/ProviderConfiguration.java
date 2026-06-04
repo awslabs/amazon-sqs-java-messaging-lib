@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@ package com.amazon.sqs.javamessaging;
 public class ProviderConfiguration {
     private int numberOfMessagesToPrefetch;
 
+    private boolean cacheQueues;
+
     public ProviderConfiguration() {
         // Set default numberOfMessagesToPrefetch to MIN_BATCH.
-        this.numberOfMessagesToPrefetch = SQSMessagingClientConstants.MIN_BATCH;        
+        this.numberOfMessagesToPrefetch = SQSMessagingClientConstants.MIN_BATCH;
+        this.cacheQueues = false;
     }
     
     public int getNumberOfMessagesToPrefetch() {
@@ -35,6 +38,19 @@ public class ProviderConfiguration {
 
     public ProviderConfiguration withNumberOfMessagesToPrefetch(int numberOfMessagesToPrefetch) {
         setNumberOfMessagesToPrefetch(numberOfMessagesToPrefetch);
+        return this;
+    }
+
+    public boolean isCacheQueues() {
+        return this.cacheQueues;
+    }
+
+    public void setCacheQueues(boolean cacheQueues) {
+        this.cacheQueues = cacheQueues;
+    }
+
+    public ProviderConfiguration withCacheQueues(boolean cacheQueues) {
+        setCacheQueues(cacheQueues);
         return this;
     }
 
