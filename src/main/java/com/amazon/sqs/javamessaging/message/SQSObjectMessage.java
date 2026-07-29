@@ -17,6 +17,8 @@ package com.amazon.sqs.javamessaging.message;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InvalidClassException;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -116,6 +118,8 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
     /**
      * Deserialize the <code>String</code> into <code>Serializable</code>
      * object.
+     * <P>
+     * Only trusted classes are reconstructed. See {@link ObjectMessageDeserializationFilter}.
      */
     protected static Serializable deserialize(String serialized) throws JMSException {
         if (serialized == null) {
@@ -126,7 +130,15 @@ public class SQSObjectMessage extends SQSMessage implements ObjectMessage {
         try {
             byte[] bytes = Base64.decode(serialized);
             objectInputStream = new ObjectInputStream(new ByteArrayInputStream(bytes));
+            ObjectInputFilter filter = ObjectMessageDeserializationFilter.fromSystemProperties();
+            if (filter != null) {
+                objectInputStream.setObjectInputFilter(
+                        ObjectMessageDeserializationFilter.combineWith(filter, objectInputStream.getObjectInputFilter()));
+            }
             deserializedObject = (Serializable) objectInputStream.readObject();
+        } catch (InvalidClassException e) {
+            LOG.error("Refused to deserialize the ObjectMessage body", e);
+            throw convertExceptionToMessageFormatException(e);
         } catch (IOException e) {
             LOG.error("IOException: Message cannot be written", e);
             throw convertExceptionToMessageFormatException(e);
