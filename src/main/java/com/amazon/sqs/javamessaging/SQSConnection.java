@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -92,6 +92,14 @@ public class SQSConnection implements Connection, QueueConnection {
      * but it will make multiple calls as necessary.
      */
     private final int numberOfMessagesToPrefetch;
+
+    /**
+     * Configures sessions to cache queues created JMS Queue objects.
+     * @see SQSSession#createQueue(String)
+     * @see SQSSession#createQueue(String, String)
+     */
+    private final boolean cacheQueues;
+
     private volatile boolean closed = false;
     private volatile boolean closing = false;
 
@@ -106,10 +114,11 @@ public class SQSConnection implements Connection, QueueConnection {
 
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    SQSConnection(AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper, int numberOfMessagesToPrefetch) {
+    SQSConnection(AmazonSQSMessagingClientWrapper amazonSQSClientJMSWrapper, int numberOfMessagesToPrefetch,
+            boolean cacheQueues) {
         amazonSQSClient = amazonSQSClientJMSWrapper;
         this.numberOfMessagesToPrefetch = numberOfMessagesToPrefetch;
-
+        this.cacheQueues = cacheQueues;
     }
     
     /**
@@ -184,11 +193,11 @@ public class SQSConnection implements Connection, QueueConnection {
 
         SQSSession sqsSession;
         if (acknowledgeMode == Session.AUTO_ACKNOWLEDGE) {
-            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(acknowledgeMode));
+            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_AUTO.withOriginalAcknowledgeMode(acknowledgeMode), this.cacheQueues);
         } else if (acknowledgeMode == Session.CLIENT_ACKNOWLEDGE || acknowledgeMode == Session.DUPS_OK_ACKNOWLEDGE) {
-            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_RANGE.withOriginalAcknowledgeMode(acknowledgeMode));
+            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_RANGE.withOriginalAcknowledgeMode(acknowledgeMode), this.cacheQueues);
         } else if (acknowledgeMode == SQSSession.UNORDERED_ACKNOWLEDGE) {
-            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_UNORDERED.withOriginalAcknowledgeMode(acknowledgeMode));
+            sqsSession = new SQSSession(this, AcknowledgeMode.ACK_UNORDERED.withOriginalAcknowledgeMode(acknowledgeMode), this.cacheQueues);
         } else {
             LOG.error("Unrecognized acknowledgeMode. Cannot create Session.");
             throw new JMSException("Unrecognized acknowledgeMode. Cannot create Session.");

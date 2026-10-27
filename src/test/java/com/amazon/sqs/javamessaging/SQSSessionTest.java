@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -105,7 +105,7 @@ public class SQSSessionTest {
         messageProducers = new HashSet<>(Set.of(producer1, producer2));
 
         sqsSession = spy(new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO,
-                messageConsumers, messageProducers));
+                messageConsumers, messageProducers, false));
     }
 
     /**
@@ -116,7 +116,7 @@ public class SQSSessionTest {
         /*
          * Set up session
          */
-        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers, false);
         sqsSession.close();
 
         /*
@@ -189,7 +189,7 @@ public class SQSSessionTest {
         /*
          * Set up session
          */
-        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers, false);
         sqsSession.close();
         SQSMessageConsumer consumer1 = mock(SQSMessageConsumer.class);
         SQSMessageConsumer consumer2 = mock(SQSMessageConsumer.class);
@@ -397,7 +397,7 @@ public class SQSSessionTest {
         final CountDownLatch beforeSessionWaitCall = new CountDownLatch(1);
         final CountDownLatch passedSessionWaitCall = new CountDownLatch(1);
 
-        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers, false);
         sqsSession.start();
 
         PrefetchManager prefetchManager = new PrefetchManager() {
@@ -456,7 +456,7 @@ public class SQSSessionTest {
         /*
          * Set up session and mocks
          */
-        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers, false);
         sqsSession.start();
         sqsSession.startingCallback(consumer1);
         final CountDownLatch beforeWaitCall = new CountDownLatch(1);
@@ -653,7 +653,7 @@ public class SQSSessionTest {
     @Test
     public void testCreateQueue() throws JMSException {
         GetQueueUrlResponse result = GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build();
-        when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME))
+        when(sqsClientJMSWrapper.getQueueUrl(QUEUE_NAME, null))
                 .thenReturn(result);
 
         /*
@@ -904,10 +904,10 @@ public class SQSSessionTest {
      */
     @Test
     public void testRecover() throws JMSException, InterruptedException {
-        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_UNORDERED);
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_UNORDERED, false);
         when(parentSQSConnection.getNumberOfMessagesToPrefetch()).thenReturn(4);
 
-        when(sqsClientJMSWrapper.getQueueUrl("queue1"))
+        when(sqsClientJMSWrapper.getQueueUrl("queue1", null))
                 .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl1").build());
         when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl1"))))
                 .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue1-group1-message1")).build())
@@ -918,7 +918,7 @@ public class SQSSessionTest {
                 .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group3", "message6", "queue1-group3-message6")).build())
                 .thenReturn(ReceiveMessageResponse.builder().build());
 
-        when(sqsClientJMSWrapper.getQueueUrl("queue2"))
+        when(sqsClientJMSWrapper.getQueueUrl("queue2", null))
                 .thenReturn(GetQueueUrlResponse.builder().queueUrl("queueUrl2").build());
         when(sqsClientJMSWrapper.receiveMessage(argThat(new ReceiveRequestMatcher("queueUrl2"))))
                 .thenReturn(ReceiveMessageResponse.builder().messages(createFifoMessage("group1", "message1", "queue2-group1-message1")).build())
@@ -1109,7 +1109,7 @@ public class SQSSessionTest {
      */
     @Test
     public void testDoClose() throws JMSException {
-        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers);
+        sqsSession = new SQSSession(parentSQSConnection, AcknowledgeMode.ACK_AUTO, messageConsumers, messageProducers, false);
         /*
          * Do close
          */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -181,15 +181,18 @@ public class SQSSession implements Session, QueueSession {
      */
     private SQSMessageConsumer activeConsumerInCallback = null;
 
-    SQSSession(SQSConnection parentSQSConnection, AcknowledgeMode acknowledgeMode) throws JMSException {
-        this(parentSQSConnection, acknowledgeMode,
-                Collections.newSetFromMap(new ConcurrentHashMap<>()),
-                Collections.newSetFromMap(new ConcurrentHashMap<>()));
+    private final boolean cacheQueues;
+
+    private final Map<String, SQSQueueDestination> queueCache = new ConcurrentHashMap<>();
+
+    SQSSession(SQSConnection parentSQSConnection, AcknowledgeMode acknowledgeMode, boolean cacheQueues) throws JMSException {
+        this(parentSQSConnection, acknowledgeMode, Collections.newSetFromMap(new ConcurrentHashMap<>()),
+            Collections.newSetFromMap(new ConcurrentHashMap<>()), cacheQueues);
     }
 
     SQSSession(SQSConnection parentSQSConnection, AcknowledgeMode acknowledgeMode,
-               Set<SQSMessageConsumer> messageConsumers,
-               Set<SQSMessageProducer> messageProducers) throws JMSException {
+            Set<SQSMessageConsumer> messageConsumers, Set<SQSMessageProducer> messageProducers, boolean cacheQueues)
+            throws JMSException {
         this.parentSQSConnection = parentSQSConnection;
         this.amazonSQSClient = parentSQSConnection.getWrappedAmazonSQSClient();
         this.acknowledgeMode = acknowledgeMode;
@@ -199,6 +202,7 @@ public class SQSSession implements Session, QueueSession {
         this.executor = Executors.newSingleThreadExecutor(SESSION_THREAD_FACTORY);
         this.messageConsumers = messageConsumers;
         this.messageProducers = messageProducers;
+        this.cacheQueues = cacheQueues;
 
         executor.execute(sqsSessionRunnable);
     }
@@ -614,8 +618,7 @@ public class SQSSession implements Session, QueueSession {
      */
     @Override
     public Queue createQueue(String queueName) throws JMSException {
-        checkClosed();
-        return new SQSQueueDestination(queueName, amazonSQSClient.getQueueUrl(queueName).queueUrl());
+        return createQueue(queueName, null);
     }
 
     /**
@@ -630,8 +633,18 @@ public class SQSSession implements Session, QueueSession {
      */
     public Queue createQueue(String queueName, String ownerAccountId) throws JMSException {
         checkClosed();
-        return new SQSQueueDestination(
-                queueName, amazonSQSClient.getQueueUrl(queueName, ownerAccountId).queueUrl());
+        SQSQueueDestination queue = null;
+        String cacheKey = (ownerAccountId != null) ? (ownerAccountId + "/" + queueName) : queueName;
+        if (this.cacheQueues) {
+            queue = this.queueCache.get(cacheKey);
+        }
+        if (queue == null) {
+            queue = new SQSQueueDestination(queueName, amazonSQSClient.getQueueUrl(queueName, ownerAccountId).queueUrl());
+        }
+        if (this.cacheQueues) {
+            this.queueCache.put(cacheKey, queue);
+        }
+        return queue;
     }
 
     /**
