@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ package com.amazon.sqs.javamessaging;
 import com.amazon.sqs.javamessaging.acknowledge.Acknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.NegativeAcknowledger;
 import com.amazon.sqs.javamessaging.acknowledge.SQSMessageIdentifier;
+import com.amazon.sqs.javamessaging.message.SQSMessage;
 import jakarta.jms.IllegalStateException;
 import jakarta.jms.JMSException;
 import jakarta.jms.Message;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.MessageListener;
-import jakarta.jms.Queue;
 import jakarta.jms.QueueReceiver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +104,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      * @return a queue destination
      */
     @Override
-    public Queue getQueue() throws JMSException {
+    public SQSQueueDestination getQueue() throws JMSException {
         return sqsDestination;
     }
     
@@ -143,7 +143,7 @@ public class SQSMessageConsumer implements MessageConsumer, QueueReceiver {
      *             On internal error
      */
     @Override
-    public Message receive() throws JMSException {
+    public SQSMessage receive() throws JMSException {
         checkClosed();
         return sqsMessageConsumerPrefetch.receive();
     }

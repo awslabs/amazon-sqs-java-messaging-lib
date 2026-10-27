@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import com.amazon.sqs.javamessaging.message.SQSBytesMessage;
 import com.amazon.sqs.javamessaging.message.SQSObjectMessage;
 import com.amazon.sqs.javamessaging.message.SQSTextMessage;
 import com.amazon.sqs.javamessaging.util.SQSMessagingClientThreadFactory;
-import jakarta.jms.BytesMessage;
 import jakarta.jms.Destination;
 import jakarta.jms.IllegalStateException;
 import jakarta.jms.JMSException;
@@ -32,17 +31,13 @@ import jakarta.jms.Message;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.MessageListener;
 import jakarta.jms.MessageProducer;
-import jakarta.jms.ObjectMessage;
 import jakarta.jms.Queue;
 import jakarta.jms.QueueBrowser;
-import jakarta.jms.QueueReceiver;
-import jakarta.jms.QueueSender;
 import jakarta.jms.QueueSession;
 import jakarta.jms.Session;
 import jakarta.jms.StreamMessage;
 import jakarta.jms.TemporaryQueue;
 import jakarta.jms.TemporaryTopic;
-import jakarta.jms.TextMessage;
 import jakarta.jms.Topic;
 import jakarta.jms.TopicSubscriber;
 import org.slf4j.Logger;
@@ -224,8 +219,8 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed
      */
     @Override
-    public QueueReceiver createReceiver(Queue queue) throws JMSException {
-        return (QueueReceiver) createConsumer(queue);
+    public SQSMessageConsumer createReceiver(Queue queue) throws JMSException {
+        return createConsumer(queue);
     }
 
     /**
@@ -238,7 +233,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed
      */
     @Override
-    public QueueReceiver createReceiver(Queue queue, String messageSelector) throws JMSException {
+    public SQSMessageConsumer createReceiver(Queue queue, String messageSelector) throws JMSException {
         return createReceiver(queue);
     }
 
@@ -250,8 +245,8 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed
      */
     @Override
-    public QueueSender createSender(Queue queue) throws JMSException {
-        return (QueueSender) createProducer(queue);
+    public SQSMessageProducer createSender(Queue queue) throws JMSException {
+        return createProducer(queue);
     }
 
     /**
@@ -261,7 +256,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or internal error
      */
     @Override
-    public BytesMessage createBytesMessage() throws JMSException {
+    public SQSBytesMessage createBytesMessage() throws JMSException {
         checkClosed();
         return new SQSBytesMessage();
     }
@@ -283,7 +278,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or internal error
      */
     @Override
-    public ObjectMessage createObjectMessage() throws JMSException {
+    public SQSObjectMessage createObjectMessage() throws JMSException {
         checkClosed();
         return new SQSObjectMessage();
     }
@@ -296,7 +291,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or internal error
      */
     @Override
-    public ObjectMessage createObjectMessage(Serializable object) throws JMSException {
+    public SQSObjectMessage createObjectMessage(Serializable object) throws JMSException {
         checkClosed();
         return new SQSObjectMessage(object);
     }
@@ -308,7 +303,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or internal error
      */
     @Override
-    public TextMessage createTextMessage() throws JMSException {
+    public SQSTextMessage createTextMessage() throws JMSException {
         checkClosed();
         return new SQSTextMessage();
     }
@@ -321,7 +316,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or internal error
      */
     @Override
-    public TextMessage createTextMessage(String text) throws JMSException {
+    public SQSTextMessage createTextMessage(String text) throws JMSException {
         checkClosed();
         return new SQSTextMessage(text);
     }
@@ -469,7 +464,7 @@ public class SQSSession implements Session, QueueSession {
         Map<String, Set<String>> queueToGroupsMapping = getAffectedGroupsPerQueueUrl(unAckedMessages);
 
         for (SQSMessageConsumer consumer : this.messageConsumers) {
-            SQSQueueDestination sqsQueue = (SQSQueueDestination) consumer.getQueue();
+            SQSQueueDestination sqsQueue = consumer.getQueue();
             Set<String> affectedGroups = queueToGroupsMapping.get(sqsQueue.getQueueUrl());
             if (affectedGroups != null) {
                 unAckedMessages.addAll(consumer.purgePrefetchedMessagesWithGroups(affectedGroups));
@@ -509,7 +504,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or queue destination is not used
      */
     @Override
-    public MessageProducer createProducer(Destination destination) throws JMSException {
+    public SQSMessageProducer createProducer(Destination destination) throws JMSException {
         checkClosed();
         if (destination != null && !(destination instanceof SQSQueueDestination)) {
             throw new JMSException("Actual type of Destination/Queue has to be SQSQueueDestination");
@@ -532,7 +527,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or queue destination is not used
      */
     @Override
-    public MessageConsumer createConsumer(Destination destination) throws JMSException {
+    public SQSMessageConsumer createConsumer(Destination destination) throws JMSException {
         checkClosed();
         if (!(destination instanceof SQSQueueDestination sqsQueueDestination)) {
             throw new JMSException("Actual type of Destination/Queue has to be SQSQueueDestination");
@@ -568,7 +563,7 @@ public class SQSSession implements Session, QueueSession {
      */
 
     @Override
-    public MessageConsumer createConsumer(Destination destination, String messageSelector) throws JMSException {
+    public SQSMessageConsumer createConsumer(Destination destination, String messageSelector) throws JMSException {
         if (messageSelector != null) {
             throw new JMSException("SQSSession does not support MessageSelector. This should be null.");
         }
@@ -587,7 +582,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or queue destination is not used
      */
     @Override
-    public MessageConsumer createConsumer(Destination destination, String messageSelector, boolean NoLocal) throws JMSException {
+    public SQSMessageConsumer createConsumer(Destination destination, String messageSelector, boolean NoLocal) throws JMSException {
         if (messageSelector != null) {
             throw new JMSException("SQSSession does not support MessageSelector. This should be null.");
         }
@@ -613,7 +608,7 @@ public class SQSSession implements Session, QueueSession {
      * @throws JMSException If session is closed or invalid queue is provided
      */
     @Override
-    public Queue createQueue(String queueName) throws JMSException {
+    public SQSQueueDestination createQueue(String queueName) throws JMSException {
         checkClosed();
         return new SQSQueueDestination(queueName, amazonSQSClient.getQueueUrl(queueName).queueUrl());
     }
@@ -628,7 +623,7 @@ public class SQSSession implements Session, QueueSession {
      * @return a queue destination
      * @throws JMSException If session is closed or invalid queue is provided
      */
-    public Queue createQueue(String queueName, String ownerAccountId) throws JMSException {
+    public SQSQueueDestination createQueue(String queueName, String ownerAccountId) throws JMSException {
         checkClosed();
         return new SQSQueueDestination(
                 queueName, amazonSQSClient.getQueueUrl(queueName, ownerAccountId).queueUrl());

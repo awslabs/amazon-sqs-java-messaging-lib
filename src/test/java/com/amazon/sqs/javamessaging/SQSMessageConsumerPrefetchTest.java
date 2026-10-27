@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ public class SQSMessageConsumerPrefetchTest {
                     //after we return 'isClosed() == true' we will empty the prefetch queue while nacking messages
                     assertEquals(numMessages, consumerPrefetch.messageQueue.size());
                     for (MessageManager messageManager : consumerPrefetch.messageQueue) {
-                        SQSMessage sqsMessage = (SQSMessage) messageManager.message();
+                        SQSMessage sqsMessage = messageManager.message();
                         assertTrue(receipt.contains(sqsMessage.getReceiptHandle()));
                     }
 
@@ -169,7 +169,7 @@ public class SQSMessageConsumerPrefetchTest {
         // Ensure message queue was filled with expected messages
         assertEquals(numMessages, consumerPrefetch.messageQueue.size());
         for (SQSMessageConsumerPrefetch.MessageManager messageManager : consumerPrefetch.messageQueue) {
-            SQSMessage sqsMessage = (SQSMessage) messageManager.message();
+            SQSMessage sqsMessage = messageManager.message();
             assertTrue(receipt.contains(sqsMessage.getReceiptHandle()));
         }
     }
@@ -484,8 +484,8 @@ public class SQSMessageConsumerPrefetchTest {
     @MethodSource("prefetchParameters")
     public void testSetMessageListener(int numberOfMessagesToPrefetch) {
         init(numberOfMessagesToPrefetch);
-        SQSMessageConsumerPrefetch.MessageManager msgManager1 = new SQSMessageConsumerPrefetch.MessageManager(null, mock(jakarta.jms.Message.class));
-        SQSMessageConsumerPrefetch.MessageManager msgManager2 = new SQSMessageConsumerPrefetch.MessageManager(null, mock(jakarta.jms.Message.class));
+        SQSMessageConsumerPrefetch.MessageManager msgManager1 = new SQSMessageConsumerPrefetch.MessageManager(null, mock(SQSMessage.class));
+        SQSMessageConsumerPrefetch.MessageManager msgManager2 = new SQSMessageConsumerPrefetch.MessageManager(null, mock(SQSMessage.class));
 
         consumerPrefetch.messageQueue.add(msgManager1);
         consumerPrefetch.messageQueue.add(msgManager2);
@@ -798,7 +798,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jsmMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jsmMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -839,7 +839,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jsmMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jsmMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -928,7 +928,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jsmMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jsmMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -1009,7 +1009,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jsmMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jsmMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -1082,7 +1082,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Call receive messages
          */
-        SQSMessage msg = (SQSMessage) consumerPrefetch.receive();
+        SQSMessage msg = consumerPrefetch.receive();
 
         /*
          * Verify results
@@ -1148,7 +1148,7 @@ public class SQSMessageConsumerPrefetchTest {
         executorService.execute(() -> {
             try {
                 beforeReceiveCall.countDown();
-                jakarta.jms.Message msg = consumerPrefetch.receive(0);
+                SQSMessage msg = consumerPrefetch.receive(0);
                 if (msg == null) {
                     noMessageReturned.set(true);
                 }
@@ -1198,7 +1198,7 @@ public class SQSMessageConsumerPrefetchTest {
         executorService.execute(() -> {
             try {
                 beforeReceiveCall.countDown();
-                SQSMessage msg = (SQSMessage) consumerPrefetch.receive(0);
+                SQSMessage msg = consumerPrefetch.receive(0);
                 if ((msg != null) && (msg.getReceiptHandle().equals(receiptHandle))) {
                     messageReceived.set(true);
                 }
@@ -1245,7 +1245,7 @@ public class SQSMessageConsumerPrefetchTest {
         /*
          * Call receive messages
          */
-        SQSMessage msg = (SQSMessage) consumerPrefetch.receive(waitTime);
+        SQSMessage msg = consumerPrefetch.receive(waitTime);
 
         assertNull(msg);
 
@@ -1321,7 +1321,7 @@ public class SQSMessageConsumerPrefetchTest {
 
         while (!consumerPrefetch.messageQueue.isEmpty()) {
             SQSMessageConsumerPrefetch.MessageManager msgManager = consumerPrefetch.messageQueue.pollFirst();
-            SQSMessage msg = (SQSMessage) msgManager.message();
+            SQSMessage msg = msgManager.message();
             assertTrue(receiptHandlers.contains(msg.getReceiptHandle()));
         }
 
@@ -1810,10 +1810,10 @@ public class SQSMessageConsumerPrefetchTest {
         }).when(consumerPrefetch).requestMessage();
 
         // Close the prefetcher immediately after completing one loop
-        final List<Future<jakarta.jms.Message>> receivedMessageFutures = new ArrayList<>();
+        final List<Future<SQSMessage>> receivedMessageFutures = new ArrayList<>();
         doAnswer((Answer<Object>) invocation -> {
             invocation.callRealMethod();
-            for (Future<jakarta.jms.Message> messageFuture : receivedMessageFutures) {
+            for (Future<SQSMessage> messageFuture : receivedMessageFutures) {
                 assertNotNull(messageFuture.get());
             }
             consumerPrefetch.close();
@@ -1867,7 +1867,7 @@ public class SQSMessageConsumerPrefetchTest {
                     .receiptHandle(receiptHandler)
                     .attributes(mapAttributes)
                     .build();
-            jakarta.jms.Message m1 = consumerPrefetch.convertToJMSMessage(message);
+            SQSMessage m1 = consumerPrefetch.convertToJMSMessage(message);
             SQSMessageConsumerPrefetch.MessageManager msgManager = new SQSMessageConsumerPrefetch.MessageManager(null, m1);
 
             consumerPrefetch.messageQueue.add(msgManager);

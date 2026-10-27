@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -273,7 +273,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         List<MessageManager> messageManagers = new ArrayList<>();
         for (Message message : messages) {
             try {
-                jakarta.jms.Message jmsMessage = convertToJMSMessage(message);
+                SQSMessage jmsMessage = convertToJMSMessage(message);
                 messageManagers.add(new MessageManager(this, jmsMessage));
             } catch (JMSException e) {
                 LOG.warn("Caught exception while converting received messages", e);
@@ -337,10 +337,10 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
      * @return Converted JMS message
      * @throws JMSException
      */
-    protected jakarta.jms.Message convertToJMSMessage(Message message) throws JMSException {
+    protected SQSMessage convertToJMSMessage(Message message) throws JMSException {
         MessageAttributeValue messageTypeAttribute = message.messageAttributes().get(
                 SQSMessage.JMS_SQS_MESSAGE_TYPE);
-        jakarta.jms.Message jmsMessage;
+        SQSMessage jmsMessage;
         if (messageTypeAttribute == null) {
             jmsMessage = new SQSTextMessage(acknowledger, queueUrl, message);
         } else {
@@ -457,15 +457,15 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         }
     }
 
-    public record MessageManager(PrefetchManager prefetchManager, jakarta.jms.Message message) {
+    public record MessageManager(PrefetchManager prefetchManager, SQSMessage message) {
 
     }
 
-    jakarta.jms.Message receive() throws JMSException {
+    SQSMessage receive() throws JMSException {
         return receive(0);
     }
 
-    jakarta.jms.Message receive(long timeout) throws JMSException {
+    SQSMessage receive(long timeout) throws JMSException {
         if (cannotDeliver()) {
             return null;
         }
@@ -516,7 +516,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
         }
     }
 
-    jakarta.jms.Message receiveNoWait() throws JMSException {
+    SQSMessage receiveNoWait() throws JMSException {
         if (cannotDeliver()) {
             return null;
         }
@@ -571,11 +571,11 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
     /**
      * Helper that notifies PrefetchThread that message is dispatched and AutoAcknowledge
      */
-    private jakarta.jms.Message messageHandler(MessageManager messageManager) throws JMSException {
+    private SQSMessage messageHandler(MessageManager messageManager) throws JMSException {
         if (messageManager == null) {
             return null;
         }
-        jakarta.jms.Message message = messageManager.message();
+        SQSMessage message = messageManager.message();
 
         // Notify PrefetchThread that message is dispatched
         this.messageDispatched();
@@ -616,7 +616,7 @@ public class SQSMessageConsumerPrefetch implements Runnable, PrefetchManager {
             Iterator<MessageManager> managerIterator = messageQueue.iterator();
             while (managerIterator.hasNext()) {
                 MessageManager messageManager = managerIterator.next();
-                SQSMessage prefetchedMessage = (SQSMessage)messageManager.message();
+                SQSMessage prefetchedMessage = messageManager.message();
                 SQSMessageIdentifier messageIdentifier = SQSMessageIdentifier.fromSQSMessage(prefetchedMessage);
 
                 //is the prefetch entry for one of the affected group ids?

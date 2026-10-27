@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -150,7 +150,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         int index = 0;
         for (SQSMessageConsumerPrefetch.MessageManager messageManager : consumerPrefetch.messageQueue) {
             Message mockedMessage = messages.get(index);
-            SQSMessage sqsMessage = (SQSMessage) messageManager.message();
+            SQSMessage sqsMessage = messageManager.message();
             assertEquals(mockedMessage.receiptHandle(), sqsMessage.getReceiptHandle(),
                     "Receipt handle is the same");
             assertEquals(
@@ -193,7 +193,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -234,7 +234,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -315,7 +315,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results
@@ -389,7 +389,7 @@ public class SQSMessageConsumerPrefetchFifoTest {
         /*
          * Convert the SQS message to JMS Message
          */
-        jakarta.jms.Message jmsMessage = consumerPrefetch.convertToJMSMessage(message);
+        SQSMessage jmsMessage = consumerPrefetch.convertToJMSMessage(message);
 
         /*
          * Verify results

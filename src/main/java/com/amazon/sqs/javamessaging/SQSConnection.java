@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import jakarta.jms.InvalidClientIDException;
 import jakarta.jms.JMSException;
 import jakarta.jms.Queue;
 import jakarta.jms.QueueConnection;
-import jakarta.jms.QueueSession;
 import jakarta.jms.ServerSessionPool;
 import jakarta.jms.Session;
 import jakarta.jms.Topic;
@@ -155,8 +154,8 @@ public class SQSConnection implements Connection, QueueConnection {
      *             transaction and acknowledge mode.
      */
     @Override
-    public QueueSession createQueueSession(boolean transacted, int acknowledgeMode) throws JMSException {
-        return (QueueSession) createSession(transacted, acknowledgeMode);
+    public SQSSession createQueueSession(boolean transacted, int acknowledgeMode) throws JMSException {
+        return createSession(transacted, acknowledgeMode);
     }
     
     /**
@@ -176,7 +175,7 @@ public class SQSConnection implements Connection, QueueConnection {
      *             transaction and acknowledge mode.
      */
     @Override
-    public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
+    public SQSSession createSession(boolean transacted, int acknowledgeMode) throws JMSException {
         checkClosed();
         actionOnConnectionTaken = true;
         if (transacted || acknowledgeMode == Session.SESSION_TRANSACTED)
@@ -216,12 +215,12 @@ public class SQSConnection implements Connection, QueueConnection {
     }
 
     @Override
-    public Session createSession(int sessionMode) throws JMSException {
+    public SQSSession createSession(int sessionMode) throws JMSException {
         return createSession(false, sessionMode);
     }
 
     @Override
-    public Session createSession() throws JMSException {
+    public SQSSession createSession() throws JMSException {
         throw new JMSException(SQSMessagingClientConstants.UNSUPPORTED_METHOD);
     }
 

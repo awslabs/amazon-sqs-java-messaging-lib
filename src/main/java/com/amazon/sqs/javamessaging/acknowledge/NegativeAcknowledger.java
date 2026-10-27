@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package com.amazon.sqs.javamessaging.acknowledge;
 import com.amazon.sqs.javamessaging.AmazonSQSMessagingClientWrapper;
 import com.amazon.sqs.javamessaging.SQSMessageConsumerPrefetch.MessageManager;
 import com.amazon.sqs.javamessaging.SQSMessagingClientConstants;
-import com.amazon.sqs.javamessaging.message.SQSMessage;
 import jakarta.jms.JMSException;
 import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
 import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
@@ -59,7 +58,7 @@ public class NegativeAcknowledger extends BulkSQSOperation {
     public void bulkAction(ArrayDeque<MessageManager> messageQueue, String queueUrl) throws JMSException {
         List<String> receiptHandles = new ArrayList<>();
         while (!messageQueue.isEmpty()) {
-            receiptHandles.add(((SQSMessage) (messageQueue.pollFirst().message())).getReceiptHandle());
+            receiptHandles.add(messageQueue.pollFirst().message().getReceiptHandle());
 
             // If there is more than 10 stop can call action
             if (receiptHandles.size() == SQSMessagingClientConstants.MAX_BATCH) {
